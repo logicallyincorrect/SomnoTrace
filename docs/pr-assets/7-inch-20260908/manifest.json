@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "source": "historical per-layer QEMU captures for the local 12-PR stack",
+  "files": [
+    {
+      "path": "docs/pr-assets/7-inch-20260908/screenshots/05/original-graph-20260908.png",
+      "sha256": "af01e2cc757519423aa379e3e278b9f6328314c2f0b4597e199875692a99e8df",
+      "bytes": 11763
+    },
+    {
+      "path": "docs/pr-assets/7-inch-20260908/screenshots/05/original-status-20260908.png",
+      "sha256": "111d41a618488eb6c5968cfc7d08f0640c4d87338f843667065a902c9448e9d7",
+      "bytes": 7298
+    },
+    {
+      "path": "docs/pr-assets/7-inch-20260908/screenshots/05/status-20260908.png",
+      "sha256": "9a23b23b79ec61d604e63b1ebcfdd96043453f3d5520df9d4ef37ce9f8e3a1c4",
+      "bytes": 25883
+    },
+    {
+      "path": "docs/pr-assets/7-inch-20260908/screenshots/06/home-20260908.png",
+      "sha256": "16f3299c7a76d5cfee1e7cb3958ebe0d7ac203be4db15eff64614fbb4585bc0f",
+      "bytes": 75034
+    },
+    {
+      "path": "docs/pr-assets/7-inch-20260908/screenshots/07/logs-20260908.png",
+      "sha256": "4f410a28ab46c74186a4c5af7a3946df5150a81e0494156c6dfcaf153e961ee9",
+      "bytes": 78177
+    },
+    {
+      "path": "docs/pr-assets/7-inch-20260908/screenshots/08/setup-wifi-20260908.png",
+      "sha256": "7138bee5a6d2de96ecd464842a7ce712c99ecaccc6bd699b3f33c585758dffc4",
+      "bytes": 58013
+    },
+    {
+      "path": "docs/pr-assets/7-inch-20260908/screenshots/10/history-20260908.png",
+      "sha256": "0b04d556c2234c5bd782c35a462493a50045e654354bcd45cae0fc6a02d608d2",
+      "bytes": 79747
+    },
+    {
+      "path": "docs/pr-assets/7-inch-20260908/screenshots/10/history-zoom-20260908.png",
+      "sha256": "0710f5917c94f59a94eb9607a7b595d1bd8990a34b669cd59a8373720bc1621b",
+      "bytes": 79685
+    },
+    {
+      "path": "docs/pr-assets/7-inch-20260908/screenshots/11/connectivity-overview-20260908.png",
+      "sha256": "d240f51ace47ecefd8b6246603694a1e2d8bb143521b3b7f7884d15644e046b7",
+      "bytes": 60305
+    },
+    {
+      "path": "docs/pr-assets/7-inch-20260908/screenshots/11/devices-20260908.png",
+      "sha256": "cf3a858702e13497633791e487e1952cc7457ce8c473f8462f9b883575503f3f",
+      "bytes": 52587
+    },
+    {
+      "path": "docs/pr-assets/7-inch-20260908/screenshots/12/advanced-overview-20260908.png",
+      "sha256": "892a695f008fe57770a9bd98079c1ecbcb782cf95fdd7f5de469f529c09e8311",
+      "bytes": 62620
+    },
+    {
+      "path": "docs/pr-assets/7-inch-20260908/screenshots/12/diagnostics-overview-20260908.png",
+      "sha256": "ad4075aed9dc629389c5278ca5ad47b923590176c7e7e999f509bc2ab3abc16f",
+      "bytes": 62364
+    },
+    {
+      "path": "docs/pr-assets/7-inch-20260908/screenshots/12/home-20260908.png",
+      "sha256": "81b0f044b39e1a9f891d0f3296ab4e9e82e4a1fd73f97d36eb55d438ecf740ea",
+      "bytes": 76919
+    },
+    {
+      "path": "docs/pr-assets/7-inch-20260908/screenshots/12/system-overview-20260908.png",
+      "sha256": "6c5802719f69fbf4c3baf1a3576e43fde54848c72f151e3ddcd2bdde8f3aeddb",
+      "bytes": 49961
+    }
+  ]
+}
