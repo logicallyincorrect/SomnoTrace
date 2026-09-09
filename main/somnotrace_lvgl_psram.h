@@ -6,16 +6,14 @@
 
 static inline void *somnotrace_lvgl_alloc(size_t size)
 {
-    return heap_caps_malloc_prefer(size, 2,
-                                   MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT,
-                                   MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    return heap_caps_malloc_prefer(
+        size, 2, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
 }
 
 static inline void *somnotrace_lvgl_realloc(void *ptr, size_t size)
 {
-    return heap_caps_realloc_prefer(ptr, size, 2,
-                                    MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT,
-                                    MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    return heap_caps_realloc_prefer(
+        ptr, size, 2, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
 }
 
 static inline void somnotrace_lvgl_free(void *ptr)

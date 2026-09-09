@@ -40,7 +40,7 @@
 #include "bsp_display.h"
 #include "sdkconfig.h"
 #if CONFIG_SOMNOTRACE_BOARD_WAVESHARE_7B
-#include "board_waveshare_7b.h"
+#include "board_storage.h"
 #endif
 
 static const char *TAG = "sd_storage";
@@ -89,8 +89,8 @@ static void capacity_cache_store(uint64_t free_bytes, uint64_t total_bytes)
  * A night of raw stream data is ~3-4 MB, plus derived EDFs.  The reserve
  * keeps enough room for the session about to start plus its recovery
  * metadata; the floor is the point at which recording is refused. */
-#define SD_RESERVE_BYTES   (24ULL * 1024 * 1024)   /* warn below 24 MB  */
-#define SD_FLOOR_BYTES     (8ULL * 1024 * 1024)    /* refuse below 8 MB */
+#define SD_RESERVE_BYTES (24ULL * 1024 * 1024) /* warn below 24 MB  */
+#define SD_FLOOR_BYTES (8ULL * 1024 * 1024)    /* refuse below 8 MB */
 
 /* Explicit cluster size for f_mkfs.  This MUST be set: passing 0 lets ESP-IDF
  * default it to the 512-byte sector size, and on a 32-64 GB card that means
@@ -99,11 +99,11 @@ static void capacity_cache_store(uint64_t free_bytes, uint64_t total_bytes)
  * minutes and trips the task watchdog, so "Format SD" appears to do nothing.
  * 32 KB is the normal cluster size for this capacity and keeps the FAT small
  * enough to write in a few seconds. */
-#define SD_FORMAT_ALLOC_UNIT  (32 * 1024)
+#define SD_FORMAT_ALLOC_UNIT (32 * 1024)
 
 /* ── Arbitration state ────────────────────────────────────────────── */
-static SemaphoreHandle_t s_lease_mutex = NULL;   /* guards the counters  */
-static SemaphoreHandle_t s_export_sem = NULL;    /* EXPORT/DESTRUCTIVE   */
+static SemaphoreHandle_t s_lease_mutex = NULL; /* guards the counters  */
+static SemaphoreHandle_t s_export_sem = NULL;  /* EXPORT/DESTRUCTIVE   */
 static volatile int s_recording = 0;
 static volatile int s_recording_waiters = 0;
 static uint32_t s_recording_intents = 0;
@@ -115,11 +115,13 @@ static volatile int s_destructive = 0;
 
 static void lease_init_once(void)
 {
-    if (!s_lease_mutex) s_lease_mutex = xSemaphoreCreateMutex();
+    if (!s_lease_mutex)
+        s_lease_mutex = xSemaphoreCreateMutex();
     /* Recursive: a day rebuild holds the export lease across the whole
      * transaction and calls the per-session generator inside it, which takes
      * the same lease.  A plain mutex would self-deadlock. */
-    if (!s_export_sem) s_export_sem = xSemaphoreCreateRecursiveMutex();
+    if (!s_export_sem)
+        s_export_sem = xSemaphoreCreateRecursiveMutex();
 }
 
 /* Shared SDMMC host/slot configuration for the Waveshare ESP32-S3-Touch-LCD-1.54.
@@ -137,20 +139,20 @@ static void sdmmc_config_default(sdmmc_host_t *host, sdmmc_slot_config_t *slot)
 #if CONFIG_SOMNOTRACE_BOARD_WAVESHARE_7B
     /* The 7B routes its TF socket as one-bit SD: CLK=12, CMD=11, D0=13.
      * DAT3/CS is held high by EXIO4 on the CH32V003 I/O controller. */
-    s.clk   = GPIO_NUM_12;
-    s.cmd   = GPIO_NUM_11;
-    s.d0    = GPIO_NUM_13;
-    s.d1    = GPIO_NUM_NC;
-    s.d2    = GPIO_NUM_NC;
-    s.d3    = GPIO_NUM_NC;
+    s.clk = GPIO_NUM_12;
+    s.cmd = GPIO_NUM_11;
+    s.d0 = GPIO_NUM_13;
+    s.d1 = GPIO_NUM_NC;
+    s.d2 = GPIO_NUM_NC;
+    s.d3 = GPIO_NUM_NC;
     s.width = 1;
 #else
-    s.clk   = GPIO_NUM_16;
-    s.cmd   = GPIO_NUM_15;
-    s.d0    = GPIO_NUM_17;
-    s.d1    = GPIO_NUM_18;
-    s.d2    = GPIO_NUM_13;
-    s.d3    = GPIO_NUM_14;
+    s.clk = GPIO_NUM_16;
+    s.cmd = GPIO_NUM_15;
+    s.d0 = GPIO_NUM_17;
+    s.d1 = GPIO_NUM_18;
+    s.d2 = GPIO_NUM_13;
+    s.d3 = GPIO_NUM_14;
     s.width = 4;
 #endif
     /* Internal pull-ups are often too weak for SD cards.
@@ -159,29 +161,26 @@ static void sdmmc_config_default(sdmmc_host_t *host, sdmmc_slot_config_t *slot)
     *slot = s;
 }
 
-static esp_err_t sdmmc_mount_with_fallback(
-    sdmmc_host_t *host,
-    sdmmc_slot_config_t *slot,
-    const esp_vfs_fat_sdmmc_mount_config_t *mount_config,
-    sdmmc_card_t **card)
+static esp_err_t sdmmc_mount_with_fallback(sdmmc_host_t *host,
+                                           sdmmc_slot_config_t *slot,
+                                           const esp_vfs_fat_sdmmc_mount_config_t *mount_config,
+                                           sdmmc_card_t **card)
 {
-    esp_err_t ret = esp_vfs_fat_sdmmc_mount(
-        SD_MOUNT_POINT, host, slot, mount_config, card);
+    esp_err_t ret = esp_vfs_fat_sdmmc_mount(SD_MOUNT_POINT, host, slot, mount_config, card);
 
     if (ret != ESP_OK && slot->width != 1) {
-        ESP_LOGW(TAG, "4-bit mount failed (%s), trying 1-bit high speed",
-                 esp_err_to_name(ret));
+        ESP_LOGW(TAG, "4-bit mount failed (%s), trying 1-bit high speed", esp_err_to_name(ret));
         slot->width = 1;
-        ret = esp_vfs_fat_sdmmc_mount(
-            SD_MOUNT_POINT, host, slot, mount_config, card);
+        ret = esp_vfs_fat_sdmmc_mount(SD_MOUNT_POINT, host, slot, mount_config, card);
     }
 
     if (ret != ESP_OK && host->max_freq_khz > SDMMC_FREQ_DEFAULT) {
-        ESP_LOGW(TAG, "high-speed mount failed (%s), trying %d kHz",
-                 esp_err_to_name(ret), SDMMC_FREQ_DEFAULT);
+        ESP_LOGW(TAG,
+                 "high-speed mount failed (%s), trying %d kHz",
+                 esp_err_to_name(ret),
+                 SDMMC_FREQ_DEFAULT);
         host->max_freq_khz = SDMMC_FREQ_DEFAULT;
-        ret = esp_vfs_fat_sdmmc_mount(
-            SD_MOUNT_POINT, host, slot, mount_config, card);
+        ret = esp_vfs_fat_sdmmc_mount(SD_MOUNT_POINT, host, slot, mount_config, card);
     }
     return ret;
 }
@@ -191,7 +190,7 @@ esp_err_t sd_storage_init(void)
     sd_storage_content_changed();
     capacity_cache_invalidate();
 #if CONFIG_SOMNOTRACE_BOARD_WAVESHARE_7B
-    esp_err_t prep = waveshare_7b_prepare_sd();
+    esp_err_t prep = board_storage_prepare();
     if (prep != ESP_OK) {
         ESP_LOGE(TAG, "failed to enable 7B TF interface: %s", esp_err_to_name(prep));
         bsp_display_set_sd_ready(false);
@@ -201,7 +200,6 @@ esp_err_t sd_storage_init(void)
 #else
     ESP_LOGI(TAG, "initialising SDMMC 4-bit mode...");
 #endif
-
 
     sdmmc_host_t host;
     sdmmc_slot_config_t slot_config;
@@ -214,8 +212,7 @@ esp_err_t sd_storage_init(void)
     };
 
     sdmmc_card_t *card;
-    esp_err_t ret = sdmmc_mount_with_fallback(
-        &host, &slot_config, &mount_config, &card);
+    esp_err_t ret = sdmmc_mount_with_fallback(&host, &slot_config, &mount_config, &card);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "failed to mount SD card: %s (0x%x)", esp_err_to_name(ret), ret);
 #if CONFIG_SOMNOTRACE_BOARD_WAVESHARE_7B
@@ -271,7 +268,8 @@ bool sd_storage_is_ready(void)
 
 esp_err_t sd_storage_get_free(uint64_t *free_bytes, uint64_t *total_bytes)
 {
-    if (!s_mounted) return ESP_ERR_INVALID_STATE;
+    if (!s_mounted)
+        return ESP_ERR_INVALID_STATE;
 
     FATFS *fs = NULL;
     DWORD free_clst = 0;
@@ -282,8 +280,10 @@ esp_err_t sd_storage_get_free(uint64_t *free_bytes, uint64_t *total_bytes)
     uint64_t total = (uint64_t)(fs->n_fatent - 2) * fs->csize * fs->ssize;
     uint64_t free = (uint64_t)free_clst * fs->csize * fs->ssize;
     capacity_cache_store(free, total);
-    if (total_bytes) *total_bytes = total;
-    if (free_bytes) *free_bytes = free;
+    if (total_bytes)
+        *total_bytes = total;
+    if (free_bytes)
+        *free_bytes = free;
     return ESP_OK;
 }
 
@@ -293,8 +293,10 @@ bool sd_storage_get_cached_free(uint64_t *free_bytes, uint64_t *total_bytes)
     portENTER_CRITICAL(&s_capacity_lock);
     valid = s_capacity_cache_valid;
     if (valid) {
-        if (free_bytes) *free_bytes = s_cached_free_bytes;
-        if (total_bytes) *total_bytes = s_cached_total_bytes;
+        if (free_bytes)
+            *free_bytes = s_cached_free_bytes;
+        if (total_bytes)
+            *total_bytes = s_cached_total_bytes;
     }
     portEXIT_CRITICAL(&s_capacity_lock);
     return valid;
@@ -316,7 +318,8 @@ static uint64_t reclaim_derived_output(void)
 
 bool sd_storage_reserve_for_recording(void)
 {
-    if (!s_mounted) return false;
+    if (!s_mounted)
+        return false;
 
     uint64_t free_bytes = 0, total = 0;
     if (!sd_storage_get_cached_free(&free_bytes, &total)) {
@@ -327,16 +330,19 @@ bool sd_storage_reserve_for_recording(void)
         return true;
     }
 
-    if (free_bytes >= SD_RESERVE_BYTES) return true;
+    if (free_bytes >= SD_RESERVE_BYTES)
+        return true;
 
-    ESP_LOGW(TAG, "low free space: %llu KB free of %llu KB",
+    ESP_LOGW(TAG,
+             "low free space: %llu KB free of %llu KB",
              (unsigned long long)(free_bytes / 1024),
              (unsigned long long)(total / 1024));
 
     if (free_bytes < SD_FLOOR_BYTES) {
         free_bytes = reclaim_derived_output();
         if (free_bytes < SD_FLOOR_BYTES) {
-            ESP_LOGE(TAG, "below hard floor (%llu KB) — refusing to record",
+            ESP_LOGE(TAG,
+                     "below hard floor (%llu KB) — refusing to record",
                      (unsigned long long)(free_bytes / 1024));
             bsp_display_set_critical_notice("microSD full");
             return false;
@@ -351,23 +357,23 @@ bool sd_storage_reserve_for_recording(void)
 
 bool sd_storage_reserve_for_recording_cached(void)
 {
-    if (!s_mounted) return false;
+    if (!s_mounted)
+        return false;
     uint64_t free_bytes = 0;
     /* Match the existing missing-cache admission policy without probing FAT,
      * reclaiming output, or calling a display notice from an ingest callback. */
-    return !sd_storage_get_cached_free(&free_bytes, NULL) ||
-           free_bytes >= SD_FLOOR_BYTES;
+    return !sd_storage_get_cached_free(&free_bytes, NULL) || free_bytes >= SD_FLOOR_BYTES;
 }
 
 bool sd_storage_recording_try_begin(void)
 {
     /* Mount initializes arbitration. A notification retry must not allocate
      * mutexes, poll a reader, or wait behind another arbitration transition. */
-    if (!s_export_sem || !s_lease_mutex ||
-        xSemaphoreTake(s_lease_mutex, 0) != pdTRUE)
+    if (!s_export_sem || !s_lease_mutex || xSemaphoreTake(s_lease_mutex, 0) != pdTRUE)
         return false;
     bool claimed = s_destructive == 0 && s_uploading == 0;
-    if (claimed) __atomic_add_fetch(&s_recording, 1, __ATOMIC_RELEASE);
+    if (claimed)
+        __atomic_add_fetch(&s_recording, 1, __ATOMIC_RELEASE);
     xSemaphoreGive(s_lease_mutex);
     return claimed;
 }
@@ -375,10 +381,11 @@ bool sd_storage_recording_try_begin(void)
 bool sd_storage_recording_begin(void)
 {
     lease_init_once();
-    if (!s_lease_mutex) return false;
+    if (!s_lease_mutex)
+        return false;
 
-    const int64_t deadline_us = esp_timer_get_time() +
-        (int64_t)SD_RECORDING_PRIORITY_WAIT_MS * 1000;
+    const int64_t deadline_us =
+        esp_timer_get_time() + (int64_t)SD_RECORDING_PRIORITY_WAIT_MS * 1000;
     xSemaphoreTake(s_lease_mutex, portMAX_DELAY);
     __atomic_add_fetch(&s_recording_waiters, 1, __ATOMIC_RELEASE);
     bool claimed = false;
@@ -406,11 +413,13 @@ void sd_storage_recording_end(void)
 {
     sd_storage_content_changed();
     if (!s_lease_mutex) {
-        if (s_recording > 0) __atomic_sub_fetch(&s_recording, 1, __ATOMIC_RELEASE);
+        if (s_recording > 0)
+            __atomic_sub_fetch(&s_recording, 1, __ATOMIC_RELEASE);
         return;
     }
     xSemaphoreTake(s_lease_mutex, portMAX_DELAY);
-    if (s_recording > 0) __atomic_sub_fetch(&s_recording, 1, __ATOMIC_RELEASE);
+    if (s_recording > 0)
+        __atomic_sub_fetch(&s_recording, 1, __ATOMIC_RELEASE);
     xSemaphoreGive(s_lease_mutex);
 }
 
@@ -422,19 +431,26 @@ bool sd_storage_recording_active(void)
 void sd_storage_recording_intent_begin(void)
 {
     lease_init_once();
-    if (s_lease_mutex) xSemaphoreTake(s_lease_mutex, portMAX_DELAY);
+    if (s_lease_mutex)
+        xSemaphoreTake(s_lease_mutex, portMAX_DELAY);
     __atomic_add_fetch(&s_recording_intents, 1U, __ATOMIC_RELEASE);
-    if (s_lease_mutex) xSemaphoreGive(s_lease_mutex);
+    if (s_lease_mutex)
+        xSemaphoreGive(s_lease_mutex);
 }
 
 void sd_storage_recording_intent_end(void)
 {
-    if (s_lease_mutex) xSemaphoreTake(s_lease_mutex, portMAX_DELAY);
+    if (s_lease_mutex)
+        xSemaphoreTake(s_lease_mutex, portMAX_DELAY);
     uint32_t count = __atomic_load_n(&s_recording_intents, __ATOMIC_ACQUIRE);
     /* Also safe before the arbitration mutex exists; never underflow. */
-    while (count && !__atomic_compare_exchange_n(&s_recording_intents,
-            &count, count - 1, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED)) {}
-    if (s_lease_mutex) xSemaphoreGive(s_lease_mutex);
+    while (
+        count &&
+        !__atomic_compare_exchange_n(
+            &s_recording_intents, &count, count - 1, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED)) {
+    }
+    if (s_lease_mutex)
+        xSemaphoreGive(s_lease_mutex);
 }
 
 bool sd_storage_recording_pending(void)
@@ -446,7 +462,8 @@ bool sd_storage_recording_pending(void)
 bool sd_storage_lease_acquire(sd_lease_t role, uint32_t timeout_ms)
 {
     lease_init_once();
-    if (!s_export_sem || !s_lease_mutex) return true;   /* pre-init: allow */
+    if (!s_export_sem || !s_lease_mutex)
+        return true; /* pre-init: allow */
 
     TickType_t wait = pdMS_TO_TICKS(timeout_ms);
 
@@ -461,8 +478,8 @@ bool sd_storage_lease_acquire(sd_lease_t role, uint32_t timeout_ms)
             return false;
         }
         xSemaphoreTake(s_lease_mutex, portMAX_DELAY);
-        if (s_recording > 0 || sd_storage_recording_pending() ||
-            s_uploading > 0 || s_destructive > 0) {
+        if (s_recording > 0 || sd_storage_recording_pending() || s_uploading > 0 ||
+            s_destructive > 0) {
             xSemaphoreGive(s_lease_mutex);
             xSemaphoreGiveRecursive(s_export_sem);
             ESP_LOGW(TAG, "destructive op refused: card owner active");
@@ -491,8 +508,7 @@ bool sd_storage_lease_acquire(sd_lease_t role, uint32_t timeout_ms)
             return false;
         }
         xSemaphoreTake(s_lease_mutex, portMAX_DELAY);
-        if (s_recording > 0 || sd_storage_recording_pending() ||
-            s_destructive > 0) {
+        if (s_recording > 0 || sd_storage_recording_pending() || s_destructive > 0) {
             xSemaphoreGive(s_lease_mutex);
             xSemaphoreGiveRecursive(s_export_sem);
             ESP_LOGW(TAG, "upload lease refused: recording in progress");
@@ -507,7 +523,8 @@ bool sd_storage_lease_acquire(sd_lease_t role, uint32_t timeout_ms)
 
 void sd_storage_lease_release_unchanged(sd_lease_t role)
 {
-    if (!s_export_sem || !s_lease_mutex) return;
+    if (!s_export_sem || !s_lease_mutex)
+        return;
 
     switch (role) {
     case SD_LEASE_EXPORT:
@@ -515,13 +532,15 @@ void sd_storage_lease_release_unchanged(sd_lease_t role)
         break;
     case SD_LEASE_DESTRUCTIVE:
         xSemaphoreTake(s_lease_mutex, portMAX_DELAY);
-        if (s_destructive > 0) s_destructive--;
+        if (s_destructive > 0)
+            s_destructive--;
         xSemaphoreGive(s_lease_mutex);
         xSemaphoreGiveRecursive(s_export_sem);
         break;
     case SD_LEASE_UPLOAD:
         xSemaphoreTake(s_lease_mutex, portMAX_DELAY);
-        if (s_uploading > 0) s_uploading--;
+        if (s_uploading > 0)
+            s_uploading--;
         xSemaphoreGive(s_lease_mutex);
         xSemaphoreGiveRecursive(s_export_sem);
         break;
@@ -532,7 +551,8 @@ void sd_storage_lease_release(sd_lease_t role)
 {
     /* Preserve conservative invalidation for existing writer call sites.
      * Publish before giving the file-operation gate to the next reader. */
-    if (role != SD_LEASE_UPLOAD) sd_storage_content_changed();
+    if (role != SD_LEASE_UPLOAD)
+        sd_storage_content_changed();
     sd_storage_lease_release_unchanged(role);
 }
 
@@ -569,13 +589,12 @@ esp_err_t sd_storage_format(void)
          * whose allocation_unit_size is 0 (see SD_FORMAT_ALLOC_UNIT). */
         esp_vfs_fat_mount_config_t fmt_cfg = {
             .format_if_mount_failed = false,
-            .max_files              = 16,
-            .allocation_unit_size   = SD_FORMAT_ALLOC_UNIT,
+            .max_files = 16,
+            .allocation_unit_size = SD_FORMAT_ALLOC_UNIT,
         };
         ret = esp_vfs_fat_sdcard_format_cfg(SD_MOUNT_POINT, s_card, &fmt_cfg);
         if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "format: esp_vfs_fat_sdcard_format_cfg failed: %s",
-                     esp_err_to_name(ret));
+            ESP_LOGE(TAG, "format: esp_vfs_fat_sdcard_format_cfg failed: %s", esp_err_to_name(ret));
             /* esp_vfs_fat_sdcard_format_cfg() unmounts, runs f_mkfs, then tries
              * to remount.  On f_mkfs failure the remount may still have
              * succeeded (card usable) or failed (driver has recycled s_card).
@@ -584,7 +603,10 @@ esp_err_t sd_storage_format(void)
              * which is exactly the case where s_card is still valid.  Otherwise
              * leave s_mounted=false and the user reboots. */
             DIR *d = opendir(SD_MOUNT_POINT);
-            if (d) { closedir(d); s_mounted = true; }
+            if (d) {
+                closedir(d);
+                s_mounted = true;
+            }
             return ret;
         }
         s_mounted = true;
@@ -600,8 +622,8 @@ esp_err_t sd_storage_format(void)
 
         esp_vfs_fat_sdmmc_mount_config_t cfg = {
             .format_if_mount_failed = true,
-            .max_files              = 16,
-            .allocation_unit_size   = SD_FORMAT_ALLOC_UNIT,
+            .max_files = 16,
+            .allocation_unit_size = SD_FORMAT_ALLOC_UNIT,
         };
 
         /* The IDF 5.5 mount helper unregisters FATFS and deinitialises the host
@@ -615,7 +637,7 @@ esp_err_t sd_storage_format(void)
             bsp_display_set_sd_ready(false);
             return ret;
         }
-        s_card    = card;
+        s_card = card;
         s_mounted = true;
         lease_init_once();
     }
@@ -646,7 +668,8 @@ void sd_storage_deinit(void)
 {
     sd_storage_content_changed();
     capacity_cache_invalidate();
-    if (!s_mounted || !s_card) return;
+    if (!s_mounted || !s_card)
+        return;
 
     /* The VFS unmount runs f_unmount, which syncs the FAT window and issues a
      * final CTRL_SYNC so the card commits its own write buffer.  Without it a
@@ -663,4 +686,7 @@ void sd_storage_deinit(void)
 }
 
 /* FTP source mutations invalidate retained History data. */
-void ftp_storage_changed(void) { sd_storage_content_changed(); }
+void ftp_storage_changed(void)
+{
+    sd_storage_content_changed();
+}

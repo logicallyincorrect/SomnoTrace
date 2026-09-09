@@ -33,8 +33,7 @@ static uint16_t le16(const uint8_t *p)
 
 static uint32_t le32(const uint8_t *p)
 {
-    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
-           ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
 }
 
 static bool leap_year(uint16_t year)
@@ -44,14 +43,16 @@ static bool leap_year(uint16_t year)
 
 static bool valid_date(uint16_t year, uint8_t month, uint8_t day)
 {
-    static const uint8_t days[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+    static const uint8_t days[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
     if (year < 2015 || year > 2099 || month < 1 || month > 12 || day < 1)
         return false;
     uint8_t max_day = days[month - 1] + (month == 2 && leap_year(year));
     return day <= max_day;
 }
 
-bool ox_vld3_parse_header(const uint8_t *data, size_t len, size_t source_size,
+bool ox_vld3_parse_header(const uint8_t *data,
+                          size_t len,
+                          size_t source_size,
                           ox_vld3_header_t *out)
 {
     if (!data || !out || len < OX_VLD3_HEADER_LEN ||
@@ -79,8 +80,8 @@ bool ox_vld3_parse_header(const uint8_t *data, size_t len, size_t source_size,
                             parsed.hour <= 23 && parsed.minute <= 59 && parsed.second <= 59;
     parsed.declared_size_matches = parsed.declared_size == source_size;
 
-    if (parsed.version != OX_VLD3_VERSION || parsed.mode > 1 ||
-        parsed.sample_count == 0 || parsed.duration_seconds == 0)
+    if (parsed.version != OX_VLD3_VERSION || parsed.mode > 1 || parsed.sample_count == 0 ||
+        parsed.duration_seconds == 0)
         return false;
 
     uint64_t period_num = (uint64_t)parsed.duration_seconds * 1000000ULL;
@@ -94,8 +95,7 @@ bool ox_vld3_parse_header(const uint8_t *data, size_t len, size_t source_size,
     return true;
 }
 
-bool ox_vld3_parse_record(const uint8_t data[OX_VLD3_RECORD_LEN],
-                          ox_vld3_record_t *out)
+bool ox_vld3_parse_record(const uint8_t data[OX_VLD3_RECORD_LEN], ox_vld3_record_t *out)
 {
     if (!data || !out)
         return false;

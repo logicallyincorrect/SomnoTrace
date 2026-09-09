@@ -46,7 +46,7 @@
 static const char *TAG = "upload_smb";
 
 /* Write buffer size — allocated in PSRAM */
-#define SMB_BUF_SIZE  (32 * 1024)
+#define SMB_BUF_SIZE (32 * 1024)
 
 /* ── Helpers ────────────────────────────────────────────────────────── */
 
@@ -54,17 +54,25 @@ static const char *TAG = "upload_smb";
  * to callers that own their write buffers or file handles. Callback storage
  * lives through destruction, including libsmb2's cancellation callbacks. */
 static struct smb2_context *s_smb;
-static struct { bool finished; int status; void *data; } s_wait;
+static struct {
+    bool finished;
+    int status;
+    void *data;
+} s_wait;
 static void smb_wait_cb(struct smb2_context *ctx, int status, void *data, void *arg)
 {
-    (void)ctx; (void)arg;
-    s_wait.status = status; s_wait.data = data; s_wait.finished = true;
+    (void)ctx;
+    (void)arg;
+    s_wait.status = status;
+    s_wait.data = data;
+    s_wait.finished = true;
 }
 static void smb_abort(void)
 {
     struct smb2_context *ctx = s_smb;
     s_smb = NULL;
-    if (ctx) smb2_destroy_context(ctx);
+    if (ctx)
+        smb2_destroy_context(ctx);
 }
 static const char *smb_error(struct smb2_context *ctx)
 {
@@ -72,81 +80,104 @@ static const char *smb_error(struct smb2_context *ctx)
 }
 static bool smb_wait_begin(struct smb2_context *ctx)
 {
-    if (!ctx || ctx != s_smb) return false;
-    if (uploader_should_cancel()) { smb_abort(); return false; }
+    if (!ctx || ctx != s_smb)
+        return false;
+    if (uploader_should_cancel()) {
+        smb_abort();
+        return false;
+    }
     memset(&s_wait, 0, sizeof(s_wait));
     return true;
 }
 static int smb_wait_result(struct smb2_context *ctx, int submitted)
 {
-    if (submitted < 0) { smb_abort(); return submitted; }
+    if (submitted < 0) {
+        smb_abort();
+        return submitted;
+    }
     const int64_t deadline = esp_timer_get_time() + 5000000;
     while (!s_wait.finished) {
         if (uploader_should_cancel() || esp_timer_get_time() >= deadline) {
-            smb_abort(); return -ECANCELED;
+            smb_abort();
+            return -ECANCELED;
         }
-        struct pollfd pfd = { .fd = smb2_get_fd(ctx), .events = smb2_which_events(ctx) };
+        struct pollfd pfd = {.fd = smb2_get_fd(ctx), .events = smb2_which_events(ctx)};
         int rc = poll(&pfd, 1, 20);
-        if (rc < 0 && errno == EINTR) continue;
+        if (rc < 0 && errno == EINTR)
+            continue;
         /* Service idle polls as well, so libsmb2's own timeout machinery runs. */
         if (rc < 0 || smb2_service(ctx, pfd.revents) < 0) {
-            smb_abort(); return -EIO;
+            smb_abort();
+            return -EIO;
         }
     }
     return s_wait.status;
 }
-static int smb_connect(struct smb2_context *ctx, const char *host, const char *share, const char *user)
+static int smb_connect(struct smb2_context *ctx,
+                       const char *host,
+                       const char *share,
+                       const char *user)
 {
-    if (!smb_wait_begin(ctx)) return -ECANCELED;
-    return smb_wait_result(ctx, smb2_connect_share_async(ctx, host, share, user, smb_wait_cb, NULL));
+    if (!smb_wait_begin(ctx))
+        return -ECANCELED;
+    return smb_wait_result(ctx,
+                           smb2_connect_share_async(ctx, host, share, user, smb_wait_cb, NULL));
 }
 static int smb_mkdir(struct smb2_context *ctx, const char *path)
 {
-    if (!smb_wait_begin(ctx)) return -ECANCELED;
+    if (!smb_wait_begin(ctx))
+        return -ECANCELED;
     return smb_wait_result(ctx, smb2_mkdir_async(ctx, path, smb_wait_cb, NULL));
 }
 static struct smb2fh *smb_open(struct smb2_context *ctx, const char *path, int flags)
 {
-    if (!smb_wait_begin(ctx)) return NULL;
+    if (!smb_wait_begin(ctx))
+        return NULL;
     return smb_wait_result(ctx, smb2_open_async(ctx, path, flags, smb_wait_cb, NULL)) < 0
-           ? NULL : s_wait.data;
+               ? NULL
+               : s_wait.data;
 }
-static int smb_write(struct smb2_context *ctx, struct smb2fh *fh, const uint8_t *buf, uint32_t len, uint64_t off)
+static int smb_write(
+    struct smb2_context *ctx, struct smb2fh *fh, const uint8_t *buf, uint32_t len, uint64_t off)
 {
-    if (!smb_wait_begin(ctx)) return -ECANCELED;
+    if (!smb_wait_begin(ctx))
+        return -ECANCELED;
     return smb_wait_result(ctx, smb2_pwrite_async(ctx, fh, buf, len, off, smb_wait_cb, NULL));
 }
-static int smb_write_all(struct smb2_context *ctx, struct smb2fh *fh,
-                         const uint8_t *buf, uint32_t len, uint64_t off)
+static int smb_write_all(
+    struct smb2_context *ctx, struct smb2fh *fh, const uint8_t *buf, uint32_t len, uint64_t off)
 {
     uint32_t sent = 0;
     while (sent < len) {
         int n = smb_write(ctx, fh, buf + sent, len - sent, off + sent);
-        if (n <= 0 || (uint32_t)n > len - sent) return -EIO;
+        if (n <= 0 || (uint32_t)n > len - sent)
+            return -EIO;
         sent += (uint32_t)n;
     }
     return (int)sent;
 }
 static int smb_close(struct smb2_context *ctx, struct smb2fh *fh)
 {
-    if (!smb_wait_begin(ctx)) return -ECANCELED;
+    if (!smb_wait_begin(ctx))
+        return -ECANCELED;
     return smb_wait_result(ctx, smb2_close_async(ctx, fh, smb_wait_cb, NULL));
 }
 static int smb_disconnect(struct smb2_context *ctx)
 {
-    if (!smb_wait_begin(ctx)) return -ECANCELED;
+    if (!smb_wait_begin(ctx))
+        return -ECANCELED;
     return smb_wait_result(ctx, smb2_disconnect_share_async(ctx, smb_wait_cb, NULL));
 }
 
 /* Set the last-write and change timestamps on an open SMB file handle
  * to match the local file's mtime.  Uses SMB2 SET_INFO with
  * FILE_BASIC_INFORMATION. */
-static int smb_set_mtime(struct smb2_context *smb2, struct smb2fh *fh,
-                         time_t mtime)
+static int smb_set_mtime(struct smb2_context *smb2, struct smb2fh *fh, time_t mtime)
 {
     struct smb2_file_basic_info bi;
     struct smb2_set_info_request si_req;
-    if (!smb_wait_begin(smb2)) return -ECANCELED;
+    if (!smb_wait_begin(smb2))
+        return -ECANCELED;
     struct smb2_pdu *pdu;
 
     memset(&bi, 0, sizeof(bi));
@@ -159,7 +190,7 @@ static int smb_set_mtime(struct smb2_context *smb2, struct smb2fh *fh,
     bi.last_write_time.tv_usec = 0;
     bi.change_time.tv_sec = mtime;
     bi.change_time.tv_usec = 0;
-    bi.file_attributes = 0;  /* 0 = don't change */
+    bi.file_attributes = 0; /* 0 = don't change */
 
     memset(&si_req, 0, sizeof(si_req));
     si_req.info_type = SMB2_0_INFO_FILE;
@@ -171,8 +202,7 @@ static int smb_set_mtime(struct smb2_context *smb2, struct smb2fh *fh,
 
     pdu = smb2_cmd_set_info_async(smb2, &si_req, smb_wait_cb, NULL);
     if (!pdu) {
-        ESP_LOGW(TAG, "  smb2_cmd_set_info_async failed: %s",
-                 smb2_get_error(smb2));
+        ESP_LOGW(TAG, "  smb2_cmd_set_info_async failed: %s", smb2_get_error(smb2));
         return -1;
     }
     smb2_queue_pdu(smb2, pdu);
@@ -182,8 +212,8 @@ static int smb_set_mtime(struct smb2_context *smb2, struct smb2fh *fh,
 
 /* Upload a single local file to an SMB path. */
 static upload_result_t smb_upload_file(struct smb2_context *smb2,
-                                        const char *local_path,
-                                        const char *remote_path)
+                                       const char *local_path,
+                                       const char *remote_path)
 {
     FILE *f = fopen(local_path, "rb");
     if (!f) {
@@ -199,8 +229,7 @@ static upload_result_t smb_upload_file(struct smb2_context *smb2,
     /* Open remote file for writing */
     struct smb2fh *fh = smb_open(smb2, remote_path, O_WRONLY | O_CREAT | O_TRUNC);
     if (!fh) {
-        ESP_LOGW(TAG, "  smb_open(%s) failed: %s", remote_path,
-                 smb_error(smb2));
+        ESP_LOGW(TAG, "  smb_open(%s) failed: %s", remote_path, smb_error(smb2));
         /* Try creating parent directory and retry */
         char dir_path[512];
         strlcpy(dir_path, remote_path, sizeof(dir_path));
@@ -240,12 +269,15 @@ static upload_result_t smb_upload_file(struct smb2_context *smb2,
             to_read = file_size - total_written;
 
         size_t rd = fread(buf, 1, to_read, f);
-        if (rd == 0) break;
+        if (rd == 0)
+            break;
 
         int wr = smb_write_all(smb2, fh, buf, rd, total_written);
         if (wr <= 0) {
-            ESP_LOGE(TAG, "  smb2_pwrite failed at offset %u: %s",
-                     (unsigned)total_written, smb_error(smb2));
+            ESP_LOGE(TAG,
+                     "  smb2_pwrite failed at offset %u: %s",
+                     (unsigned)total_written,
+                     smb_error(smb2));
             free(buf);
             smb_close(smb2, fh);
             fclose(f);
@@ -256,9 +288,12 @@ static upload_result_t smb_upload_file(struct smb2_context *smb2,
 
         int pct = (int)(total_written * 100 / file_size);
         if (pct != last_pct && pct % 25 == 0) {
-            ESP_LOGI(TAG, "  %s: %d%% (%u/%u)",
+            ESP_LOGI(TAG,
+                     "  %s: %d%% (%u/%u)",
                      strrchr(local_path, '/') ? strrchr(local_path, '/') + 1 : local_path,
-                     pct, (unsigned)total_written, (unsigned)file_size);
+                     pct,
+                     (unsigned)total_written,
+                     (unsigned)file_size);
             last_pct = pct;
         }
     }
@@ -266,7 +301,9 @@ static upload_result_t smb_upload_file(struct smb2_context *smb2,
     free(buf);
 
     if (total_written != file_size || uploader_should_cancel()) {
-        smb_close(smb2, fh); fclose(f); return UPLOAD_FAILED;
+        smb_close(smb2, fh);
+        fclose(f);
+        return UPLOAD_FAILED;
     }
 
     /* Set remote file timestamps to match local file mtime */
@@ -280,7 +317,8 @@ static upload_result_t smb_upload_file(struct smb2_context *smb2,
 
     int close_rc = smb_close(smb2, fh);
     fclose(f);
-    if (close_rc != 0 || uploader_should_cancel()) return UPLOAD_FAILED;
+    if (close_rc != 0 || uploader_should_cancel())
+        return UPLOAD_FAILED;
 
     ESP_LOGI(TAG, "  uploaded %s (%u bytes)", remote_path, (unsigned)total_written);
     return UPLOAD_OK;
@@ -300,7 +338,8 @@ static upload_result_t smb_prepare(void)
 {
     uploader_load_config(&s_prepared_config);
     return uploader_resolve_host(s_prepared_config.smb_host, s_server_ip, sizeof(s_server_ip))
-        ? UPLOAD_OK : UPLOAD_ERR_TRANSIENT;
+               ? UPLOAD_OK
+               : UPLOAD_ERR_TRANSIENT;
 }
 static char s_remote_base[256];
 
@@ -312,9 +351,11 @@ static bool smb_is_configured(void)
 static upload_result_t smb_session_begin(void)
 {
     const uploader_config_t cfg = s_prepared_config;
-    if (!cfg.smb_host[0] || !cfg.smb_share[0]) return UPLOAD_NOT_CONFIGURED;
+    if (!cfg.smb_host[0] || !cfg.smb_share[0])
+        return UPLOAD_NOT_CONFIGURED;
 
-    if (uploader_should_cancel() || !s_server_ip[0]) return UPLOAD_CANCELLED;
+    if (uploader_should_cancel() || !s_server_ip[0])
+        return UPLOAD_CANCELLED;
     s_smb = smb2_init_context();
     if (!s_smb) {
         ESP_LOGE(TAG, "smb2_init_context failed");
@@ -323,13 +364,17 @@ static upload_result_t smb_session_begin(void)
 
     smb2_set_security_mode(s_smb, SMB2_NEGOTIATE_SIGNING_ENABLED);
     smb2_set_user(s_smb, cfg.smb_user[0] ? cfg.smb_user : "Guest");
-    if (cfg.smb_pass[0]) smb2_set_password(s_smb, cfg.smb_pass);
+    if (cfg.smb_pass[0])
+        smb2_set_password(s_smb, cfg.smb_pass);
 
-    ESP_LOGI(TAG, "connecting to %s/%s as %s", cfg.smb_host, cfg.smb_share,
+    ESP_LOGI(TAG,
+             "connecting to %s/%s as %s",
+             cfg.smb_host,
+             cfg.smb_share,
              cfg.smb_user[0] ? cfg.smb_user : "Guest");
 
-    if (smb_connect(s_smb, s_server_ip, cfg.smb_share,
-                           cfg.smb_user[0] ? cfg.smb_user : "Guest") != 0) {
+    if (smb_connect(s_smb, s_server_ip, cfg.smb_share, cfg.smb_user[0] ? cfg.smb_user : "Guest") !=
+        0) {
         ESP_LOGE(TAG, "smb2_connect_share failed: %s", smb_error(s_smb));
         smb_abort();
         /* Unreachable host and bad credentials are indistinguishable here
@@ -342,7 +387,8 @@ static upload_result_t smb_session_begin(void)
     /* SMB paths are relative to the share root: a leading slash makes
      * Windows return STATUS_INVALID_PARAMETER. */
     const char *p = cfg.smb_path;
-    while (*p == '/' || *p == '\\') p++;
+    while (*p == '/' || *p == '\\')
+        p++;
     snprintf(s_remote_base, sizeof(s_remote_base), "%s", p);
 
     char remote_datalog[400];
@@ -353,7 +399,8 @@ static upload_result_t smb_session_begin(void)
 
 static void smb_session_end(void)
 {
-    if (!s_smb) return;
+    if (!s_smb)
+        return;
     smb_disconnect(s_smb);
     smb_abort();
 }
@@ -387,33 +434,47 @@ static bool smb_test(const uploader_config_t *cfgp, char *msg, size_t msg_len)
     smb2_set_security_mode(ctx, SMB2_NEGOTIATE_SIGNING_ENABLED);
     smb2_set_timeout(ctx, SMB_TEST_TIMEOUT_S);
     smb2_set_user(ctx, user);
-    if (cfg.smb_pass[0]) smb2_set_password(ctx, cfg.smb_pass);
+    if (cfg.smb_pass[0])
+        smb2_set_password(ctx, cfg.smb_pass);
 
     ESP_LOGI(TAG, "test: connecting to %s/%s as %s", cfg.smb_host, cfg.smb_share, user);
     if (smb2_connect_share(ctx, cfg.smb_host, cfg.smb_share, user) != 0) {
-        snprintf(msg, msg_len, "Cannot open //%s/%s as %s: %s",
-                 cfg.smb_host, cfg.smb_share, user, smb2_get_error(ctx));
+        snprintf(msg,
+                 msg_len,
+                 "Cannot open //%s/%s as %s: %s",
+                 cfg.smb_host,
+                 cfg.smb_share,
+                 user,
+                 smb2_get_error(ctx));
         smb2_destroy_context(ctx);
         return false;
     }
 
     /* Relative to the share root, as in smb_session_begin(). */
     const char *p = cfg.smb_path;
-    while (*p == '/' || *p == '\\') p++;
+    while (*p == '/' || *p == '\\')
+        p++;
 
     bool ok = true;
     if (!*p) {
-        snprintf(msg, msg_len, "Connected to //%s/%s (share root)",
-                 cfg.smb_host, cfg.smb_share);
+        snprintf(msg, msg_len, "Connected to //%s/%s (share root)", cfg.smb_host, cfg.smb_share);
     } else {
         struct smb2_stat_64 st;
         if (smb2_stat(ctx, p, &st) == 0) {
-            snprintf(msg, msg_len, "Connected to //%s/%s, folder '%s' found",
-                     cfg.smb_host, cfg.smb_share, p);
+            snprintf(msg,
+                     msg_len,
+                     "Connected to //%s/%s, folder '%s' found",
+                     cfg.smb_host,
+                     cfg.smb_share,
+                     p);
         } else {
-            snprintf(msg, msg_len, "Connected to //%s/%s, but folder '%s' was not "
+            snprintf(msg,
+                     msg_len,
+                     "Connected to //%s/%s, but folder '%s' was not "
                      "found on the share: create it or fix Remote Path",
-                     cfg.smb_host, cfg.smb_share, p);
+                     cfg.smb_host,
+                     cfg.smb_share,
+                     p);
             ok = false;
         }
     }
@@ -424,23 +485,23 @@ static bool smb_test(const uploader_config_t *cfgp, char *msg, size_t msg_len)
 
 static upload_result_t smb_day_begin(const char *day)
 {
-    if (!s_smb) return UPLOAD_ERR_TRANSIENT;
+    if (!s_smb)
+        return UPLOAD_ERR_TRANSIENT;
     char remote_day[512];
     snprintf(remote_day, sizeof(remote_day), "%s/DATALOG/%s", s_remote_base, day);
-    smb_mkdir(s_smb, remote_day);   /* EEXIST is fine */
+    smb_mkdir(s_smb, remote_day); /* EEXIST is fine */
     return UPLOAD_OK;
 }
 
 static upload_result_t smb_put_group(const char *day, const upload_group_ref_t *g)
 {
-    if (!s_smb || !g) return UPLOAD_ERR_TRANSIENT;
+    if (!s_smb || !g)
+        return UPLOAD_ERR_TRANSIENT;
 
     for (int i = 0; i < g->n_files; i++) {
         char local[512], remote[640];
-        snprintf(local, sizeof(local), "%s/%s/%s", SD_SDCARD_DATALOG, day,
-                 g->files[i]);
-        snprintf(remote, sizeof(remote), "%s/DATALOG/%s/%s", s_remote_base, day,
-                 g->files[i]);
+        snprintf(local, sizeof(local), "%s/%s/%s", SD_SDCARD_DATALOG, day, g->files[i]);
+        snprintf(remote, sizeof(remote), "%s/DATALOG/%s/%s", s_remote_base, day, g->files[i]);
 
         if (smb_upload_file(s_smb, local, remote) != UPLOAD_OK) {
             ESP_LOGW(TAG, "  failed to upload %s", g->files[i]);
@@ -451,19 +512,19 @@ static upload_result_t smb_put_group(const char *day, const upload_group_ref_t *
     return UPLOAD_OK;
 }
 
-static upload_result_t smb_put_bundle(const char *day,
-                                      const upload_bundle_ref_t *b, bool changed)
+static upload_result_t smb_put_bundle(const char *day, const upload_bundle_ref_t *b, bool changed)
 {
     (void)day;
-    if (!s_smb || !b) return UPLOAD_ERR_TRANSIENT;
+    if (!s_smb || !b)
+        return UPLOAD_ERR_TRANSIENT;
 
     /* Unlike SleepHQ, SMB is a plain file tree: the root files only need
      * re-sending when they actually changed. */
-    if (!changed) return UPLOAD_OK;
+    if (!changed)
+        return UPLOAD_OK;
 
     char remote_settings[400];
-    snprintf(remote_settings, sizeof(remote_settings), "%s/SETTINGS",
-             s_remote_base);
+    snprintf(remote_settings, sizeof(remote_settings), "%s/SETTINGS", s_remote_base);
     smb_mkdir(s_smb, remote_settings);
 
     int count = 0;
@@ -486,24 +547,33 @@ static upload_result_t smb_put_bundle(const char *day,
 
 static upload_result_t smb_ox_day_begin(const char *day)
 {
-    if (!s_smb || !day) return UPLOAD_ERR_TRANSIENT;
+    if (!s_smb || !day)
+        return UPLOAD_ERR_TRANSIENT;
     char path[640];
-    snprintf(path, sizeof(path), "%s/OXYMETRY", s_remote_base); smb_mkdir(s_smb, path);
-    snprintf(path, sizeof(path), "%s/OXYMETRY/%s", s_remote_base, day); smb_mkdir(s_smb, path);
+    snprintf(path, sizeof(path), "%s/OXYMETRY", s_remote_base);
+    smb_mkdir(s_smb, path);
+    snprintf(path, sizeof(path), "%s/OXYMETRY/%s", s_remote_base, day);
+    smb_mkdir(s_smb, path);
     return UPLOAD_OK;
 }
 
 static upload_result_t smb_put_oximetry(const upload_ox_ref_t *ref)
 {
-    if (!s_smb || !ref || !ref->recording_id[0]) return UPLOAD_ERR_TRANSIENT;
+    if (!s_smb || !ref || !ref->recording_id[0])
+        return UPLOAD_ERR_TRANSIENT;
     for (int i = 0; i < ref->n_files; i++) {
         const char *rel = ref->relative_paths[i];
-        if (strcmp(rel, "source/source.bin") != 0 &&
-            strcmp(rel, "source/source.vld") != 0) continue;
+        if (strcmp(rel, "source/source.bin") != 0 && strcmp(rel, "source/source.vld") != 0)
+            continue;
         const char *ext = strstr(rel, ".vld") ? ".vld" : ".bin";
         char path[760];
-        snprintf(path, sizeof(path), "%s/OXYMETRY/%s/%s%s", s_remote_base,
-                 ref->day, ref->recording_id, ext);
+        snprintf(path,
+                 sizeof(path),
+                 "%s/OXYMETRY/%s/%s%s",
+                 s_remote_base,
+                 ref->day,
+                 ref->recording_id,
+                 ext);
         return smb_upload_file(s_smb, ref->local_paths[i], path);
     }
     return UPLOAD_ERR_PERMANENT;
@@ -513,13 +583,13 @@ static upload_result_t smb_day_end(const char *day, bool any_uploaded)
 {
     (void)day;
     (void)any_uploaded;
-    return UPLOAD_OK;   /* nothing to finalise on a file share */
+    return UPLOAD_OK; /* nothing to finalise on a file share */
 }
 
 const upload_backend_t smb_backend = {
     .id = "smb",
     .label = "SMB Network Share",
-    .bundle_only_ok = true,     /* plain file copy, no side effects */
+    .bundle_only_ok = true, /* plain file copy, no side effects */
     .is_configured = smb_is_configured,
     .prepare = smb_prepare,
     .session_begin = smb_session_begin,

@@ -51,7 +51,8 @@ static uint64_t pb_decode_varint(const uint8_t *buf, size_t buf_len, size_t *pos
     while (*pos < buf_len) {
         uint8_t b = buf[(*pos)++];
         val |= (uint64_t)(b & 0x7F) << shift;
-        if (!(b & 0x80)) break;
+        if (!(b & 0x80))
+            break;
         shift += 7;
     }
     return val;
@@ -66,7 +67,8 @@ static int64_t extract_scalar_field(const uint8_t *rec, size_t rec_len, int targ
         uint64_t tag = pb_decode_varint(rec, rec_len, &pos);
         int field = (int)(tag >> 3);
         int wire = (int)(tag & 0x07);
-        if (field == 0) break;
+        if (field == 0)
+            break;
 
         if (field == target_field && wire == 0) {
             return (int64_t)pb_decode_varint(rec, rec_len, &pos);
@@ -121,7 +123,8 @@ static void noon_day_from_epoch(int64_t epoch_ms, char *out, size_t out_len)
  * descriptor or storage lease crosses an RPC or a spool wait. */
 static bool post_storage_begin(void)
 {
-    if (!sd_storage_lease_acquire(SD_LEASE_EXPORT, 250)) return false;
+    if (!sd_storage_lease_acquire(SD_LEASE_EXPORT, 250))
+        return false;
     if (!sd_storage_is_ready() || sd_storage_recording_pending() || sd_storage_recording_active()) {
         sd_storage_lease_release(SD_LEASE_EXPORT);
         return false;
@@ -131,27 +134,36 @@ static bool post_storage_begin(void)
 
 static uint8_t *read_bin_file(const char *path, size_t *out_len)
 {
-    if (out_len) *out_len = 0;
-    if (!post_storage_begin()) return NULL;
+    if (out_len)
+        *out_len = 0;
+    if (!post_storage_begin())
+        return NULL;
     FILE *f = fopen(path, "rb");
     uint8_t *buf = NULL;
     long sz = -1;
-    if (f && fseek(f, 0, SEEK_END) == 0) sz = ftell(f);
+    if (f && fseek(f, 0, SEEK_END) == 0)
+        sz = ftell(f);
     if (sz > 0 && sz <= 100000 && fseek(f, 0, SEEK_SET) == 0) {
         buf = malloc((size_t)sz);
         if (buf && fread(buf, 1, (size_t)sz, f) != (size_t)sz) {
-            free(buf); buf = NULL;
+            free(buf);
+            buf = NULL;
         }
     }
-    if (f && fclose(f) != 0) { free(buf); buf = NULL; }
+    if (f && fclose(f) != 0) {
+        free(buf);
+        buf = NULL;
+    }
     sd_storage_lease_release(SD_LEASE_EXPORT);
-    if (buf && out_len) *out_len = (size_t)sz;
+    if (buf && out_len)
+        *out_len = (size_t)sz;
     return buf;
 }
 
 static esp_err_t write_bin_atomic(const char *path, const uint8_t *data, size_t len)
 {
-    if (!post_storage_begin()) return ESP_ERR_TIMEOUT;
+    if (!post_storage_begin())
+        return ESP_ERR_TIMEOUT;
     char tmp[380], backup[380];
     snprintf(tmp, sizeof(tmp), "%s.tmp", path);
     snprintf(backup, sizeof(backup), "%s.bak", path);
@@ -159,8 +171,10 @@ static esp_err_t write_bin_atomic(const char *path, const uint8_t *data, size_t 
     struct stat st;
     int recovery_error = 0;
     if (stat(path, &st) != 0) {
-        if (errno != ENOENT) recovery_error = errno;
-        else if (rename(backup, path) != 0 && errno != ENOENT) recovery_error = errno;
+        if (errno != ENOENT)
+            recovery_error = errno;
+        else if (rename(backup, path) != 0 && errno != ENOENT)
+            recovery_error = errno;
     }
     if (recovery_error) {
         sd_storage_lease_release(SD_LEASE_EXPORT);
@@ -170,31 +184,46 @@ static esp_err_t write_bin_atomic(const char *path, const uint8_t *data, size_t 
     FILE *f = fopen(tmp, "wb");
     int first_error = f ? 0 : (errno ? errno : EIO);
     if (f) {
-        if (len && fwrite(data, 1, len, f) != len) first_error = errno ? errno : EIO;
-        if (!first_error && fflush(f) != 0) first_error = errno ? errno : EIO;
-        if (!first_error && fsync(fileno(f)) != 0) first_error = errno ? errno : EIO;
-        if (fclose(f) != 0 && !first_error) first_error = errno ? errno : EIO;
+        if (len && fwrite(data, 1, len, f) != len)
+            first_error = errno ? errno : EIO;
+        if (!first_error && fflush(f) != 0)
+            first_error = errno ? errno : EIO;
+        if (!first_error && fsync(fileno(f)) != 0)
+            first_error = errno ? errno : EIO;
+        if (fclose(f) != 0 && !first_error)
+            first_error = errno ? errno : EIO;
     }
     bool moved_old = false;
     if (!first_error) {
-        if (unlink(backup) != 0 && errno != ENOENT) first_error = errno;
-        if (!first_error && rename(path, backup) == 0) moved_old = true;
-        else if (!first_error && errno != ENOENT) first_error = errno;
-        if (!first_error && rename(tmp, path) != 0) first_error = errno;
-        if (first_error && moved_old) rename(backup, path);
-        if (!first_error && moved_old) unlink(backup);
+        if (unlink(backup) != 0 && errno != ENOENT)
+            first_error = errno;
+        if (!first_error && rename(path, backup) == 0)
+            moved_old = true;
+        else if (!first_error && errno != ENOENT)
+            first_error = errno;
+        if (!first_error && rename(tmp, path) != 0)
+            first_error = errno;
+        if (first_error && moved_old)
+            rename(backup, path);
+        if (!first_error && moved_old)
+            unlink(backup);
     }
-    if (first_error) unlink(tmp);
+    if (first_error)
+        unlink(tmp);
     /* A failed transaction can still have changed a directory entry. */
     sd_storage_lease_release(SD_LEASE_EXPORT);
-    if (first_error) { errno = first_error; return ESP_FAIL; }
+    if (first_error) {
+        errno = first_error;
+        return ESP_FAIL;
+    }
     return ESP_OK;
 }
 
 static esp_err_t write_json_file(const char *path, const cJSON *json)
 {
     char *str = cJSON_PrintUnformatted(json);
-    if (!str) return ESP_ERR_NO_MEM;
+    if (!str)
+        return ESP_ERR_NO_MEM;
     esp_err_t ret = write_bin_atomic(path, (const uint8_t *)str, strlen(str));
     free(str);
     return ret;
@@ -206,9 +235,16 @@ static void epoch_ms_to_iso_utc(int64_t epoch_ms, char *out, size_t out_len)
     int ms = (int)(epoch_ms % 1000);
     struct tm tm;
     gmtime_r(&t, &tm);
-    snprintf(out, out_len, "%04d-%02d-%02dT%02d:%02d:%02d.%03dZ",
-             (tm.tm_year + 1900) % 10000, (tm.tm_mon + 1) % 100, tm.tm_mday % 100,
-             tm.tm_hour % 100, tm.tm_min % 100, tm.tm_sec % 100, ms % 1000);
+    snprintf(out,
+             out_len,
+             "%04d-%02d-%02dT%02d:%02d:%02d.%03dZ",
+             (tm.tm_year + 1900) % 10000,
+             (tm.tm_mon + 1) % 100,
+             tm.tm_mday % 100,
+             tm.tm_hour % 100,
+             tm.tm_min % 100,
+             tm.tm_sec % 100,
+             ms % 1000);
 }
 
 /* ── Summary spool decode & per-day storage ─────────────────────────── */
@@ -245,13 +281,15 @@ static esp_err_t collect_summary_spool(int64_t clock_drift_ms)
         uint64_t tag = pb_decode_varint(data, len, &pos);
         int field = (int)(tag >> 3);
         int wire = (int)(tag & 0x07);
-        if (field == 0) break;
+        if (field == 0)
+            break;
 
         if (field == 2 && wire == 2) {
             size_t lpos = pos;
             uint64_t flen = pb_decode_varint(data, len, &lpos);
             pos = lpos;
-            if (pos + flen > len) break;
+            if (pos + flen > len)
+                break;
 
             const uint8_t *rec = data + pos;
             size_t rec_len = (size_t)flen;
@@ -269,14 +307,16 @@ static esp_err_t collect_summary_spool(int64_t clock_drift_ms)
                 /* Deriving variant: PeriodStart is a noon stamp, so this also
                  * teaches as11_time the device's offset on the very first
                  * record — before collect_settings() has run. */
-                as11_time_noon_day_for_period_start(period_start, day_label,
-                                                    sizeof(day_label));
+                as11_time_noon_day_for_period_start(period_start, day_label, sizeof(day_label));
 
                 char spool_path[300];
-                snprintf(spool_path, sizeof(spool_path), "%s/%s.spool",
-                         SD_SUMMARIES_DIR, day_label);
+                snprintf(
+                    spool_path, sizeof(spool_path), "%s/%s.spool", SD_SUMMARIES_DIR, day_label);
                 ret = write_bin_atomic(spool_path, rec, rec_len);
-                if (ret != ESP_OK) { free(data); return ret; }
+                if (ret != ESP_OK) {
+                    free(data);
+                    return ret;
+                }
                 days_written++;
             }
             pos += flen;
@@ -302,14 +342,12 @@ static esp_err_t collect_summary_spool(int64_t clock_drift_ms)
 
 /* ── Spool collection (TherapyEvents) ───────────────────────────────── */
 
-static esp_err_t collect_resp_events(const char *dir, const char *prefix,
-                                     const char *from_dt)
+static esp_err_t collect_resp_events(const char *dir, const char *prefix, const char *from_dt)
 {
     uint8_t *data = NULL;
     size_t len = 0;
 
-    esp_err_t ret = as11_ble_spool_pull("TherapyEvents-RespiratoryEvents",
-                                        from_dt, &data, &len);
+    esp_err_t ret = as11_ble_spool_pull("TherapyEvents-RespiratoryEvents", from_dt, &data, &len);
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "resp events spool pull failed: %s", esp_err_to_name(ret));
         return ret;
@@ -348,8 +386,8 @@ static const char *const SETTINGS_KEYS[] = {
 
 static esp_err_t collect_identification(const char *dir, const char *prefix)
 {
-    cJSON *ident = as11_ble_get_values(
-        IDENTITY_KEYS, sizeof(IDENTITY_KEYS) / sizeof(IDENTITY_KEYS[0]));
+    cJSON *ident =
+        as11_ble_get_values(IDENTITY_KEYS, sizeof(IDENTITY_KEYS) / sizeof(IDENTITY_KEYS[0]));
     if (!ident) {
         ESP_LOGW(TAG, "failed to get device identification");
         return ESP_FAIL;
@@ -364,8 +402,8 @@ static esp_err_t collect_identification(const char *dir, const char *prefix)
 
 static esp_err_t collect_settings(const char *dir, const char *prefix)
 {
-    cJSON *settings = as11_ble_get_values(
-        SETTINGS_KEYS, sizeof(SETTINGS_KEYS) / sizeof(SETTINGS_KEYS[0]));
+    cJSON *settings =
+        as11_ble_get_values(SETTINGS_KEYS, sizeof(SETTINGS_KEYS) / sizeof(SETTINGS_KEYS[0]));
     if (!settings) {
         ESP_LOGW(TAG, "failed to get device settings");
         return ESP_FAIL;
@@ -376,8 +414,7 @@ static esp_err_t collect_settings(const char *dir, const char *prefix)
      * even before any spool record has been parsed. */
     as11_offset_t as11_off;
     if (as11_time_offset_from_settings(settings, &as11_off)) {
-        ESP_LOGI(TAG, "AS11 timezone offset %d min (from device settings)",
-                 (int)(as11_off / 60));
+        ESP_LOGI(TAG, "AS11 timezone offset %d min (from device settings)", (int)(as11_off / 60));
     }
 
     char path[330];
@@ -389,10 +426,14 @@ static esp_err_t collect_settings(const char *dir, const char *prefix)
     const char *day_label = slash ? slash + 1 : dir;
     if (day_label && strlen(day_label) == 8) {
         char sum_settings_path[300];
-        snprintf(sum_settings_path, sizeof(sum_settings_path), "%s/%s.settings.json",
-                 SD_SUMMARIES_DIR, day_label);
+        snprintf(sum_settings_path,
+                 sizeof(sum_settings_path),
+                 "%s/%s.settings.json",
+                 SD_SUMMARIES_DIR,
+                 day_label);
         esp_err_t mirror = write_json_file(sum_settings_path, settings);
-        if (ret == ESP_OK) ret = mirror;
+        if (ret == ESP_OK)
+            ret = mirror;
     }
 
     cJSON_Delete(settings);
@@ -410,10 +451,10 @@ static esp_err_t collect_settings(const char *dir, const char *prefix)
  * detects therapy end and when the AS11 considers the session ended,
  * plus ClockB quantisation.  Clock drift is already corrected for, so
  * this tolerance can be tight. */
-#define SPOOL_FRESHNESS_TOL_MS  5000
+#define SPOOL_FRESHNESS_TOL_MS 5000
 
 /* Field 40 (ClockB) in the Summary protobuf. */
-#define SUM_F_CLOCK_B           40
+#define SUM_F_CLOCK_B 40
 
 /* Check if the current day's Summary spool record is fresh (updated after
  * the current session ended).
@@ -436,8 +477,7 @@ static bool summary_spool_is_current(int64_t end_epoch_ms, int64_t clock_drift_m
     noon_day_from_epoch(as11_end_ms, day_label, sizeof(day_label));
 
     char spool_path[300];
-    snprintf(spool_path, sizeof(spool_path), "%s/%s.spool",
-             SD_SUMMARIES_DIR, day_label);
+    snprintf(spool_path, sizeof(spool_path), "%s/%s.spool", SD_SUMMARIES_DIR, day_label);
 
     size_t spool_len = 0;
     uint8_t *spool_data = read_bin_file(spool_path, &spool_len);
@@ -456,10 +496,14 @@ static bool summary_spool_is_current(int64_t end_epoch_ms, int64_t clock_drift_m
     }
 
     bool fresh = (clock_b >= threshold);
-    ESP_LOGI(TAG, "spool_is_current: day=%s ClockB=%lld as11_end=%lld "
+    ESP_LOGI(TAG,
+             "spool_is_current: day=%s ClockB=%lld as11_end=%lld "
              "threshold=%lld → %s",
-             day_label, (long long)clock_b, (long long)as11_end_ms,
-             (long long)threshold, fresh ? "FRESH" : "STALE");
+             day_label,
+             (long long)clock_b,
+             (long long)as11_end_ms,
+             (long long)threshold,
+             fresh ? "FRESH" : "STALE");
     return fresh;
 }
 
@@ -469,8 +513,7 @@ static bool summary_spool_is_current(int64_t end_epoch_ms, int64_t clock_drift_m
  * Uses a fromDateTime starting at noon today (AS11 time) so only the
  * current day's record is returned, making each retry fast.
  * Returns ESP_OK on success (even if no record found for today). */
-static esp_err_t refresh_today_summary_spool(int64_t end_epoch_ms,
-                                              int64_t clock_drift_ms)
+static esp_err_t refresh_today_summary_spool(int64_t end_epoch_ms, int64_t clock_drift_ms)
 {
     int64_t as11_end_ms = end_epoch_ms - clock_drift_ms;
 
@@ -503,13 +546,15 @@ static esp_err_t refresh_today_summary_spool(int64_t end_epoch_ms,
         uint64_t tag = pb_decode_varint(data, len, &pos);
         int field = (int)(tag >> 3);
         int wire = (int)(tag & 0x07);
-        if (field == 0) break;
+        if (field == 0)
+            break;
 
         if (field == 2 && wire == 2) {
             size_t lpos = pos;
             uint64_t flen = pb_decode_varint(data, len, &lpos);
             pos = lpos;
-            if (pos + flen > len) break;
+            if (pos + flen > len)
+                break;
 
             const uint8_t *rec = data + pos;
             size_t rec_len = (size_t)flen;
@@ -520,14 +565,16 @@ static esp_err_t refresh_today_summary_spool(int64_t end_epoch_ms,
                 /* Deriving variant: PeriodStart is a noon stamp, so this also
                  * teaches as11_time the device's offset on the very first
                  * record — before collect_settings() has run. */
-                as11_time_noon_day_for_period_start(period_start, day_label,
-                                                    sizeof(day_label));
+                as11_time_noon_day_for_period_start(period_start, day_label, sizeof(day_label));
 
                 char spool_path[300];
-                snprintf(spool_path, sizeof(spool_path), "%s/%s.spool",
-                         SD_SUMMARIES_DIR, day_label);
+                snprintf(
+                    spool_path, sizeof(spool_path), "%s/%s.spool", SD_SUMMARIES_DIR, day_label);
                 ret = write_bin_atomic(spool_path, rec, rec_len);
-                if (ret != ESP_OK) { free(data); return ret; }
+                if (ret != ESP_OK) {
+                    free(data);
+                    return ret;
+                }
                 days_written++;
             }
             pos += flen;
@@ -553,12 +600,17 @@ static esp_err_t refresh_today_summary_spool(int64_t end_epoch_ms,
 
 /* ── Main collection entry point ────────────────────────────────────── */
 
-esp_err_t post_therapy_collect(const char *session_dir, const char *file_prefix,
-                               int64_t start_epoch_ms, int64_t clock_drift_ms,
-                               int64_t end_epoch_ms, bool *spool_current)
+esp_err_t post_therapy_collect(const char *session_dir,
+                               const char *file_prefix,
+                               int64_t start_epoch_ms,
+                               int64_t clock_drift_ms,
+                               int64_t end_epoch_ms,
+                               bool *spool_current)
 {
-    if (!session_dir || !file_prefix) return ESP_ERR_INVALID_ARG;
-    if (spool_current) *spool_current = false;
+    if (!session_dir || !file_prefix)
+        return ESP_ERR_INVALID_ARG;
+    if (spool_current)
+        *spool_current = false;
     if (!sd_storage_is_ready()) {
         ESP_LOGW(TAG, "SD not ready, skipping post-therapy collection");
         return ESP_ERR_INVALID_STATE;
@@ -598,7 +650,8 @@ esp_err_t post_therapy_collect(const char *session_dir, const char *file_prefix,
 
     /* 5. Check if the current day's spool is fresh (updated after session end). */
     bool fresh = summary_spool_is_current(end_epoch_ms, clock_drift_ms);
-    if (spool_current) *spool_current = fresh;
+    if (spool_current)
+        *spool_current = fresh;
 
     /* Write manifest with clock_drift_ms for EDF generation */
     cJSON *manifest = cJSON_CreateObject();
@@ -608,11 +661,14 @@ esp_err_t post_therapy_collect(const char *session_dir, const char *file_prefix,
     cJSON_AddBoolToObject(manifest, "spool_current", fresh);
     char mpath[330];
     snprintf(mpath, sizeof(mpath), "%s/%s_manifest.json", session_dir, file_prefix);
-    if (!manifest || write_json_file(mpath, manifest) != ESP_OK) errors++;
+    if (!manifest || write_json_file(mpath, manifest) != ESP_OK)
+        errors++;
     cJSON_Delete(manifest);
 
-    ESP_LOGI(TAG, "=== POST-THERAPY COLLECTION DONE (%d errors, spool %s) ===",
-             errors, fresh ? "CURRENT" : "STALE");
+    ESP_LOGI(TAG,
+             "=== POST-THERAPY COLLECTION DONE (%d errors, spool %s) ===",
+             errors,
+             fresh ? "CURRENT" : "STALE");
     return errors > 0 ? ESP_FAIL : ESP_OK;
 }
 
@@ -665,7 +721,8 @@ bool post_therapy_wait_spool_current(int64_t end_epoch_ms, int64_t clock_drift_m
     int64_t as11_now_ms = (int64_t)time(NULL) * 1000 - clock_drift_ms;
     int64_t period_end_ms = noon_period_end(as11_end_ms);
     if (as11_now_ms < period_end_ms) {
-        ESP_LOGI(TAG, "spool_refresh: noon-day period still open "
+        ESP_LOGI(TAG,
+                 "spool_refresh: noon-day period still open "
                  "(closes in %lld s) — AS11 has not written this day's record "
                  "yet and will not until then; skipping wait",
                  (long long)((period_end_ms - as11_now_ms) / 1000));
@@ -681,20 +738,23 @@ bool post_therapy_wait_spool_current(int64_t end_epoch_ms, int64_t clock_drift_m
         /* Check if _SNC ValueChange notification was received (push from AS11). */
         int64_t snc_val = 0;
         if (session_writer_snc_changed(&snc_val)) {
-            ESP_LOGI(TAG, "spool_refresh: _SNC ValueChange received (%lld) "
+            ESP_LOGI(TAG,
+                     "spool_refresh: _SNC ValueChange received (%lld) "
                      "on attempt %d, pulling spool",
-                     (long long)snc_val, attempt);
+                     (long long)snc_val,
+                     attempt);
         } else if (attempt < max_attempts) {
-            ESP_LOGD(TAG, "spool_refresh: no _SNC change yet (attempt %d/%d)",
-                     attempt, max_attempts);
-            continue;  /* keep waiting for the push notification */
+            ESP_LOGD(
+                TAG, "spool_refresh: no _SNC change yet (attempt %d/%d)", attempt, max_attempts);
+            continue; /* keep waiting for the push notification */
         } else {
-            ESP_LOGW(TAG, "spool_refresh: no _SNC notification after %d attempts, "
-                     "pulling spool as fallback", attempt);
+            ESP_LOGW(TAG,
+                     "spool_refresh: no _SNC notification after %d attempts, "
+                     "pulling spool as fallback",
+                     attempt);
         }
 
-        ESP_LOGI(TAG, "spool_refresh: pulling spool (attempt %d/%d)",
-                 attempt, max_attempts);
+        ESP_LOGI(TAG, "spool_refresh: pulling spool (attempt %d/%d)", attempt, max_attempts);
 
         esp_err_t ret = refresh_today_summary_spool(end_epoch_ms, clock_drift_ms);
         if (ret == ESP_ERR_INVALID_STATE) {
@@ -707,14 +767,15 @@ bool post_therapy_wait_spool_current(int64_t end_epoch_ms, int64_t clock_drift_m
         }
 
         if (summary_spool_is_current(end_epoch_ms, clock_drift_ms)) {
-            ESP_LOGI(TAG, "spool_refresh: spool is CURRENT after %d attempts",
-                     attempt);
+            ESP_LOGI(TAG, "spool_refresh: spool is CURRENT after %d attempts", attempt);
             return true;
         }
     }
 
-    ESP_LOGW(TAG, "spool_refresh: spool still STALE after %d attempts (%d s), "
-             "proceeding with available data", max_attempts,
+    ESP_LOGW(TAG,
+             "spool_refresh: spool still STALE after %d attempts (%d s), "
+             "proceeding with available data",
+             max_attempts,
              max_attempts * retry_delay_ms / 1000);
     return false;
 }

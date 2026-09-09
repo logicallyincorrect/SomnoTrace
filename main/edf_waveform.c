@@ -30,15 +30,20 @@ static const char *TAG = "edf_wav";
 
 static uint32_t snt_available_samples(FILE *f, int channels_in_file)
 {
-    if (!f || channels_in_file <= 0) return UINT32_MAX;
+    if (!f || channels_in_file <= 0)
+        return UINT32_MAX;
 
     long cur = ftell(f);
-    if (cur < 0) return UINT32_MAX;
-    if (fseek(f, 0, SEEK_END) != 0) return UINT32_MAX;
+    if (cur < 0)
+        return UINT32_MAX;
+    if (fseek(f, 0, SEEK_END) != 0)
+        return UINT32_MAX;
     long end = ftell(f);
-    if (fseek(f, cur, SEEK_SET) != 0 || end < 0) return UINT32_MAX;
+    if (fseek(f, cur, SEEK_SET) != 0 || end < 0)
+        return UINT32_MAX;
 
-    if (end <= (long)sizeof(snt_header_t)) return 0;
+    if (end <= (long)sizeof(snt_header_t))
+        return 0;
     long data_bytes = end - (long)sizeof(snt_header_t);
     long frame = (long)channels_in_file * (long)sizeof(int16_t);
     return (uint32_t)(data_bytes / frame);
@@ -49,13 +54,15 @@ static uint32_t snt_available_samples(FILE *f, int channels_in_file)
 int64_t edf_find_mask_on_time(const char *events_snt_path)
 {
     FILE *f = fopen(events_snt_path, "r");
-    if (!f) return -1;
+    if (!f)
+        return -1;
 
     int64_t mask_on_ms = -1;
     char line[512];
     while (fgets(line, sizeof(line), f)) {
         cJSON *msg = cJSON_Parse(line);
-        if (!msg) continue;
+        if (!msg)
+            continue;
         cJSON *params = cJSON_GetObjectItem(msg, "params");
         if (params) {
             cJSON *events = cJSON_GetObjectItem(params, "events");
@@ -63,9 +70,11 @@ int64_t edf_find_mask_on_time(const char *events_snt_path)
                 int n = cJSON_GetArraySize(events);
                 for (int i = 0; i < n; i++) {
                     cJSON *ev = cJSON_GetArrayItem(events, i);
-                    if (!ev) continue;
+                    if (!ev)
+                        continue;
                     cJSON *label = cJSON_GetObjectItem(ev, "event");
-                    if (!label || !cJSON_IsString(label)) continue;
+                    if (!label || !cJSON_IsString(label))
+                        continue;
                     if (strcmp(label->valuestring, "MaskOn") == 0) {
                         cJSON *rt = cJSON_GetObjectItem(ev, "reportTime");
                         if (rt && cJSON_IsString(rt)) {
@@ -87,13 +96,15 @@ int64_t edf_find_mask_on_time(const char *events_snt_path)
 int64_t edf_find_mask_off_time(const char *events_snt_path)
 {
     FILE *f = fopen(events_snt_path, "r");
-    if (!f) return -1;
+    if (!f)
+        return -1;
 
     int64_t mask_off_ms = -1;
     char line[512];
     while (fgets(line, sizeof(line), f)) {
         cJSON *msg = cJSON_Parse(line);
-        if (!msg) continue;
+        if (!msg)
+            continue;
         cJSON *params = cJSON_GetObjectItem(msg, "params");
         if (params) {
             cJSON *events = cJSON_GetObjectItem(params, "events");
@@ -101,9 +112,11 @@ int64_t edf_find_mask_off_time(const char *events_snt_path)
                 int n = cJSON_GetArraySize(events);
                 for (int i = 0; i < n; i++) {
                     cJSON *ev = cJSON_GetArrayItem(events, i);
-                    if (!ev) continue;
+                    if (!ev)
+                        continue;
                     cJSON *label = cJSON_GetObjectItem(ev, "event");
-                    if (!label || !cJSON_IsString(label)) continue;
+                    if (!label || !cJSON_IsString(label))
+                        continue;
                     if (strcmp(label->valuestring, "MaskOff") == 0) {
                         cJSON *rt = cJSON_GetObjectItem(ev, "reportTime");
                         if (rt && cJSON_IsString(rt)) {
@@ -119,36 +132,35 @@ int64_t edf_find_mask_off_time(const char *events_snt_path)
     return mask_off_ms;
 }
 
-int64_t edf_find_zle_edge_time(const char *events_snt_path, int want_value,
-                               int64_t clock_drift_ms)
+int64_t edf_find_zle_edge_time(const char *events_snt_path, int want_value, int64_t clock_drift_ms)
 {
     FILE *f = fopen(events_snt_path, "r");
-    if (!f) return -1;
+    if (!f)
+        return -1;
 
     int64_t zle_ms = -1;
     char line[512];
     while (fgets(line, sizeof(line), f)) {
         cJSON *msg = cJSON_Parse(line);
-        if (!msg) continue;
+        if (!msg)
+            continue;
         cJSON *params = cJSON_GetObjectItem(msg, "params");
         if (params) {
             cJSON *data_id = cJSON_GetObjectItem(params, "dataId");
-            if (data_id && cJSON_IsString(data_id) &&
-                strcmp(data_id->valuestring, "_ZLE") == 0) {
+            if (data_id && cJSON_IsString(data_id) && strcmp(data_id->valuestring, "_ZLE") == 0) {
                 cJSON *events = cJSON_GetObjectItem(params, "events");
                 if (events && cJSON_IsArray(events)) {
                     int n = cJSON_GetArraySize(events);
                     for (int i = 0; i < n; i++) {
                         cJSON *ev = cJSON_GetArrayItem(events, i);
-                        if (!ev) continue;
+                        if (!ev)
+                            continue;
                         cJSON *val = cJSON_GetObjectItem(ev, "value");
-                        if (val && cJSON_IsNumber(val) &&
-                            (int)val->valuedouble == want_value) {
+                        if (val && cJSON_IsNumber(val) && (int)val->valuedouble == want_value) {
                             int64_t cand = -1;
                             cJSON *rt = cJSON_GetObjectItem(ev, "reportTime");
                             if (rt && cJSON_IsString(rt)) {
-                                int64_t as11_ms =
-                                    as11_time_parse_iso8601_ms(rt->valuestring);
+                                int64_t as11_ms = as11_time_parse_iso8601_ms(rt->valuestring);
                                 if (as11_ms > 0)
                                     cand = as11_ms + clock_drift_ms;
                             }
@@ -180,13 +192,18 @@ int64_t edf_find_zle_edge_time(const char *events_snt_path, int want_value,
  *  SNT to EDF Conversion
  * ════════════════════════════════════════════════════════════════════ */
 
-esp_err_t edf_convert_snt_to_edf(const char *snt_path, const char *edf_path,
-                                 const char *patient_id, const char *recording_id,
-                                 const char *start_date, const char *start_time,
-                                 const edf_signal_def_t *signals, int n_signals,
+esp_err_t edf_convert_snt_to_edf(const char *snt_path,
+                                 const char *edf_path,
+                                 const char *patient_id,
+                                 const char *recording_id,
+                                 const char *start_date,
+                                 const char *start_time,
+                                 const edf_signal_def_t *signals,
+                                 int n_signals,
                                  const char *record_dur,
                                  const int *channel_map,
-                                 int skip_records, int max_records,
+                                 int skip_records,
+                                 int max_records,
                                  const char *second_snt_path)
 {
     uint32_t skip_samples = (uint32_t)skip_records;
@@ -212,7 +229,8 @@ esp_err_t edf_convert_snt_to_edf(const char *snt_path, const char *edf_path,
     snt_header_t hdr;
     if (snt_read_header(snt, &hdr) != ESP_OK) {
         fclose(snt);
-        if (snt2) fclose(snt2);
+        if (snt2)
+            fclose(snt2);
         return ESP_FAIL;
     }
 
@@ -220,17 +238,22 @@ esp_err_t edf_convert_snt_to_edf(const char *snt_path, const char *edf_path,
         snt_header_t hdr2;
         if (snt_read_header(snt2, &hdr2) != ESP_OK) {
             ESP_LOGW(TAG, "cannot read header from %s", snt_path2);
-            fclose(snt); fclose(snt2);
+            fclose(snt);
+            fclose(snt2);
             return ESP_FAIL;
         }
         if (hdr.n_channels != 1 || hdr2.n_channels != 1) {
-            ESP_LOGE(TAG, "v2 pair mode requires 1-ch files: %s has %d ch, %s has %d ch",
-                     snt_path, hdr.n_channels, snt_path2, hdr2.n_channels);
-            fclose(snt); fclose(snt2);
+            ESP_LOGE(TAG,
+                     "v2 pair mode requires 1-ch files: %s has %d ch, %s has %d ch",
+                     snt_path,
+                     hdr.n_channels,
+                     snt_path2,
+                     hdr2.n_channels);
+            fclose(snt);
+            fclose(snt2);
             return ESP_FAIL;
         }
-        if (hdr2.version >= 2 &&
-            (hdr2.reserved & SNT_POSITION_GAP_FLAG)) {
+        if (hdr2.version >= 2 && (hdr2.reserved & SNT_POSITION_GAP_FLAG)) {
             fclose(snt);
             fclose(snt2);
             return EDF_GEN_ERR_POSITION_GAPS;
@@ -240,17 +263,22 @@ esp_err_t edf_convert_snt_to_edf(const char *snt_path, const char *edf_path,
 
     if (hdr.version >= 2 && (hdr.reserved & SNT_POSITION_GAP_FLAG)) {
         fclose(snt);
-        if (snt2) fclose(snt2);
+        if (snt2)
+            fclose(snt2);
         return EDF_GEN_ERR_POSITION_GAPS;
     }
 
     int snt_channels = hdr.n_channels;
     int16_t snt_missing = snt_missing_for(hdr.version);
     if (!is_channel_map_valid(channel_map, n_signals, snt_channels)) {
-        ESP_LOGE(TAG, "%s: channel mapping invalid: snt_channels=%d n_signals=%d",
-                 snt_path, snt_channels, n_signals);
+        ESP_LOGE(TAG,
+                 "%s: channel mapping invalid: snt_channels=%d n_signals=%d",
+                 snt_path,
+                 snt_channels,
+                 n_signals);
         fclose(snt);
-        if (snt2) fclose(snt2);
+        if (snt2)
+            fclose(snt2);
         return ESP_FAIL;
     }
 
@@ -259,9 +287,11 @@ esp_err_t edf_convert_snt_to_edf(const char *snt_path, const char *edf_path,
     edf_signal_def_t *sig = malloc(n_signals * sizeof(edf_signal_def_t));
     if (!spr || !sig) {
         ESP_LOGE(TAG, "malloc spr/sig failed");
-        free(spr); free(sig);
+        free(spr);
+        free(sig);
         fclose(snt);
-        if (snt2) fclose(snt2);
+        if (snt2)
+            fclose(snt2);
         return ESP_ERR_NO_MEM;
     }
     for (int i = 0; i < n_signals; i++) {
@@ -275,47 +305,71 @@ esp_err_t edf_convert_snt_to_edf(const char *snt_path, const char *edf_path,
         uint32_t avail = snt_available_samples(snt, snt2 ? 1 : snt_channels);
         if (snt2) {
             uint32_t avail2 = snt_available_samples(snt2, 1);
-            if (avail2 < avail) avail = avail2;
+            if (avail2 < avail)
+                avail = avail2;
         }
         if (avail < total_samples) {
-            ESP_LOGW(TAG, "%s: header claims %u samples but only %u are on disk "
+            ESP_LOGW(TAG,
+                     "%s: header claims %u samples but only %u are on disk "
                      "(torn tail from an interrupted session) — exporting %u",
-                     snt_path, (unsigned)total_samples, (unsigned)avail, (unsigned)avail);
+                     snt_path,
+                     (unsigned)total_samples,
+                     (unsigned)avail,
+                     (unsigned)avail);
             total_samples = avail;
         }
     }
 
     if (skip_samples > total_samples) {
-        ESP_LOGW(TAG, "%s: skip_samples (%u) > sample_count (%u), clamping",
-                 snt_path, (unsigned)skip_samples, (unsigned)total_samples);
+        ESP_LOGW(TAG,
+                 "%s: skip_samples (%u) > sample_count (%u), clamping",
+                 snt_path,
+                 (unsigned)skip_samples,
+                 (unsigned)total_samples);
         skip_samples = total_samples;
     }
     total_samples -= skip_samples;
 
     if (max_samples > 0 && max_samples < total_samples) {
-        ESP_LOGI(TAG, "%s: truncating %u → %u samples (MaskOff end-trim)",
-                 snt_path, (unsigned)total_samples, (unsigned)max_samples);
+        ESP_LOGI(TAG,
+                 "%s: truncating %u → %u samples (MaskOff end-trim)",
+                 snt_path,
+                 (unsigned)total_samples,
+                 (unsigned)max_samples);
         total_samples = max_samples;
     }
     int total_records = (int)(total_samples / spr[0]);
-    if (total_records < 0) total_records = 0;
+    if (total_records < 0)
+        total_records = 0;
 
     if (total_records == 0) {
-        ESP_LOGI(TAG, "%s: short session (%u samples < %d spr), writing header-only EDF",
-                 snt_path, (unsigned)total_samples, spr[0]);
+        ESP_LOGI(TAG,
+                 "%s: short session (%u samples < %d spr), writing header-only EDF",
+                 snt_path,
+                 (unsigned)total_samples,
+                 spr[0]);
         char tmp_path[380];
         FILE *edf = edf_open_atomic_file(edf_path, tmp_path, sizeof(tmp_path));
         if (!edf) {
             ESP_LOGE(TAG, "cannot create %s: %s", edf_path, strerror(errno));
-            free(spr); free(sig);
+            free(spr);
+            free(sig);
             fclose(snt);
-            if (snt2) fclose(snt2);
+            if (snt2)
+                fclose(snt2);
             return ESP_FAIL;
         }
         esp_err_t written = ESP_OK;
-        if (edf_write_header(edf, patient_id, recording_id,
-                             start_date, start_time,
-                             0, record_dur, "EDF", sig, n_signals) < 0) {
+        if (edf_write_header(edf,
+                             patient_id,
+                             recording_id,
+                             start_date,
+                             start_time,
+                             0,
+                             record_dur,
+                             "EDF",
+                             sig,
+                             n_signals) < 0) {
             edf_discard_atomic_file(edf, tmp_path);
             written = ESP_FAIL;
         } else {
@@ -323,20 +377,29 @@ esp_err_t edf_convert_snt_to_edf(const char *snt_path, const char *edf_path,
         }
         if (written != ESP_OK) {
             ESP_LOGE(TAG, "cannot write %s: %s", edf_path, strerror(errno));
-            free(spr); free(sig);
+            free(spr);
+            free(sig);
             fclose(snt);
-            if (snt2) fclose(snt2);
+            if (snt2)
+                fclose(snt2);
             return ESP_FAIL;
         }
-        free(spr); free(sig);
+        free(spr);
+        free(sig);
         fclose(snt);
-        if (snt2) fclose(snt2);
+        if (snt2)
+            fclose(snt2);
         return ESP_OK;
     }
 
-    ESP_LOGI(TAG, "converting %s → %s: %u samples (skip %u), %d records, %d ch",
-             snt_path, edf_path, (unsigned)total_samples, (unsigned)skip_samples,
-             total_records, n_signals);
+    ESP_LOGI(TAG,
+             "converting %s → %s: %u samples (skip %u), %d records, %d ch",
+             snt_path,
+             edf_path,
+             (unsigned)total_samples,
+             (unsigned)skip_samples,
+             total_records,
+             n_signals);
 
     if (skip_samples > 0) {
         int primary_channels = snt2 ? 1 : snt_channels;
@@ -359,21 +422,31 @@ esp_err_t edf_convert_snt_to_edf(const char *snt_path, const char *edf_path,
     if (!edf) {
         ESP_LOGE(TAG, "cannot create %s: %s", edf_path, strerror(errno));
         fclose(snt);
-        if (snt2) fclose(snt2);
-        free(spr); free(sig);
+        if (snt2)
+            fclose(snt2);
+        free(spr);
+        free(sig);
         return ESP_FAIL;
     }
 
-    int header_bytes = edf_write_header(edf, patient_id, recording_id,
-                                        start_date, start_time,
-                                        total_records, record_dur,
-                                        "EDF", sig, n_signals);
+    int header_bytes = edf_write_header(edf,
+                                        patient_id,
+                                        recording_id,
+                                        start_date,
+                                        start_time,
+                                        total_records,
+                                        record_dur,
+                                        "EDF",
+                                        sig,
+                                        n_signals);
     if (header_bytes < 0) {
         ESP_LOGE(TAG, "edf_write_header failed for %s", edf_path);
-        free(spr); free(sig);
+        free(spr);
+        free(sig);
         edf_discard_atomic_file(edf, tmp_path);
         fclose(snt);
-        if (snt2) fclose(snt2);
+        if (snt2)
+            fclose(snt2);
         return ESP_FAIL;
     }
 
@@ -389,10 +462,14 @@ esp_err_t edf_convert_snt_to_edf(const char *snt_path, const char *edf_path,
     }
     if (!raw || !record_buf) {
         ESP_LOGE(TAG, "malloc record buffers failed");
-        free(raw); free(record_buf); free(spr); free(sig);
+        free(raw);
+        free(record_buf);
+        free(spr);
+        free(sig);
         edf_discard_atomic_file(edf, tmp_path);
         fclose(snt);
-        if (snt2) fclose(snt2);
+        if (snt2)
+            fclose(snt2);
         return ESP_ERR_NO_MEM;
     }
 
@@ -413,30 +490,44 @@ esp_err_t edf_convert_snt_to_edf(const char *snt_path, const char *edf_path,
                 int16_t *press_buf = malloc(ch_bytes);
                 if (!flow_buf || !press_buf) {
                     ESP_LOGW(TAG, "v2 interleave malloc failed at record %d", rec);
-                    free(flow_buf); free(press_buf);
-                    free(raw); free(record_buf); free(spr); free(sig);
+                    free(flow_buf);
+                    free(press_buf);
+                    free(raw);
+                    free(record_buf);
+                    free(spr);
+                    free(sig);
                     edf_discard_atomic_file(edf, tmp_path);
-                    fclose(snt); fclose(snt2);
+                    fclose(snt);
+                    fclose(snt2);
                     return ESP_FAIL;
                 }
                 if (fread(flow_buf, 1, ch_bytes, snt) != ch_bytes ||
                     fread(press_buf, 1, ch_bytes, snt2) != ch_bytes) {
                     ESP_LOGW(TAG, "v2 short read at record %d", rec);
-                    free(flow_buf); free(press_buf);
-                    free(raw); free(record_buf); free(spr); free(sig);
+                    free(flow_buf);
+                    free(press_buf);
+                    free(raw);
+                    free(record_buf);
+                    free(spr);
+                    free(sig);
                     edf_discard_atomic_file(edf, tmp_path);
-                    fclose(snt); fclose(snt2);
+                    fclose(snt);
+                    fclose(snt2);
                     return ESP_FAIL;
                 }
                 for (int s = 0; s < n_samp; s++) {
-                    raw[s * 2]     = flow_buf[s];
+                    raw[s * 2] = flow_buf[s];
                     raw[s * 2 + 1] = press_buf[s];
                 }
-                free(flow_buf); free(press_buf);
+                free(flow_buf);
+                free(press_buf);
             } else {
                 if (fread(raw, 1, avail, snt) != avail) {
                     ESP_LOGW(TAG, "short read at record %d", rec);
-                    free(raw); free(record_buf); free(spr); free(sig);
+                    free(raw);
+                    free(record_buf);
+                    free(spr);
+                    free(sig);
                     edf_discard_atomic_file(edf, tmp_path);
                     fclose(snt);
                     return ESP_FAIL;
@@ -476,20 +567,28 @@ esp_err_t edf_convert_snt_to_edf(const char *snt_path, const char *edf_path,
         }
 
         if (!edf_write_all(edf, record_buf, record_bytes)) {
-            free(raw); free(record_buf); free(spr); free(sig);
+            free(raw);
+            free(record_buf);
+            free(spr);
+            free(sig);
             edf_discard_atomic_file(edf, tmp_path);
             fclose(snt);
-            if (snt2) fclose(snt2);
+            if (snt2)
+                fclose(snt2);
             return ESP_FAIL;
         }
 
         uint16_t crc = edf_crc16_ccitt((uint8_t *)record_buf, record_bytes);
         int16_t crc_val = (int16_t)crc;
         if (!edf_write_all(edf, &crc_val, sizeof(crc_val))) {
-            free(raw); free(record_buf); free(spr); free(sig);
+            free(raw);
+            free(record_buf);
+            free(spr);
+            free(sig);
             edf_discard_atomic_file(edf, tmp_path);
             fclose(snt);
-            if (snt2) fclose(snt2);
+            if (snt2)
+                fclose(snt2);
             return ESP_FAIL;
         }
     }
@@ -502,11 +601,13 @@ esp_err_t edf_convert_snt_to_edf(const char *snt_path, const char *edf_path,
     if (edf_finalize_atomic_file(edf, tmp_path, edf_path) != ESP_OK) {
         ESP_LOGE(TAG, "cannot finalize %s: %s", edf_path, strerror(errno));
         fclose(snt);
-        if (snt2) fclose(snt2);
+        if (snt2)
+            fclose(snt2);
         return ESP_FAIL;
     }
     fclose(snt);
-    if (snt2) fclose(snt2);
+    if (snt2)
+        fclose(snt2);
     ESP_LOGI(TAG, "EDF conversion complete: %s", edf_path);
     return ESP_OK;
 }

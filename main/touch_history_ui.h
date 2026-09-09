@@ -93,8 +93,7 @@ typedef struct {
     char day[9];
 } touch_history_ui_intent_t;
 
-typedef void (*touch_history_ui_intent_fn)(
-    void *context, const touch_history_ui_intent_t *intent);
+typedef void (*touch_history_ui_intent_fn)(void *context, const touch_history_ui_intent_t *intent);
 
 typedef struct {
     touch_history_ui_intent_fn on_intent;

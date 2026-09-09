@@ -113,13 +113,11 @@ void first_run_setup_snapshot(first_run_setup_snapshot_t *out);
 /* Persist one explicit transition. There is deliberately no whole-setup skip:
  * only the five skippable named steps accept UPDATE_SKIP, and Card requires
  * UPDATE_CONTINUE_WITHOUT_RECORDING when it is absent. */
-esp_err_t first_run_setup_update(first_run_setup_step_t step,
-                                 first_run_setup_update_t update);
+esp_err_t first_run_setup_update(first_run_setup_step_t step, first_run_setup_update_t update);
 
 /* Merge caller-observed facts and persist the result. Existing persisted user
  * choices are never regressed by an absent observation. */
-esp_err_t first_run_setup_reconcile(
-    const first_run_setup_observed_t *observed);
+esp_err_t first_run_setup_reconcile(const first_run_setup_observed_t *observed);
 
 /* Explicitly erase setup progress and restore the fresh first step. This also
  * permits deliberate recovery from a corrupt or unsupported stored schema. */

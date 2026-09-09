@@ -33,13 +33,13 @@
 
 #include "esp_log.h"
 
-
 static const char *TAG = "ox_http";
 
 static bool query(httpd_req_t *req, const char *key, char *out, size_t out_size)
 {
     char buf[512];
-    if (httpd_req_get_url_query_str(req, buf, sizeof(buf)) != ESP_OK) return false;
+    if (httpd_req_get_url_query_str(req, buf, sizeof(buf)) != ESP_OK)
+        return false;
     return httpd_query_key_value(buf, key, out, out_size) == ESP_OK;
 }
 
@@ -70,7 +70,8 @@ static esp_err_t oximetry_recordings_handler(httpd_req_t *req)
             json = cJSON_PrintUnformatted(arr);
             cJSON_Delete(arr);
         }
-        if (!json) json = strdup("[]");
+        if (!json)
+            json = strdup("[]");
     } else {
         json = oximetry_canonical_list_json();
     }
@@ -91,7 +92,8 @@ static esp_err_t oximetry_days_handler(httpd_req_t *req)
         json = cJSON_PrintUnformatted(arr);
         cJSON_Delete(arr);
     }
-    if (!json) json = strdup("[]");
+    if (!json)
+        json = strdup("[]");
     ox_store_end_io();
     return json_send(req, json);
 }
@@ -163,8 +165,8 @@ static esp_err_t oximetry_file_handler(httpd_req_t *req)
         httpd_resp_send_500(req);
         return ESP_FAIL;
     }
-    httpd_resp_set_type(req, strcmp(track, "events") == 0 ? "application/jsonl" :
-                        "application/octet-stream");
+    httpd_resp_set_type(
+        req, strcmp(track, "events") == 0 ? "application/jsonl" : "application/octet-stream");
     httpd_resp_set_hdr(req, "Cache-Control", "public, max-age=3600");
     httpd_resp_set_hdr(req, "Accept-Ranges", "bytes");
     long start = 0, end = size - 1;
@@ -175,11 +177,15 @@ static esp_err_t oximetry_file_handler(httpd_req_t *req)
         if (dash) {
             *dash = '\0';
             start = strtol(range + 6, NULL, 10);
-            if (*(dash + 1)) end = strtol(dash + 1, NULL, 10);
-            if (start < 0) start = 0;
-            if (end >= size) end = size - 1;
+            if (*(dash + 1))
+                end = strtol(dash + 1, NULL, 10);
+            if (start < 0)
+                start = 0;
+            if (end >= size)
+                end = size - 1;
             if (start > end || start >= size) {
-                fclose(f); httpd_resp_set_status(req, "416 Range Not Satisfiable");
+                fclose(f);
+                httpd_resp_set_status(req, "416 Range Not Satisfiable");
                 esp_err_t response = httpd_resp_send(req, NULL, 0);
                 ox_store_end_io();
                 return response;
@@ -191,7 +197,8 @@ static esp_err_t oximetry_file_handler(httpd_req_t *req)
         }
     }
     if (req->method == HTTP_HEAD) {
-        char len[24]; snprintf(len, sizeof(len), "%ld", end - start + 1);
+        char len[24];
+        snprintf(len, sizeof(len), "%ld", end - start + 1);
         httpd_resp_set_hdr(req, "Content-Length", len);
         fclose(f);
         esp_err_t response = httpd_resp_send(req, NULL, 0);
@@ -205,7 +212,8 @@ static esp_err_t oximetry_file_handler(httpd_req_t *req)
     }
     long remaining = end - start + 1;
     uint8_t *buf = heap_caps_malloc(4096, MALLOC_CAP_SPIRAM);
-    if (!buf) buf = malloc(4096);
+    if (!buf)
+        buf = malloc(4096);
     if (!buf) {
         fclose(f);
         ox_store_end_io();
@@ -216,47 +224,58 @@ static esp_err_t oximetry_file_handler(httpd_req_t *req)
     while (remaining > 0) {
         size_t want = remaining > 4096 ? 4096 : (size_t)remaining;
         size_t n = fread(buf, 1, want, f);
-        if (n == 0) break;
+        if (n == 0)
+            break;
         remaining -= (long)n;
         e = httpd_resp_send_chunk(req, (const char *)buf, n);
-        if (e != ESP_OK) break;
+        if (e != ESP_OK)
+            break;
     }
-    if (e == ESP_OK) e = httpd_resp_send_chunk(req, NULL, 0);
+    if (e == ESP_OK)
+        e = httpd_resp_send_chunk(req, NULL, 0);
     free(buf);
     fclose(f);
     ox_store_end_io();
-    if (e != ESP_OK) ESP_LOGW(TAG, "track send failed: %s", esp_err_to_name(e));
+    if (e != ESP_OK)
+        ESP_LOGW(TAG, "track send failed: %s", esp_err_to_name(e));
     return e;
 }
 
 void oximetry_http_register_handlers(httpd_handle_t server)
 {
     httpd_uri_t list = {
-        .uri = "/api/oximetry/recordings", .method = HTTP_GET,
+        .uri = "/api/oximetry/recordings",
+        .method = HTTP_GET,
         .handler = oximetry_recordings_handler,
     };
     httpd_uri_t recording = {
-        .uri = "/api/oximetry/recording", .method = HTTP_GET,
+        .uri = "/api/oximetry/recording",
+        .method = HTTP_GET,
         .handler = oximetry_recording_handler,
     };
     httpd_uri_t uploads = {
-        .uri = "/api/oximetry/uploads", .method = HTTP_GET,
+        .uri = "/api/oximetry/uploads",
+        .method = HTTP_GET,
         .handler = oximetry_uploads_handler,
     };
     httpd_uri_t diagnostics = {
-        .uri = "/api/oximetry/diagnostics", .method = HTTP_GET,
+        .uri = "/api/oximetry/diagnostics",
+        .method = HTTP_GET,
         .handler = oximetry_diagnostics_handler,
     };
     httpd_uri_t file = {
-        .uri = "/api/oximetry/file", .method = HTTP_GET,
+        .uri = "/api/oximetry/file",
+        .method = HTTP_GET,
         .handler = oximetry_file_handler,
     };
     httpd_uri_t file_head = {
-        .uri = "/api/oximetry/file", .method = HTTP_HEAD,
+        .uri = "/api/oximetry/file",
+        .method = HTTP_HEAD,
         .handler = oximetry_file_handler,
     };
     httpd_uri_t days = {
-        .uri = "/api/oximetry/days", .method = HTTP_GET,
+        .uri = "/api/oximetry/days",
+        .method = HTTP_GET,
         .handler = oximetry_days_handler,
     };
     httpd_register_uri_handler(server, &list);

@@ -46,18 +46,18 @@
 
 static const char *TAG = "time_sync";
 
-#define NVS_NAMESPACE    "cfg"
-#define NVS_KEY_TZ_STR   "tz_str"
-#define NVS_KEY_TZ_NAME  "tz_name"
-#define NVS_KEY_NTP_SRV  "ntp_srv"
-#define NVS_KEY_DRIFT    "drift_ms"
+#define NVS_NAMESPACE "cfg"
+#define NVS_KEY_TZ_STR "tz_str"
+#define NVS_KEY_TZ_NAME "tz_name"
+#define NVS_KEY_NTP_SRV "ntp_srv"
+#define NVS_KEY_DRIFT "drift_ms"
 #define NVS_KEY_DRIFT_AT "drift_at"
-#define TZ_STR_MAX       64
-#define TZ_NAME_MAX      40
-#define NTP_SRV_MAX      64
-#define SNTP_SYNC_MS    (3600 * 1000)   /* 1 hour */
-#define NTP_INITIAL_TIMEOUT_MS  15000   /* per-attempt wait for initial sync */
-#define NTP_INITIAL_ATTEMPTS    3
+#define TZ_STR_MAX 64
+#define TZ_NAME_MAX 40
+#define NTP_SRV_MAX 64
+#define SNTP_SYNC_MS (3600 * 1000)   /* 1 hour */
+#define NTP_INITIAL_TIMEOUT_MS 15000 /* per-attempt wait for initial sync */
+#define NTP_INITIAL_ATTEMPTS 3
 
 static bool s_synced = false;
 static int64_t s_last_sync_epoch;
@@ -67,10 +67,10 @@ static bool s_initial_sync_done = false;
 
 /* ── Time-source provenance ─────────────────────────────────────────── */
 static time_source_t s_source = TIME_SRC_NONE;
-static int64_t s_drift_ms = 0;       /* last known drift (NTP - AS11) */
-static int64_t s_drift_at_ms = 0;    /* NTP epoch ms when drift was measured */
-static bool s_drift_loaded = false;  /* true once s_drift_ms/at loaded from NVS */
-static const char *s_drift_src = "none";  /* provenance of s_drift_ms */
+static int64_t s_drift_ms = 0;           /* last known drift (NTP - AS11) */
+static int64_t s_drift_at_ms = 0;        /* NTP epoch ms when drift was measured */
+static bool s_drift_loaded = false;      /* true once s_drift_ms/at loaded from NVS */
+static const char *s_drift_src = "none"; /* provenance of s_drift_ms */
 static portMUX_TYPE s_drift_lock = portMUX_INITIALIZER_UNLOCKED;
 
 typedef struct {
@@ -95,8 +95,7 @@ static drift_cache_snapshot_t drift_cache_load(void)
     return snap;
 }
 
-static void drift_cache_store(int64_t drift_ms, int64_t measured_at_ms,
-                              const char *source)
+static void drift_cache_store(int64_t drift_ms, int64_t measured_at_ms, const char *source)
 {
     portENTER_CRITICAL(&s_drift_lock);
     s_drift_ms = drift_ms;
@@ -116,9 +115,14 @@ static void sntp_sync_cb(struct timeval *tv)
     time_t now = tv->tv_sec;
     struct tm tm_info;
     localtime_r(&now, &tm_info);
-    ESP_LOGI(TAG, "NTP sync OK: %04d-%02d-%02d %02d:%02d:%02d",
-             tm_info.tm_year + 1900, tm_info.tm_mon + 1, tm_info.tm_mday,
-             tm_info.tm_hour, tm_info.tm_min, tm_info.tm_sec);
+    ESP_LOGI(TAG,
+             "NTP sync OK: %04d-%02d-%02d %02d:%02d:%02d",
+             tm_info.tm_year + 1900,
+             tm_info.tm_mon + 1,
+             tm_info.tm_mday,
+             tm_info.tm_hour,
+             tm_info.tm_min,
+             tm_info.tm_sec);
 }
 
 static void apply_timezone(const char *tz_str)
@@ -146,12 +150,14 @@ static esp_err_t do_set_timezone(void *arg)
     strlcpy(tz_name, a->tz_name ? a->tz_name : "", sizeof(tz_name));
     nvs_handle_t h;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
-    if (err != ESP_OK) return err;
+    if (err != ESP_OK)
+        return err;
     err = nvs_set_str(h, NVS_KEY_TZ_STR, tz_str);
     if (err == ESP_OK && tz_name[0]) {
         nvs_set_str(h, NVS_KEY_TZ_NAME, tz_name);
     }
-    if (err == ESP_OK) err = nvs_commit(h);
+    if (err == ESP_OK)
+        err = nvs_commit(h);
     nvs_close(h);
     return err;
 }
@@ -162,7 +168,7 @@ esp_err_t time_sync_set_timezone(const char *tz_str, const char *tz_name)
         return ESP_ERR_INVALID_ARG;
     }
     /* Delegate the flash write so callers on a PSRAM stack (httpd) are safe. */
-    tz_save_args_t args = { .tz_str = tz_str, .tz_name = tz_name };
+    tz_save_args_t args = {.tz_str = tz_str, .tz_name = tz_name};
     esp_err_t err = nvs_writer_run(do_set_timezone, &args);
     if (err == ESP_OK) {
         apply_timezone(tz_str);
@@ -190,21 +196,29 @@ static esp_err_t do_read_nvs_string(void *arg)
     char value[64] = {0};
     nvs_handle_t h;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &h);
-    if (err != ESP_OK) { a->ok = false; return err; }
+    if (err != ESP_OK) {
+        a->ok = false;
+        return err;
+    }
     size_t value_len = sizeof(value);
     err = nvs_get_str(h, key, value, &value_len);
     nvs_close(h);
     a->ok = err == ESP_OK;
-    if (a->ok && out && out_len) strlcpy(out, value, out_len);
+    if (a->ok && out && out_len)
+        strlcpy(out, value, out_len);
     return err;
 }
 
 static void read_nvs_string(const char *key, char *out, size_t out_len)
 {
-    if (!out || out_len == 0) return;
+    if (!out || out_len == 0)
+        return;
     out[0] = '\0';
     nvs_string_read_args_t args = {
-        .key = key, .out = out, .out_len = out_len, .ok = false,
+        .key = key,
+        .out = out,
+        .out_len = out_len,
+        .ok = false,
     };
     nvs_writer_run(do_read_nvs_string, &args);
 }
@@ -222,31 +236,34 @@ void time_sync_get_tz_name(char *tz_name, size_t tz_name_len)
 static esp_err_t do_set_ntp_server(void *arg)
 {
     const char *server_arg = (const char *)arg;
-    char server[ NTP_SRV_MAX ];
+    char server[NTP_SRV_MAX];
     strlcpy(server, server_arg ? server_arg : "", sizeof(server));
     nvs_handle_t h;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
-    if (err != ESP_OK) return err;
+    if (err != ESP_OK)
+        return err;
 
     if (server[0] != '\0') {
         err = nvs_set_str(h, NVS_KEY_NTP_SRV, server);
     } else {
         err = nvs_erase_key(h, NVS_KEY_NTP_SRV);
-        if (err == ESP_ERR_NVS_NOT_FOUND) err = ESP_OK;
+        if (err == ESP_ERR_NVS_NOT_FOUND)
+            err = ESP_OK;
     }
-    if (err == ESP_OK) err = nvs_commit(h);
+    if (err == ESP_OK)
+        err = nvs_commit(h);
     nvs_close(h);
     return err;
 }
 
 esp_err_t time_sync_set_ntp_server(const char *server)
 {
-    if (server && (strlen(server) >= NTP_SRV_MAX || strpbrk(server, " /\\:@?#\r\n"))) return ESP_ERR_INVALID_ARG;
+    if (server && (strlen(server) >= NTP_SRV_MAX || strpbrk(server, " /\\:@?#\r\n")))
+        return ESP_ERR_INVALID_ARG;
     /* Delegate the flash write so callers on a PSRAM stack (httpd) are safe. */
     esp_err_t err = nvs_writer_run(do_set_ntp_server, (void *)server);
     if (err == ESP_OK) {
-        ESP_LOGI(TAG, "NTP server set to: %s",
-                 (server && server[0]) ? server : "(auto)");
+        ESP_LOGI(TAG, "NTP server set to: %s", (server && server[0]) ? server : "(auto)");
     }
     return err;
 }
@@ -278,14 +295,16 @@ bool time_is_usable(void)
 int64_t time_source_drift_age_ms(void)
 {
     drift_cache_snapshot_t snap = drift_cache_load();
-    if (!snap.loaded || snap.measured_at_ms == 0) return -1;
+    if (!snap.loaded || snap.measured_at_ms == 0)
+        return -1;
     int64_t now_ms = (int64_t)time(NULL) * 1000;
     return now_ms - snap.measured_at_ms;
 }
 
 bool time_sync_has_drift(void)
 {
-    if (drift_cache_load().loaded) return true;
+    if (drift_cache_load().loaded)
+        return true;
     load_drift_from_nvs();
     return drift_cache_load().loaded;
 }
@@ -294,11 +313,13 @@ static bool load_drift_from_sd(void);
 
 bool time_sync_peek_drift_snapshot(time_drift_snapshot_t *out)
 {
-    if (!out) return false;
+    if (!out)
+        return false;
     memset(out, 0, sizeof(*out));
     out->source = "none";
     drift_cache_snapshot_t snap = drift_cache_load();
-    if (!snap.loaded) return false;
+    if (!snap.loaded)
+        return false;
 
     out->available = true;
     out->drift_ms = snap.drift_ms;
@@ -309,14 +330,16 @@ bool time_sync_peek_drift_snapshot(time_drift_snapshot_t *out)
 
 bool time_sync_get_drift_snapshot(time_drift_snapshot_t *out)
 {
-    if (!out) return false;
+    if (!out)
+        return false;
     memset(out, 0, sizeof(*out));
     out->source = "none";
 
     if (!drift_cache_load().loaded) {
         /* NVS first, then the SD upgrade fallback (devices that predate the
          * NVS keys still have drift recorded in session manifests). */
-        if (!load_drift_from_nvs()) load_drift_from_sd();
+        if (!load_drift_from_nvs())
+            load_drift_from_sd();
     }
     return time_sync_peek_drift_snapshot(out);
 }
@@ -335,10 +358,13 @@ static esp_err_t do_save_drift(void *arg)
     int64_t measured_at_ms = a->measured_at_ms;
     nvs_handle_t h;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
-    if (err != ESP_OK) return err;
+    if (err != ESP_OK)
+        return err;
     err = nvs_set_i64(h, NVS_KEY_DRIFT, drift_ms);
-    if (err == ESP_OK) err = nvs_set_i64(h, NVS_KEY_DRIFT_AT, measured_at_ms);
-    if (err == ESP_OK) err = nvs_commit(h);
+    if (err == ESP_OK)
+        err = nvs_set_i64(h, NVS_KEY_DRIFT_AT, measured_at_ms);
+    if (err == ESP_OK)
+        err = nvs_commit(h);
     nvs_close(h);
     return err;
 }
@@ -347,11 +373,13 @@ void time_sync_save_drift(int64_t drift_ms, int64_t measured_at_ms)
 {
     drift_cache_store(drift_ms, measured_at_ms, "nvs");
 
-    drift_save_args_t args = { .drift_ms = drift_ms, .measured_at_ms = measured_at_ms };
+    drift_save_args_t args = {.drift_ms = drift_ms, .measured_at_ms = measured_at_ms};
     esp_err_t err = nvs_writer_run(do_save_drift, &args);
     if (err == ESP_OK) {
-        ESP_LOGI(TAG, "drift saved: %lld ms (measured at %lld)",
-                 (long long)drift_ms, (long long)measured_at_ms);
+        ESP_LOGI(TAG,
+                 "drift saved: %lld ms (measured at %lld)",
+                 (long long)drift_ms,
+                 (long long)measured_at_ms);
     } else {
         ESP_LOGW(TAG, "drift NVS save failed: %s", esp_err_to_name(err));
     }
@@ -398,7 +426,8 @@ static bool load_drift_from_nvs(void)
 
     if (args.ok) {
         drift_cache_store(args.drift_ms, args.measured_at_ms, "nvs");
-        ESP_LOGI(TAG, "drift loaded from NVS: %lld ms (age %lld s)",
+        ESP_LOGI(TAG,
+                 "drift loaded from NVS: %lld ms (age %lld s)",
                  (long long)args.drift_ms,
                  (long long)((time(NULL) * 1000 - args.measured_at_ms) / 1000));
     }
@@ -413,7 +442,8 @@ static bool load_drift_from_sd(void)
     snprintf(streams_path, sizeof(streams_path), "%s", SD_STREAMS_DIR);
 
     DIR *streams_dir = opendir(streams_path);
-    if (!streams_dir) return false;
+    if (!streams_dir)
+        return false;
 
     int64_t best_drift = 0;
     int64_t best_start = 0;
@@ -421,12 +451,14 @@ static bool load_drift_from_sd(void)
 
     struct dirent *day_entry;
     while ((day_entry = readdir(streams_dir)) != NULL) {
-        if (day_entry->d_name[0] == '.') continue;
+        if (day_entry->d_name[0] == '.')
+            continue;
 
         char day_path[320];
         snprintf(day_path, sizeof(day_path), "%s/%s", streams_path, day_entry->d_name);
         DIR *day_dir = opendir(day_path);
-        if (!day_dir) continue;
+        if (!day_dir)
+            continue;
 
         struct dirent *f_entry;
         while ((f_entry = readdir(day_dir)) != NULL) {
@@ -438,22 +470,30 @@ static bool load_drift_from_sd(void)
             char json_path[768];
             snprintf(json_path, sizeof(json_path), "%s/%s", day_path, name);
             FILE *f = fopen(json_path, "r");
-            if (!f) continue;
+            if (!f)
+                continue;
 
             fseek(f, 0, SEEK_END);
             long fsize = ftell(f);
             fseek(f, 0, SEEK_SET);
-            if (fsize <= 0 || fsize > 8192) { fclose(f); continue; }
+            if (fsize <= 0 || fsize > 8192) {
+                fclose(f);
+                continue;
+            }
 
             char *buf = malloc(fsize + 1);
-            if (!buf) { fclose(f); continue; }
+            if (!buf) {
+                fclose(f);
+                continue;
+            }
             size_t rd = fread(buf, 1, fsize, f);
             fclose(f);
             buf[rd] = '\0';
 
             cJSON *root = cJSON_Parse(buf);
             free(buf);
-            if (!root) continue;
+            if (!root)
+                continue;
 
             cJSON *valid = cJSON_GetObjectItem(root, "clock_drift_valid");
             if (valid && cJSON_IsTrue(valid)) {
@@ -481,8 +521,10 @@ static bool load_drift_from_sd(void)
 
     if (found) {
         drift_cache_store(best_drift, best_start, "sd");
-        ESP_LOGI(TAG, "drift loaded from SD: %lld ms (session start %lld)",
-                 (long long)best_drift, (long long)best_start);
+        ESP_LOGI(TAG,
+                 "drift loaded from SD: %lld ms (session start %lld)",
+                 (long long)best_drift,
+                 (long long)best_start);
     }
     return found;
 }
@@ -502,23 +544,22 @@ esp_err_t time_sync_recover_from_as11(void)
             return ESP_ERR_NOT_FOUND;
         }
         drift = drift_cache_load();
-        if (!drift.loaded) return ESP_ERR_NOT_FOUND;
+        if (!drift.loaded)
+            return ESP_ERR_NOT_FOUND;
     }
 
     /* Query AS11 wall clock. */
     int64_t as11_ms = 0;
     esp_err_t err = as11_ble_get_datetime(&as11_ms);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "recover_from_as11: GetDateTime failed: %s",
-                 esp_err_to_name(err));
+        ESP_LOGW(TAG, "recover_from_as11: GetDateTime failed: %s", esp_err_to_name(err));
         return ESP_FAIL;
     }
 
     /* Apply: wall = AS11 + drift. */
     int64_t wall_ms = as11_ms + drift.drift_ms;
-    int64_t drift_age_ms = drift.measured_at_ms > 0
-                         ? wall_ms - drift.measured_at_ms : -1;
-    struct timeval tv = { .tv_sec = wall_ms / 1000, .tv_usec = (wall_ms % 1000) * 1000 };
+    int64_t drift_age_ms = drift.measured_at_ms > 0 ? wall_ms - drift.measured_at_ms : -1;
+    struct timeval tv = {.tv_sec = wall_ms / 1000, .tv_usec = (wall_ms % 1000) * 1000};
     settimeofday(&tv, NULL);
 
     s_source = TIME_SRC_AS11_DRIFT;
@@ -526,12 +567,18 @@ esp_err_t time_sync_recover_from_as11(void)
     time_t now = (time_t)(wall_ms / 1000);
     struct tm tm_info;
     localtime_r(&now, &tm_info);
-    ESP_LOGW(TAG, "time recovered from AS11 + drift: "
+    ESP_LOGW(TAG,
+             "time recovered from AS11 + drift: "
              "%04d-%02d-%02d %02d:%02d:%02d "
              "(AS11=%lld drift=%lld ms, drift age=%lld s)",
-             tm_info.tm_year + 1900, tm_info.tm_mon + 1, tm_info.tm_mday,
-             tm_info.tm_hour, tm_info.tm_min, tm_info.tm_sec,
-             (long long)as11_ms, (long long)drift.drift_ms,
+             tm_info.tm_year + 1900,
+             tm_info.tm_mon + 1,
+             tm_info.tm_mday,
+             tm_info.tm_hour,
+             tm_info.tm_min,
+             tm_info.tm_sec,
+             (long long)as11_ms,
+             (long long)drift.drift_ms,
              (long long)(drift_age_ms / 1000));
 
     return ESP_OK;
@@ -555,8 +602,8 @@ esp_err_t time_sync_init(void)
     time_sync_get_ntp_server(ntp_srv, sizeof(ntp_srv));
     bool has_custom_ntp = (ntp_srv[0] != '\0');
 
-    esp_sntp_config_t sntp_cfg = ESP_NETIF_SNTP_DEFAULT_CONFIG(
-        has_custom_ntp ? ntp_srv : "pool.ntp.org");
+    esp_sntp_config_t sntp_cfg =
+        ESP_NETIF_SNTP_DEFAULT_CONFIG(has_custom_ntp ? ntp_srv : "pool.ntp.org");
     sntp_cfg.smooth_sync = false;
     sntp_cfg.sync_cb = sntp_sync_cb;
 
@@ -575,7 +622,7 @@ esp_err_t time_sync_init(void)
         sntp_cfg.start = false;
         sntp_cfg.renew_servers_after_new_IP = true;
         sntp_cfg.ip_event_to_renew = IP_EVENT_STA_GOT_IP;
-        sntp_cfg.index_of_first_server = 1;  /* slot 0 = static fallback */
+        sntp_cfg.index_of_first_server = 1; /* slot 0 = static fallback */
     }
 
     esp_err_t err = esp_netif_sntp_init(&sntp_cfg);
@@ -602,7 +649,9 @@ esp_err_t time_sync_init(void)
     if (has_custom_ntp) {
         ESP_LOGI(TAG, "SNTP started — custom server: %s, sync every %d ms", ntp_srv, SNTP_SYNC_MS);
     } else {
-        ESP_LOGI(TAG, "SNTP started — DHCP option 42 + pool.ntp.org + time.google.com, sync every %d ms", SNTP_SYNC_MS);
+        ESP_LOGI(TAG,
+                 "SNTP started — DHCP option 42 + pool.ntp.org + time.google.com, sync every %d ms",
+                 SNTP_SYNC_MS);
     }
     return ESP_OK;
 }
@@ -618,8 +667,8 @@ bool time_sync_wait_initial(void)
      * (lwIP default retry timeout ~15 s).  We poll s_synced in three windows
      * of NTP_INITIAL_TIMEOUT_MS each, giving ~45 s total for the first sync. */
     for (int attempt = 1; attempt <= NTP_INITIAL_ATTEMPTS; attempt++) {
-        ESP_LOGI(TAG, "waiting for initial NTP sync (attempt %d/%d)...",
-                 attempt, NTP_INITIAL_ATTEMPTS);
+        ESP_LOGI(
+            TAG, "waiting for initial NTP sync (attempt %d/%d)...", attempt, NTP_INITIAL_ATTEMPTS);
 
         int waited = 0;
         while (!s_synced && waited < NTP_INITIAL_TIMEOUT_MS) {
@@ -633,8 +682,7 @@ bool time_sync_wait_initial(void)
             return true;
         }
 
-        ESP_LOGW(TAG, "NTP sync attempt %d timed out after %d ms",
-                 attempt, NTP_INITIAL_TIMEOUT_MS);
+        ESP_LOGW(TAG, "NTP sync attempt %d timed out after %d ms", attempt, NTP_INITIAL_TIMEOUT_MS);
     }
 
     s_initial_sync_done = true;
@@ -651,7 +699,8 @@ int64_t time_sync_last_success_epoch(void)
 }
 esp_err_t time_sync_request_now(void)
 {
-    if (s_sntp_initialized) esp_netif_sntp_deinit();
+    if (s_sntp_initialized)
+        esp_netif_sntp_deinit();
     s_sntp_initialized = false;
     return time_sync_init();
 }

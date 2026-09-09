@@ -76,8 +76,7 @@ bool as11_time_offset_from_settings(const cJSON *settings, as11_offset_t *out);
  * (noon at +13:00 and at -11:00 share the same UTC time-of-day).  Returns
  * false if the timestamp does not look like a noon stamp, in which case the
  * caller should fall back rather than trust a derived value. */
-bool as11_time_offset_from_period_start(int64_t period_start_ms,
-                                        as11_offset_t *out);
+bool as11_time_offset_from_period_start(int64_t period_start_ms, as11_offset_t *out);
 
 /* Noon-day label ("YYYYMMDD") for an arbitrary AS11-clock timestamp, using
  * the AS11's own timezone and noon boundary.  Falls back to ESP local time
@@ -87,8 +86,7 @@ void as11_time_noon_day(int64_t as11_epoch_ms, char *out, size_t out_len);
 /* Noon-day label for a Summary PeriodStart.  Prefers an offset derived from
  * the timestamp itself, so a device that changed timezone or DST part-way
  * through the 30-day window still labels each record correctly. */
-void as11_time_noon_day_for_period_start(int64_t period_start_ms,
-                                         char *out, size_t out_len);
+void as11_time_noon_day_for_period_start(int64_t period_start_ms, char *out, size_t out_len);
 
 /* ESP-local noon (epoch seconds) of a "YYYYMMDD" label.
  *
@@ -115,15 +113,13 @@ int64_t as11_time_parse_iso8601_ms(const char *iso_str);
 
 /* Format date/time strings for EDF header from epoch ms.
  * date_out receives "DD.MM.YY", time_out receives "HH.MM.SS". */
-void as11_time_format_edf_datetime(int64_t epoch_ms,
-                                   char *date_out, int date_len,
-                                   char *time_out, int time_len);
+void as11_time_format_edf_datetime(
+    int64_t epoch_ms, char *date_out, int date_len, char *time_out, int time_len);
 
 /* Format recording ID string for EDF header.
  * Format: "Startdate DD-MMM-YYYY X X X SRN=<srn> MID=<mid> VID=<vid>" */
-void as11_time_format_recording_id(char *out, size_t out_len,
-                                   int64_t epoch_ms,
-                                   const char *srn, const char *mid, const char *vid);
+void as11_time_format_recording_id(
+    char *out, size_t out_len, int64_t epoch_ms, const char *srn, const char *mid, const char *vid);
 
 /* Format a session timestamp prefix: "YYYYMMDD_HHMMSS" */
 void as11_time_format_session_prefix(int64_t epoch_ms, char *out, size_t out_len);

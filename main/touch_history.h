@@ -28,8 +28,7 @@
 #define TOUCH_HISTORY_ERR_CANCELLED ((esp_err_t)0x7101)
 
 typedef bool (*touch_history_should_cancel_fn)(void *context);
-typedef void (*touch_history_progress_fn)(void *context,
-                                          uint16_t progress_per_mille);
+typedef void (*touch_history_progress_fn)(void *context, uint16_t progress_per_mille);
 
 /* Optional worker-operation hooks.  Callbacks run synchronously on the
  * calling worker and must be non-blocking; they must not call back into the
@@ -51,14 +50,14 @@ typedef enum {
  * hundredths of the unit named below. Rich Flow stays source-native L/s;
  * Leak is converted to its clinical L/min display unit. */
 typedef enum {
-    TOUCH_HISTORY_SIGNAL_FLOW = 0,       /* L/s */
-    TOUCH_HISTORY_SIGNAL_PRESSURE,       /* cmH2O; optional EPR companion */
-    TOUCH_HISTORY_SIGNAL_LEAK,           /* L/min */
-    TOUCH_HISTORY_SIGNAL_FLOW_LIMIT,     /* dimensionless */
-    TOUCH_HISTORY_SIGNAL_SNORE,          /* dimensionless */
-    TOUCH_HISTORY_SIGNAL_SPO2,           /* percent */
-    TOUCH_HISTORY_SIGNAL_PULSE,          /* bpm */
-    TOUCH_HISTORY_SIGNAL_MOTION,         /* device motion index/flags */
+    TOUCH_HISTORY_SIGNAL_FLOW = 0,   /* L/s */
+    TOUCH_HISTORY_SIGNAL_PRESSURE,   /* cmH2O; optional EPR companion */
+    TOUCH_HISTORY_SIGNAL_LEAK,       /* L/min */
+    TOUCH_HISTORY_SIGNAL_FLOW_LIMIT, /* dimensionless */
+    TOUCH_HISTORY_SIGNAL_SNORE,      /* dimensionless */
+    TOUCH_HISTORY_SIGNAL_SPO2,       /* percent */
+    TOUCH_HISTORY_SIGNAL_PULSE,      /* bpm */
+    TOUCH_HISTORY_SIGNAL_MOTION,     /* device motion index/flags */
     TOUCH_HISTORY_SIGNAL_COUNT,
 } touch_history_signal_t;
 
@@ -309,36 +308,37 @@ typedef struct {
 
 /* Compatibility first-page loader.  Returns newest days first and fills up to
  * caller capacity; there is no built-in 30-night storage/index cap. */
-esp_err_t touch_history_load(touch_history_day_t *days, size_t capacity,
-                             size_t *count);
+esp_err_t touch_history_load(touch_history_day_t *days, size_t capacity, size_t *count);
 
 /* Address the complete newest-first day index without retaining it in RAM.
  * `capacity` is the requested page size and `offset` is the zero-based row in
  * that ordering. */
-esp_err_t touch_history_load_page(size_t offset, touch_history_day_t *days,
+esp_err_t touch_history_load_page(size_t offset,
+                                  touch_history_day_t *days,
                                   size_t capacity,
                                   touch_history_index_page_t *page);
-esp_err_t touch_history_load_page_ex(
-    size_t offset, touch_history_day_t *days, size_t capacity,
-    touch_history_index_page_t *page,
-    const touch_history_operation_t *operation);
+esp_err_t touch_history_load_page_ex(size_t offset,
+                                     touch_history_day_t *days,
+                                     size_t capacity,
+                                     touch_history_index_page_t *page,
+                                     const touch_history_operation_t *operation);
 
 /* Resolve one recorded day to its newest-first global row without imposing a
  * retention cap. Used by Calendar so Previous/Next remains meaningful even
  * when the selected date is outside the currently recycled seven-row page. */
-esp_err_t touch_history_find_day_index(const char *day, size_t *index_out,
-                                       size_t *total_days_out);
-esp_err_t touch_history_find_day_index_ex(
-    const char *day, size_t *index_out, size_t *total_days_out,
-    const touch_history_operation_t *operation);
+esp_err_t touch_history_find_day_index(const char *day, size_t *index_out, size_t *total_days_out);
+esp_err_t touch_history_find_day_index_ex(const char *day,
+                                          size_t *index_out,
+                                          size_t *total_days_out,
+                                          const touch_history_operation_t *operation);
 
 /* Compact calendar metadata.  This scans ready terminal sessions and ready
  * canonical O2 Ring packages, but never loads trace samples into the result. */
-esp_err_t touch_history_load_month(uint16_t year, uint8_t month,
-                                   touch_history_month_t *month_out);
-esp_err_t touch_history_load_month_ex(
-    uint16_t year, uint8_t month, touch_history_month_t *month_out,
-    const touch_history_operation_t *operation);
+esp_err_t touch_history_load_month(uint16_t year, uint8_t month, touch_history_month_t *month_out);
+esp_err_t touch_history_load_month_ex(uint16_t year,
+                                      uint8_t month,
+                                      touch_history_month_t *month_out,
+                                      const touch_history_operation_t *operation);
 
 /* Night detail and session-boundary discovery.  `sessions` may be NULL only
  * when session_capacity is zero; total/returned/truncated are always reported. */
@@ -346,10 +346,11 @@ esp_err_t touch_history_load_night(const char *day,
                                    touch_history_night_t *night,
                                    touch_history_session_t *sessions,
                                    size_t session_capacity);
-esp_err_t touch_history_load_night_ex(
-    const char *day, touch_history_night_t *night,
-    touch_history_session_t *sessions, size_t session_capacity,
-    const touch_history_operation_t *operation);
+esp_err_t touch_history_load_night_ex(const char *day,
+                                      touch_history_night_t *night,
+                                      touch_history_session_t *sessions,
+                                      size_t session_capacity,
+                                      const touch_history_operation_t *operation);
 
 /* Load one 480-bin, all-terminal-session overview on a shared wall-clock
  * axis.  Gaps have no VALID flag and retain TOUCH_HISTORY_VALUE_MISSING.
@@ -358,33 +359,39 @@ esp_err_t touch_history_load_night_ex(
 esp_err_t touch_history_load_overview(const char *day,
                                       touch_history_signal_t signal,
                                       touch_history_overview_t *overview);
-esp_err_t touch_history_load_overview_ex(
-    const char *day, touch_history_signal_t signal,
-    touch_history_overview_t *overview,
-    const touch_history_operation_t *operation);
+esp_err_t touch_history_load_overview_ex(const char *day,
+                                         touch_history_signal_t signal,
+                                         touch_history_overview_t *overview,
+                                         const touch_history_operation_t *operation);
 
 /* Re-read a half-open wall-clock window [start_ms, end_ms) from SD. The range
  * must lie inside the night axis returned by touch_history_load_night(). Flow
  * prefers bucketed 25 Hz L0 data through the 22-minute/quarter-night zoom
  * threshold and reports an honest 1 Hz min/max fallback when L0 is absent;
  * other channels retain their native cadence. */
-esp_err_t touch_history_load_range(
-    const char *day, touch_history_signal_t signal,
-    int64_t start_ms, int64_t end_ms, touch_history_overview_t *range);
-esp_err_t touch_history_load_range_ex(
-    const char *day, touch_history_signal_t signal,
-    int64_t start_ms, int64_t end_ms, touch_history_overview_t *range,
-    const touch_history_operation_t *operation);
+esp_err_t touch_history_load_range(const char *day,
+                                   touch_history_signal_t signal,
+                                   int64_t start_ms,
+                                   int64_t end_ms,
+                                   touch_history_overview_t *range);
+esp_err_t touch_history_load_range_ex(const char *day,
+                                      touch_history_signal_t signal,
+                                      int64_t start_ms,
+                                      int64_t end_ms,
+                                      touch_history_overview_t *range,
+                                      const touch_history_operation_t *operation);
 
 /* Controller-oriented graph loader. A zero start/end pair selects the
  * all-night overview; otherwise it has the same ranged semantics as above.
  * `therapy_only` is meaningful only for SpO2 and filters source samples using
  * the exact eligible therapy intervals rather than display-bin inference. */
-esp_err_t touch_history_load_view_ex(
-    const char *day, touch_history_signal_t signal,
-    int64_t start_ms, int64_t end_ms, bool therapy_only,
-    touch_history_overview_t *view,
-    const touch_history_operation_t *operation);
+esp_err_t touch_history_load_view_ex(const char *day,
+                                     touch_history_signal_t signal,
+                                     int64_t start_ms,
+                                     int64_t end_ms,
+                                     bool therapy_only,
+                                     touch_history_overview_t *view,
+                                     const touch_history_operation_t *operation);
 
 /* Stream exact source samples through a bounded PSRAM histogram. The selected
  * half-open wall-clock range must lie inside the night axis. AirSense signals
@@ -393,45 +400,47 @@ esp_err_t touch_history_load_view_ex(
  * L0 for every contributing interval and never labels a sidecar envelope as
  * exact. Motion currently returns a loaded, explicitly unavailable result
  * because its bit-field has no agreed scalar statistic. */
-esp_err_t touch_history_load_stats(
-    const char *day, touch_history_signal_t signal,
-    int64_t start_ms, int64_t end_ms, bool therapy_only,
-    touch_history_stats_t *stats);
-esp_err_t touch_history_load_stats_ex(
-    const char *day, touch_history_signal_t signal,
-    int64_t start_ms, int64_t end_ms, bool therapy_only,
-    touch_history_stats_t *stats,
-    const touch_history_operation_t *operation);
+esp_err_t touch_history_load_stats(const char *day,
+                                   touch_history_signal_t signal,
+                                   int64_t start_ms,
+                                   int64_t end_ms,
+                                   bool therapy_only,
+                                   touch_history_stats_t *stats);
+esp_err_t touch_history_load_stats_ex(const char *day,
+                                      touch_history_signal_t signal,
+                                      int64_t start_ms,
+                                      int64_t end_ms,
+                                      bool therapy_only,
+                                      touch_history_stats_t *stats,
+                                      const touch_history_operation_t *operation);
 
 /* Pageable event markers plus whole-night counts/indices.  A complete empty
  * events file is a valid zero-event night; missing/malformed eligible-session
  * files never become a false zero. */
-esp_err_t touch_history_load_events(const char *day, size_t offset,
+esp_err_t touch_history_load_events(const char *day,
+                                    size_t offset,
                                     touch_history_event_t *events,
                                     size_t capacity,
                                     touch_history_event_page_t *page);
-esp_err_t touch_history_load_events_ex(
-    const char *day, size_t offset, touch_history_event_t *events,
-    size_t capacity, touch_history_event_page_t *page,
-    const touch_history_operation_t *operation);
+esp_err_t touch_history_load_events_ex(const char *day,
+                                       size_t offset,
+                                       touch_history_event_t *events,
+                                       size_t capacity,
+                                       touch_history_event_page_t *page,
+                                       const touch_history_operation_t *operation);
 
 /* Small pure helpers are public so host tests and future zoom/range readers
  * share the exact event taxonomy and combined-duration arithmetic. */
 touch_history_event_type_t touch_history_event_type_from_name(const char *name);
 /* BLE spool replay can repeat an event. Compact equal whole-second report
  * time + event type identities in place and return the retained count. */
-size_t touch_history_deduplicate_events(touch_history_event_t *events,
-                                        size_t count);
-bool touch_history_compute_event_indices(
-    const uint32_t counts[TOUCH_HISTORY_EVENT_TYPE_COUNT],
-    uint64_t eligible_therapy_ms,
-    touch_history_event_totals_t *totals);
-int touch_history_overview_bin(int64_t axis_start_ms, int64_t axis_end_ms,
-                               int64_t timestamp_ms);
-uint16_t touch_history_range_point_count(touch_history_signal_t signal,
-                                         uint64_t duration_ms);
-bool touch_history_flow_range_prefers_raw(uint64_t duration_ms,
-                                          uint64_t night_duration_ms);
+size_t touch_history_deduplicate_events(touch_history_event_t *events, size_t count);
+bool touch_history_compute_event_indices(const uint32_t counts[TOUCH_HISTORY_EVENT_TYPE_COUNT],
+                                         uint64_t eligible_therapy_ms,
+                                         touch_history_event_totals_t *totals);
+int touch_history_overview_bin(int64_t axis_start_ms, int64_t axis_end_ms, int64_t timestamp_ms);
+uint16_t touch_history_range_point_count(touch_history_signal_t signal, uint64_t duration_ms);
+bool touch_history_flow_range_prefers_raw(uint64_t duration_ms, uint64_t night_duration_ms);
 /* Raw Flow may be drawn as a conventional line only while the retained view
  * has at least one display bin per source sample. Wider windows must preserve
  * each bin's signed minimum and maximum; averaging breathing around zero can
@@ -449,22 +458,23 @@ bool touch_history_sample_span_within(uint32_t sample_count,
 /* Pure rich-History source-unit conversion used by overview, ranged reads,
  * exact stats, and host regressions. Legacy touch_history_load_trace keeps its
  * existing raw compatibility semantics. */
-bool touch_history_scale_source_x100(touch_history_signal_t signal,
-                                     int16_t raw, int16_t *scaled);
+bool touch_history_scale_source_x100(touch_history_signal_t signal, int16_t raw, int16_t *scaled);
 /* Applies a manifest drift only when it is within the same strict one-day
  * plausibility bound used at capture time and signed addition is safe. */
-bool touch_history_apply_clock_drift(int64_t as11_ms, int64_t drift_ms,
-                                     int64_t *corrected_ms);
+bool touch_history_apply_clock_drift(int64_t as11_ms, int64_t drift_ms, int64_t *corrected_ms);
 /* Browser-compatible weighted percentile over an integer histogram. `p` is
  * per-mille (5 = 0.5%, 995 = 99.5%). */
-bool touch_history_weighted_percentile_histogram(
-    const uint32_t *counts, size_t bin_count, int32_t first_value,
-    uint64_t sample_count, uint16_t percentile_per_mille,
-    int32_t *value_out);
+bool touch_history_weighted_percentile_histogram(const uint32_t *counts,
+                                                 size_t bin_count,
+                                                 int32_t first_value,
+                                                 uint64_t sample_count,
+                                                 uint16_t percentile_per_mille,
+                                                 int32_t *value_out);
 /* Allocation-free decoder for one unwrapped AS11 Summary spool record.
  * Existing day/session identity fields are preserved; summary fields are
  * published only after the complete protobuf record validates. */
-bool touch_history_decode_summary_record(const uint8_t *record, size_t length,
+bool touch_history_decode_summary_record(const uint8_t *record,
+                                         size_t length,
                                          touch_history_day_t *day);
 
 /* Loads one bounded overview for the given noon-day. Flow uses the longest
@@ -478,18 +488,22 @@ esp_err_t touch_history_load_trace(const char *day,
 
 /* Optional, cancellable backfill for terminal sessions, called only after the
  * foreground graph and exact statistics have been published. */
-esp_err_t touch_history_prepare_day_ex(const char *day,
-                                      const touch_history_operation_t *operation);
+esp_err_t touch_history_prepare_day_ex(const char *day, const touch_history_operation_t *operation);
 
 /* Pure bounded reprojection for immediate navigation feedback. Missing source
  * bins remain missing; no interpolation across gaps. Source and out differ. */
 void touch_history_make_preview(const touch_history_overview_t *source,
-    touch_history_signal_t signal, int64_t start_ms, int64_t end_ms,
-    touch_history_overview_t *out);
+                                touch_history_signal_t signal,
+                                int64_t start_ms,
+                                int64_t end_ms,
+                                touch_history_overview_t *out);
 
 /* One collection/filter pass, including oversized nights that bypass retention.
  * total_count is the whole night; has_more reports truncated visible markers. */
 esp_err_t touch_history_load_window_events_ex(const char *day,
-    int64_t start_ms, int64_t end_ms, touch_history_event_t *events,
-    size_t capacity, touch_history_event_page_t *page,
-    const touch_history_operation_t *operation);
+                                              int64_t start_ms,
+                                              int64_t end_ms,
+                                              touch_history_event_t *events,
+                                              size_t capacity,
+                                              touch_history_event_page_t *page,
+                                              const touch_history_operation_t *operation);

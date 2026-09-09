@@ -32,33 +32,28 @@ typedef struct {
 /* The controller and its coherent published model are allocated from PSRAM.
  * Its mutex and one-slot queue use FreeRTOS's internal allocator, while the
  * worker stack and inactive work result remain PSRAM-backed. */
-esp_err_t touch_history_controller_create(
-    const touch_history_controller_config_t *config,
-    touch_history_controller_t **out_controller);
+esp_err_t touch_history_controller_create(const touch_history_controller_config_t *config,
+                                          touch_history_controller_t **out_controller);
 void touch_history_controller_destroy(touch_history_controller_t *controller);
 
 /* Entering History triggers a newest-first seven-row page load and selects
  * the newest night exactly once. Leaving cancels cancellable work and rejects
  * every in-flight generation without destroying the cached surface. */
-esp_err_t touch_history_controller_set_active(
-    touch_history_controller_t *controller, bool active);
+esp_err_t touch_history_controller_set_active(touch_history_controller_t *controller, bool active);
 
 /* Invalidates the cached index/night. If History is visible, immediately
  * queues a newest-first reload; otherwise the next activation reloads. */
-esp_err_t touch_history_controller_refresh(
-    touch_history_controller_t *controller);
+esp_err_t touch_history_controller_refresh(touch_history_controller_t *controller);
 
 /* Signature intentionally matches touch_history_ui_intent_fn. */
-void touch_history_controller_handle_intent(
-    void *context, const touch_history_ui_intent_t *intent);
+void touch_history_controller_handle_intent(void *context, const touch_history_ui_intent_t *intent);
 
 /* Called only by the LVGL task. Applies one coherent deep-copy snapshot. */
-esp_err_t touch_history_controller_apply(
-    touch_history_controller_t *controller, touch_history_ui_t *ui);
+esp_err_t touch_history_controller_apply(touch_history_controller_t *controller,
+                                         touch_history_ui_t *ui);
 
 /* Monotonic model revision, useful to avoid redundant LVGL applies. */
-uint32_t touch_history_controller_revision(
-    touch_history_controller_t *controller);
+uint32_t touch_history_controller_revision(touch_history_controller_t *controller);
 
 #ifdef __cplusplus
 }

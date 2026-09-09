@@ -27,12 +27,18 @@ def function_body(source: str, name: str) -> str:
     return source[match.end(): cursor - 1]
 
 
+def squash_ws(source: str) -> str:
+    """Normalize formatter-only whitespace while preserving source tokens."""
+    return " ".join(source.split())
+
+
 request = function_body(WRITER, "sw_request_finalize")
 start = function_body(WRITER, "session_writer_start")
 send_open = function_body(WRITER, "storage_queue_send_open")
 finish = function_body(WRITER, "storage_finish_and_dispatch")
 post = function_body(WRITER, "sw_post_task")
 worker = function_body(WRITER, "sw_storage_task")
+worker_ws = squash_ws(worker)
 stream = function_body(WRITER, "session_writer_try_stream_data_raw")
 notify = function_body(WRITER, "session_writer_on_notification")
 
@@ -60,7 +66,11 @@ assert start.find("xSemaphoreTake(s_active_mutex") < start.find(
 )
 assert start.find("storage_queue_send_open(&cmd") < start.find("s_active = s")
 assert "uxQueueSpacesAvailable(s_storage_q)" in send_open
-assert ">\n                SW_STORAGE_TERMINAL_RESERVE" in send_open
+assert re.search(
+    r"uxQueueSpacesAvailable\s*\(s_storage_q\)\s*>\s*"
+    r"SW_STORAGE_TERMINAL_RESERVE",
+    send_open,
+)
 assert "xQueueSend(s_storage_q, cmd, 0)" in send_open
 
 # Post work owns only copied values.  It cannot retain seven FILE handles,
@@ -96,7 +106,7 @@ assert "session_writer_get_active()" not in stream
 assert "active_session_lock()" in notify
 assert "session_writer_get_active()" not in notify
 assert "active_session_try_lock(&lifecycle_sampled)" in worker
-assert "if (!lifecycle_sampled) continue" in worker
+assert "if (!lifecycle_sampled) continue" in worker_ws
 try_lock = function_body(WRITER, "active_session_try_lock")
 assert "xSemaphoreTake(s_active_mutex, 0)" in try_lock
 assert "xSemaphoreTake(s_active->fill_mutex, 0)" in try_lock

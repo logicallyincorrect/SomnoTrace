@@ -34,11 +34,13 @@ static SemaphoreHandle_t s_init_lock = NULL;
 
 esp_err_t bsp_i2c_init(void)
 {
-    if (s_bus_handle) return ESP_OK;
+    if (s_bus_handle)
+        return ESP_OK;
 
     if (!s_init_lock) {
         s_init_lock = xSemaphoreCreateMutex();
-        if (!s_init_lock) return ESP_ERR_NO_MEM;
+        if (!s_init_lock)
+            return ESP_ERR_NO_MEM;
     }
 
     xSemaphoreTake(s_init_lock, portMAX_DELAY);
@@ -60,8 +62,11 @@ esp_err_t bsp_i2c_init(void)
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "failed to initialize shared I2C bus: %s", esp_err_to_name(ret));
     } else {
-        ESP_LOGI(TAG, "shared I2C bus initialized (SCL=%d, SDA=%d, %d Hz)",
-                 BSP_I2C_SCL_PIN, BSP_I2C_SDA_PIN, BSP_I2C_FREQ_HZ);
+        ESP_LOGI(TAG,
+                 "shared I2C bus initialized (SCL=%d, SDA=%d, %d Hz)",
+                 BSP_I2C_SCL_PIN,
+                 BSP_I2C_SDA_PIN,
+                 BSP_I2C_FREQ_HZ);
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 

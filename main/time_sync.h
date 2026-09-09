@@ -59,9 +59,9 @@ bool time_sync_is_synced(void);
 /* ── Time-source provenance and degraded mode ──────────────────────── */
 
 typedef enum {
-    TIME_SRC_NONE = 0,       /* unusable — must not record            */
-    TIME_SRC_AS11_DRIFT,     /* degraded — AS11 clock + stored drift  */
-    TIME_SRC_NTP,            /* authoritative                         */
+    TIME_SRC_NONE = 0,   /* unusable — must not record            */
+    TIME_SRC_AS11_DRIFT, /* degraded — AS11 clock + stored drift  */
+    TIME_SRC_NTP,        /* authoritative                         */
 } time_source_t;
 
 /* Returns the current time source. */
@@ -90,10 +90,10 @@ bool time_sync_has_drift(void);
  * recovery runs before wall time is usable, so "now - measured_at" is
  * meaningless there. */
 typedef struct {
-    bool        available;
-    int64_t     drift_ms;         /* NTP_epoch_ms - AS11_epoch_ms          */
-    int64_t     measured_at_ms;   /* NTP epoch ms when it was measured     */
-    const char *source;           /* "nvs" | "sd" | "none"                 */
+    bool available;
+    int64_t drift_ms;       /* NTP_epoch_ms - AS11_epoch_ms          */
+    int64_t measured_at_ms; /* NTP epoch ms when it was measured     */
+    const char *source;     /* "nvs" | "sd" | "none"                 */
 } time_drift_snapshot_t;
 
 /* Fills *out with the best available persisted drift.  Loads from NVS (or

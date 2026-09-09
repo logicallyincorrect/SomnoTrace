@@ -30,10 +30,10 @@
 extern "C" {
 #endif
 
-#define BSP_I2C_NUM         0
-#define BSP_I2C_SCL_PIN     41
-#define BSP_I2C_SDA_PIN     42
-#define BSP_I2C_FREQ_HZ     100000
+#define BSP_I2C_NUM 0
+#define BSP_I2C_SCL_PIN 41
+#define BSP_I2C_SDA_PIN 42
+#define BSP_I2C_FREQ_HZ 100000
 
 /* Initialize the shared I2C master bus (idempotent). */
 esp_err_t bsp_i2c_init(void);

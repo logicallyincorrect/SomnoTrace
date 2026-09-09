@@ -47,25 +47,24 @@
 #include "cJSON.h"
 #include "mbedtls/md5.h"
 
-
 static const char *TAG = "upload_shq";
 
-#define SHQ_HOST        "sleephq.com"
-#define SHQ_PORT        443
-#define SHQ_URL_BASE    "https://sleephq.com"
-#define SHQ_TOKEN_PATH  "/oauth/token"
-#define SHQ_ME_PATH     "/api/v1/me"
+#define SHQ_HOST "sleephq.com"
+#define SHQ_PORT 443
+#define SHQ_URL_BASE "https://sleephq.com"
+#define SHQ_TOKEN_PATH "/oauth/token"
+#define SHQ_ME_PATH "/api/v1/me"
 #define SHQ_IMPORTS_FMT "/api/v1/teams/%s/imports"
-#define SHQ_IMPORT_FMT  "/api/v1/imports/%s"
-#define SHQ_FILES_FMT   "/api/v1/imports/%s/files"
+#define SHQ_IMPORT_FMT "/api/v1/imports/%s"
+#define SHQ_FILES_FMT "/api/v1/imports/%s/files"
 #define SHQ_PROCESS_FMT "/api/v1/imports/%s/process_files"
 
-#define SHQ_TIMEOUT_MS  30000
-#define SHQ_READ_BUF    1024
-#define SHQ_RESP_CAP    4096
+#define SHQ_TIMEOUT_MS 30000
+#define SHQ_READ_BUF 1024
+#define SHQ_RESP_CAP 4096
 
 /* Token cache (token string in PSRAM; allocated on first auth). */
-#define SHQ_TOKEN_MAX  512
+#define SHQ_TOKEN_MAX 512
 static char *s_token;
 static int64_t s_token_time_s = 0;
 static int s_token_expires = 0;
@@ -73,7 +72,8 @@ static char s_team_id[32] = {0};
 
 static bool shq_token_ready(void)
 {
-    if (s_token) return true;
+    if (s_token)
+        return true;
     s_token = heap_caps_calloc(1, SHQ_TOKEN_MAX, MALLOC_CAP_SPIRAM);
     if (!s_token) {
         ESP_LOGE(TAG, "token buffer alloc failed");
@@ -96,7 +96,8 @@ static ssize_t shq_tls_read(esp_tls_t *tls, void *data, size_t len)
 {
     while (shq_io_allowed()) {
         ssize_t n = esp_tls_conn_read(tls, data, len);
-        if (n != ESP_TLS_ERR_SSL_WANT_READ && n != ESP_TLS_ERR_SSL_WANT_WRITE) return n;
+        if (n != ESP_TLS_ERR_SSL_WANT_READ && n != ESP_TLS_ERR_SSL_WANT_WRITE)
+            return n;
         vTaskDelay(pdMS_TO_TICKS(20));
     }
     return -1;
@@ -107,9 +108,11 @@ static int shq_tls_write_all(esp_tls_t *tls, const void *data, size_t len)
     while (total < len && shq_io_allowed()) {
         ssize_t w = esp_tls_conn_write(tls, (const char *)data + total, len - total);
         if (w == ESP_TLS_ERR_SSL_WANT_READ || w == ESP_TLS_ERR_SSL_WANT_WRITE) {
-            vTaskDelay(pdMS_TO_TICKS(20)); continue;
+            vTaskDelay(pdMS_TO_TICKS(20));
+            continue;
         }
-        if (w <= 0) return -1;
+        if (w <= 0)
+            return -1;
         total += w;
     }
     return total == len ? (int)total : -1;
@@ -126,8 +129,10 @@ static int shq_http_read_response(esp_tls_t *tls, char **body_out, size_t *body_
     /* Buffer for entire response (headers + body) */
     size_t buf_cap = SHQ_RESP_CAP + 1024;
     char *buf = heap_caps_malloc(buf_cap, MALLOC_CAP_SPIRAM);
-    if (!buf) buf = malloc(buf_cap);
-    if (!buf) return -1;
+    if (!buf)
+        buf = malloc(buf_cap);
+    if (!buf)
+        return -1;
 
     size_t buf_len = 0;
     char *header_end = NULL;
@@ -155,14 +160,16 @@ static int shq_http_read_response(esp_tls_t *tls, char **body_out, size_t *body_
         buf[buf_len] = '\0';
 
         header_end = strstr(buf, "\r\n\r\n");
-        if (header_end) header_end += 4;
+        if (header_end)
+            header_end += 4;
     }
 
     /* Parse status line */
     int status = -1;
     if (strncmp(buf, "HTTP/", 5) == 0) {
         char *sp = strchr(buf, ' ');
-        if (sp) status = atoi(sp + 1);
+        if (sp)
+            status = atoi(sp + 1);
     }
     if (status < 0) {
         ESP_LOGE(TAG, "no HTTP status in response");
@@ -178,16 +185,19 @@ static int shq_http_read_response(esp_tls_t *tls, char **body_out, size_t *body_
     char *body_start = header_end;
     while (line < body_start - 4) {
         char *eol = strstr(line, "\r\n");
-        if (!eol || eol >= body_start - 4) break;
+        if (!eol || eol >= body_start - 4)
+            break;
         *eol = '\0';
 
         if (strncasecmp(line, "Content-Length:", 15) == 0) {
             char *v = line + 15;
-            while (*v == ' ') v++;
+            while (*v == ' ')
+                v++;
             content_length = (size_t)atoi(v);
         }
         if (strncasecmp(line, "Transfer-Encoding:", 18) == 0) {
-            if (strstr(line, "chunked")) chunked = true;
+            if (strstr(line, "chunked"))
+                chunked = true;
         }
 
         *eol = '\r';
@@ -201,36 +211,46 @@ static int shq_http_read_response(esp_tls_t *tls, char **body_out, size_t *body_
     if (content_length > 0 && body_in_buf < content_length) {
         size_t remaining = content_length - body_in_buf;
         while (remaining > 0) {
-            if (buf_len >= buf_cap - 1) break;
-            size_t to_read = remaining < (buf_cap - buf_len - 1) ?
-                             remaining : (buf_cap - buf_len - 1);
+            if (buf_len >= buf_cap - 1)
+                break;
+            size_t to_read =
+                remaining < (buf_cap - buf_len - 1) ? remaining : (buf_cap - buf_len - 1);
             ssize_t n = shq_tls_read(tls, buf + buf_len, to_read);
             if (n < 0) {
                 ESP_LOGE(TAG, "TLS read error during body: %d", (int)n);
                 free(buf);
                 return -1;
             }
-            if (n == 0) break;
+            if (n == 0)
+                break;
             buf_len += n;
             remaining -= n;
         }
     } else if (chunked) {
         /* Read until we see 0\r\n\r\n or connection closes */
         while (1) {
-            if (buf_len >= buf_cap - 1) break;
+            if (buf_len >= buf_cap - 1)
+                break;
             ssize_t n = shq_tls_read(tls, buf + buf_len, buf_cap - buf_len - 1);
-            if (n < 0) { free(buf); return -1; }
-            if (n == 0) break;
+            if (n < 0) {
+                free(buf);
+                return -1;
+            }
+            if (n == 0)
+                break;
             buf_len += n;
             buf[buf_len] = '\0';
-            if (strstr(body_start, "\r\n0\r\n\r\n")) break;
+            if (strstr(body_start, "\r\n0\r\n\r\n"))
+                break;
         }
     } else if (content_length == 0 && !chunked) {
         /* No Content-Length, no chunked — read until connection closes */
         while (1) {
-            if (buf_len >= buf_cap - 1) break;
+            if (buf_len >= buf_cap - 1)
+                break;
             ssize_t n = shq_tls_read(tls, buf + buf_len, buf_cap - buf_len - 1);
-            if (n <= 0) break;
+            if (n <= 0)
+                break;
             buf_len += n;
         }
     }
@@ -240,8 +260,8 @@ static int shq_http_read_response(esp_tls_t *tls, char **body_out, size_t *body_
      * and cJSON_Parse misinterprets the hex chunk size as a JSON number. */
     size_t body_total = buf_len - (body_start - buf);
     if (chunked && body_total > 0) {
-        size_t rd = 0;          /* read position in raw body  */
-        size_t wr = 0;          /* write position (de-chunked) */
+        size_t rd = 0; /* read position in raw body  */
+        size_t wr = 0; /* write position (de-chunked) */
         while (rd < body_total) {
             /* Parse hex chunk size up to \r\n */
             size_t chunk_sz = 0;
@@ -249,24 +269,33 @@ static int shq_http_read_response(esp_tls_t *tls, char **body_out, size_t *body_
             while (rd < body_total && body_start[rd] != '\r') {
                 char c = body_start[rd];
                 int val;
-                if (c >= '0' && c <= '9') val = c - '0';
-                else if (c >= 'a' && c <= 'f') val = c - 'a' + 10;
-                else if (c >= 'A' && c <= 'F') val = c - 'A' + 10;
-                else break;
+                if (c >= '0' && c <= '9')
+                    val = c - '0';
+                else if (c >= 'a' && c <= 'f')
+                    val = c - 'a' + 10;
+                else if (c >= 'A' && c <= 'F')
+                    val = c - 'A' + 10;
+                else
+                    break;
                 chunk_sz = chunk_sz * 16 + val;
                 hex_digits++;
                 rd++;
             }
-            if (hex_digits == 0) break;
+            if (hex_digits == 0)
+                break;
             /* Skip \r\n after chunk size */
             if (rd + 1 < body_total && body_start[rd] == '\r' && body_start[rd + 1] == '\n')
                 rd += 2;
-            else break;
+            else
+                break;
             /* Copy chunk data (if it fits) */
-            if (chunk_sz == 0) break;       /* terminal chunk */
+            if (chunk_sz == 0)
+                break; /* terminal chunk */
             size_t copy = chunk_sz;
-            if (rd + copy > body_total) copy = body_total - rd;
-            if (wr + copy > buf_cap - (body_start - buf)) break;
+            if (rd + copy > body_total)
+                copy = body_total - rd;
+            if (wr + copy > buf_cap - (body_start - buf))
+                break;
             memmove(body_start + wr, body_start + rd, copy);
             wr += copy;
             rd += chunk_sz;
@@ -280,18 +309,24 @@ static int shq_http_read_response(esp_tls_t *tls, char **body_out, size_t *body_
 
     /* Extract body if requested */
     if (body_out) {
-        if (body_total > SHQ_RESP_CAP) body_total = SHQ_RESP_CAP;
+        if (body_total > SHQ_RESP_CAP)
+            body_total = SHQ_RESP_CAP;
         char *body = heap_caps_malloc(SHQ_RESP_CAP, MALLOC_CAP_SPIRAM);
-        if (!body) body = malloc(SHQ_RESP_CAP);
-        if (!body) { free(buf); return -1; }
+        if (!body)
+            body = malloc(SHQ_RESP_CAP);
+        if (!body) {
+            free(buf);
+            return -1;
+        }
         memcpy(body, body_start, body_total);
-        if (body_total < SHQ_RESP_CAP) body[body_total] = '\0';
+        if (body_total < SHQ_RESP_CAP)
+            body[body_total] = '\0';
         *body_out = body;
-        if (body_len) *body_len = body_total;
+        if (body_len)
+            *body_len = body_total;
     }
 
-    ESP_LOGI(TAG, "response: HTTP %d (%u bytes body)", status,
-             (unsigned)body_total);
+    ESP_LOGI(TAG, "response: HTTP %d (%u bytes body)", status, (unsigned)body_total);
 
     free(buf);
     return status;
@@ -302,11 +337,15 @@ static int shq_http_read_response(esp_tls_t *tls, char **body_out, size_t *body_
 /* Send a simple GET or POST request with optional body and read the response.
  * The TLS connection stays open — caller manages it.
  * If body_out is non-NULL, response body is returned (caller frees). */
-static int shq_http_request(esp_tls_t *tls, const char *method,
-                            const char *path, const char *query,
+static int shq_http_request(esp_tls_t *tls,
+                            const char *method,
+                            const char *path,
+                            const char *query,
                             const char *auth_token,
-                            const char *body, const char *content_type,
-                            char **body_out, size_t *body_len)
+                            const char *body,
+                            const char *content_type,
+                            char **body_out,
+                            size_t *body_len)
 {
     s_request_deadline = esp_timer_get_time() + (int64_t)SHQ_TIMEOUT_MS * 1000;
     /* Build request line + headers */
@@ -368,31 +407,47 @@ static int shq_http_request(esp_tls_t *tls, const char *method,
 /* One token request.  On success the token is copied into `token` and its
  * lifetime into *expires_s.  On failure `err` (may be NULL) receives a
  * one-line reason worded for the web UI. */
-static esp_err_t shq_request_token(esp_tls_t *tls, const uploader_config_t *cfg,
-                                   char *token, size_t token_cap, int *expires_s,
-                                   char *err, size_t err_len)
+static esp_err_t shq_request_token(esp_tls_t *tls,
+                                   const uploader_config_t *cfg,
+                                   char *token,
+                                   size_t token_cap,
+                                   int *expires_s,
+                                   char *err,
+                                   size_t err_len)
 {
     char body[512];
-    snprintf(body, sizeof(body),
+    snprintf(body,
+             sizeof(body),
              "grant_type=password&client_id=%s&client_secret=%s&scope=read+write",
-             cfg->shq_client_id, cfg->shq_client_secret);
+             cfg->shq_client_id,
+             cfg->shq_client_secret);
 
     char *resp_body = NULL;
     size_t resp_len = 0;
-    int status = shq_http_request(tls, "POST", SHQ_TOKEN_PATH, NULL, NULL,
-                                  body, "application/x-www-form-urlencoded",
-                                  &resp_body, &resp_len);
+    int status = shq_http_request(tls,
+                                  "POST",
+                                  SHQ_TOKEN_PATH,
+                                  NULL,
+                                  NULL,
+                                  body,
+                                  "application/x-www-form-urlencoded",
+                                  &resp_body,
+                                  &resp_len);
     if (status < 200) {
         ESP_LOGE(TAG, "auth request failed (status=%d)", status);
-        if (err) snprintf(err, err_len, "No answer from %s", SHQ_HOST);
+        if (err)
+            snprintf(err, err_len, "No answer from %s", SHQ_HOST);
         free(resp_body);
         return ESP_FAIL;
     }
     if (status >= 300) {
         /* 401 is what a wrong or revoked Client ID / Secret produces. */
-        if (err) snprintf(err, err_len, "SleepHQ rejected the API key (HTTP %d): "
-                          "check Client ID / Secret and that the account has API access",
-                          status);
+        if (err)
+            snprintf(err,
+                     err_len,
+                     "SleepHQ rejected the API key (HTTP %d): "
+                     "check Client ID / Secret and that the account has API access",
+                     status);
         free(resp_body);
         return ESP_FAIL;
     }
@@ -402,7 +457,8 @@ static esp_err_t shq_request_token(esp_tls_t *tls, const uploader_config_t *cfg,
 
     if (!root) {
         ESP_LOGE(TAG, "auth: failed to parse JSON");
-        if (err) snprintf(err, err_len, "Unexpected reply from %s", SHQ_HOST);
+        if (err)
+            snprintf(err, err_len, "Unexpected reply from %s", SHQ_HOST);
         return ESP_FAIL;
     }
 
@@ -411,7 +467,8 @@ static esp_err_t shq_request_token(esp_tls_t *tls, const uploader_config_t *cfg,
 
     if (!tok || !cJSON_IsString(tok)) {
         ESP_LOGE(TAG, "auth: no access_token in response");
-        if (err) snprintf(err, err_len, "SleepHQ did not issue a token");
+        if (err)
+            snprintf(err, err_len, "SleepHQ did not issue a token");
         cJSON_Delete(root);
         return ESP_FAIL;
     }
@@ -434,12 +491,13 @@ static esp_err_t shq_authenticate(esp_tls_t *tls, const uploader_config_t *cfg)
 
     ESP_LOGI(TAG, "authenticating with SleepHQ...");
 
-    if (!shq_token_ready()) return ESP_ERR_NO_MEM;
+    if (!shq_token_ready())
+        return ESP_ERR_NO_MEM;
 
     int expires_s = 0;
-    esp_err_t rc = shq_request_token(tls, cfg, s_token, SHQ_TOKEN_MAX, &expires_s,
-                                     NULL, 0);
-    if (rc != ESP_OK) return rc;
+    esp_err_t rc = shq_request_token(tls, cfg, s_token, SHQ_TOKEN_MAX, &expires_s, NULL, 0);
+    if (rc != ESP_OK)
+        return rc;
     s_token_expires = expires_s;
     s_token_time_s = time(NULL);
 
@@ -451,14 +509,15 @@ static esp_err_t shq_authenticate(esp_tls_t *tls, const uploader_config_t *cfg)
 
 static esp_err_t shq_discover_team(esp_tls_t *tls)
 {
-    if (s_team_id[0]) return ESP_OK;
+    if (s_team_id[0])
+        return ESP_OK;
 
     ESP_LOGI(TAG, "discovering team ID...");
 
     char *resp_body = NULL;
     size_t resp_len = 0;
-    int status = shq_http_request(tls, "GET", SHQ_ME_PATH, NULL, s_token,
-                                  NULL, NULL, &resp_body, &resp_len);
+    int status =
+        shq_http_request(tls, "GET", SHQ_ME_PATH, NULL, s_token, NULL, NULL, &resp_body, &resp_len);
     if (status < 200) {
         free(resp_body);
         return ESP_FAIL;
@@ -467,14 +526,17 @@ static esp_err_t shq_discover_team(esp_tls_t *tls)
     cJSON *root = cJSON_Parse(resp_body);
     free(resp_body);
 
-    if (!root) return ESP_FAIL;
+    if (!root)
+        return ESP_FAIL;
 
     cJSON *data = cJSON_GetObjectItem(root, "data");
     if (data) {
         cJSON *attrs = cJSON_GetObjectItem(data, "attributes");
         cJSON *team = NULL;
-        if (attrs) team = cJSON_GetObjectItem(attrs, "current_team_id");
-        if (!team) team = cJSON_GetObjectItem(data, "current_team_id");
+        if (attrs)
+            team = cJSON_GetObjectItem(attrs, "current_team_id");
+        if (!team)
+            team = cJSON_GetObjectItem(data, "current_team_id");
         if (team) {
             if (cJSON_IsNumber(team))
                 snprintf(s_team_id, sizeof(s_team_id), "%d", team->valueint);
@@ -505,8 +567,8 @@ static esp_err_t shq_create_import(esp_tls_t *tls, char *out_import_id, size_t i
 
     char *resp_body = NULL;
     size_t resp_len = 0;
-    int status = shq_http_request(tls, "POST", path, o2 ? "o2=true" : NULL, s_token,
-                                  NULL, NULL, &resp_body, &resp_len);
+    int status = shq_http_request(
+        tls, "POST", path, o2 ? "o2=true" : NULL, s_token, NULL, NULL, &resp_body, &resp_len);
     if (status < 200) {
         free(resp_body);
         return ESP_FAIL;
@@ -515,14 +577,17 @@ static esp_err_t shq_create_import(esp_tls_t *tls, char *out_import_id, size_t i
     cJSON *root = cJSON_Parse(resp_body);
     free(resp_body);
 
-    if (!root) return ESP_FAIL;
+    if (!root)
+        return ESP_FAIL;
 
     cJSON *data = cJSON_GetObjectItem(root, "data");
     if (data) {
         cJSON *attrs = cJSON_GetObjectItem(data, "attributes");
         cJSON *id = NULL;
-        if (attrs) id = cJSON_GetObjectItem(attrs, "id");
-        if (!id) id = cJSON_GetObjectItem(data, "id");
+        if (attrs)
+            id = cJSON_GetObjectItem(attrs, "id");
+        if (!id)
+            id = cJSON_GetObjectItem(data, "id");
         if (id) {
             if (cJSON_IsNumber(id))
                 snprintf(out_import_id, id_len, "%d", id->valueint);
@@ -551,8 +616,7 @@ static esp_err_t shq_process_import(esp_tls_t *tls, const char *import_id)
     char path[256];
     snprintf(path, sizeof(path), SHQ_PROCESS_FMT, import_id);
 
-    int status = shq_http_request(tls, "POST", path, NULL, s_token,
-                                  NULL, NULL, NULL, NULL);
+    int status = shq_http_request(tls, "POST", path, NULL, s_token, NULL, NULL, NULL, NULL);
     if (status < 200 || status >= 300) {
         ESP_LOGW(TAG, "process import HTTP %d", status);
         return ESP_FAIL;
@@ -567,9 +631,10 @@ static esp_err_t shq_wait_import(esp_tls_t *tls, const char *import_id)
     char path[256];
     snprintf(path, sizeof(path), SHQ_IMPORT_FMT, import_id);
     for (int attempt = 0; attempt < 30; attempt++) {
-        char *body = NULL; size_t body_len = 0;
-        int status = shq_http_request(tls, "GET", path, NULL, s_token,
-                                       NULL, NULL, &body, &body_len);
+        char *body = NULL;
+        size_t body_len = 0;
+        int status =
+            shq_http_request(tls, "GET", path, NULL, s_token, NULL, NULL, &body, &body_len);
         /* Every failure below used to return the same bare ESP_FAIL, and the caller
          * reports all of them as "import processing failed for day <d>" -- which reads
          * as "SleepHQ rejected the import" whichever one actually happened. Three
@@ -590,8 +655,11 @@ static esp_err_t shq_wait_import(esp_tls_t *tls, const char *import_id)
             /* A body we cannot parse is OUR problem, not SleepHQ's verdict. The length
              * and the head of it separate the cases: a truncated body shows a length at
              * the read cap, a de-chunking fault shows hex chunk prefixes in the text. */
-            ESP_LOGW(TAG, "import %s: unparseable status body (%u bytes): %.120s",
-                     import_id, (unsigned)body_len, body ? body : "(null)");
+            ESP_LOGW(TAG,
+                     "import %s: unparseable status body (%u bytes): %.120s",
+                     import_id,
+                     (unsigned)body_len,
+                     body ? body : "(null)");
             free(body);
             return ESP_FAIL;
         }
@@ -607,14 +675,20 @@ static esp_err_t shq_wait_import(esp_tls_t *tls, const char *import_id)
              * shape we expect, which is a different bug from a rejected import -- warn on
              * the first poll only, since that case still retries and would otherwise log
              * thirty times. Behaviour is unchanged by this commit; only what it says is. */
-            ESP_LOGW(TAG, "import %s: remote status \"%s\" after %d poll(s)",
-                     import_id, name[0] ? name : "(absent)", attempt + 1);
+            ESP_LOGW(TAG,
+                     "import %s: remote status \"%s\" after %d poll(s)",
+                     import_id,
+                     name[0] ? name : "(absent)",
+                     attempt + 1);
         }
         cJSON_Delete(root);
-        if (complete) return ESP_OK;
-        if (failed) return ESP_FAIL;
+        if (complete)
+            return ESP_OK;
+        if (failed)
+            return ESP_FAIL;
         for (int slice = 0; slice < 100; ++slice) {
-            if (uploader_should_cancel()) return ESP_ERR_INVALID_STATE;
+            if (uploader_should_cancel())
+                return ESP_ERR_INVALID_STATE;
             vTaskDelay(pdMS_TO_TICKS(20));
         }
     }
@@ -653,57 +727,68 @@ static upload_result_t shq_upload_file(esp_tls_t *tls,
 
     /* Calculate sizes of multipart parts (no heap alloc for dummy calc) */
     char part1[512];
-    size_t part1_len = snprintf(part1, sizeof(part1),
-        "--%s\r\n"
-        "Content-Disposition: form-data; name=\"name\"\r\n\r\n"
-        "%s\r\n",
-        boundary, filename);
+    size_t part1_len = snprintf(part1,
+                                sizeof(part1),
+                                "--%s\r\n"
+                                "Content-Disposition: form-data; name=\"name\"\r\n\r\n"
+                                "%s\r\n",
+                                boundary,
+                                filename);
 
     char part2[512];
-    size_t part2_len = snprintf(part2, sizeof(part2),
-        "--%s\r\n"
-        "Content-Disposition: form-data; name=\"path\"\r\n\r\n"
-        "%s\r\n",
-        boundary, remote_subpath);
+    size_t part2_len = snprintf(part2,
+                                sizeof(part2),
+                                "--%s\r\n"
+                                "Content-Disposition: form-data; name=\"path\"\r\n\r\n"
+                                "%s\r\n",
+                                boundary,
+                                remote_subpath);
 
     char part3[512];
-    size_t part3_len = snprintf(part3, sizeof(part3),
-        "--%s\r\n"
-        "Content-Disposition: form-data; name=\"file\"; filename=\"%s\"\r\n"
-        "Content-Type: application/octet-stream\r\n\r\n",
-        boundary, filename);
+    size_t part3_len = snprintf(part3,
+                                sizeof(part3),
+                                "--%s\r\n"
+                                "Content-Disposition: form-data; name=\"file\"; filename=\"%s\"\r\n"
+                                "Content-Type: application/octet-stream\r\n\r\n",
+                                boundary,
+                                filename);
 
     /* Footer: content_hash (32 hex chars) + closing boundary */
     char footer_hdr[256];
-    size_t footer_hdr_len = snprintf(footer_hdr, sizeof(footer_hdr),
-        "\r\n--%s\r\n"
-        "Content-Disposition: form-data; name=\"content_hash\"\r\n\r\n",
-        boundary);
+    size_t footer_hdr_len =
+        snprintf(footer_hdr,
+                 sizeof(footer_hdr),
+                 "\r\n--%s\r\n"
+                 "Content-Disposition: form-data; name=\"content_hash\"\r\n\r\n",
+                 boundary);
 
     char closing[64];
-    size_t closing_len = snprintf(closing, sizeof(closing),
-        "\r\n--%s--\r\n",
-        boundary);
+    size_t closing_len = snprintf(closing, sizeof(closing), "\r\n--%s--\r\n", boundary);
 
     /* Total multipart body length = parts + file + footer_header + 32 (md5 hex) + closing */
-    size_t total_body_len = part1_len + part2_len + part3_len + file_size
-                           + footer_hdr_len + 32 + closing_len;
+    size_t total_body_len =
+        part1_len + part2_len + part3_len + file_size + footer_hdr_len + 32 + closing_len;
 
     /* Build HTTP request headers */
     char path[256];
     snprintf(path, sizeof(path), SHQ_FILES_FMT, import_id);
 
     char req_hdr[1024];
-    int hdr_pos = snprintf(req_hdr, sizeof(req_hdr),
-        "POST %s HTTP/1.1\r\n"
-        "Host: %s\r\n"
-        "Authorization: Bearer %s\r\n"
-        "Accept: application/vnd.api+json\r\n"
-        "Content-Type: multipart/form-data; boundary=%s\r\n"
-        "Content-Length: %u\r\n"
-        "Connection: keep-alive\r\n"
-        "\r\n",
-        path, SHQ_HOST, s_token, boundary, (unsigned)total_body_len);
+    int hdr_pos = snprintf(req_hdr,
+                           sizeof(req_hdr),
+                           "POST %s HTTP/1.1\r\n"
+                           "Host: %s\r\n"
+                           "Authorization: Bearer %s\r\n"
+                           "Accept: application/vnd.api+json\r\n"
+                           "Content-Type: multipart/form-data; boundary=%s\r\n"
+                           "Content-Length: %u\r\n"
+                           "Connection: keep-alive\r\n"
+                           "\r\n",
+                           path,
+                           SHQ_HOST,
+                           s_token,
+                           boundary,
+                           (unsigned)total_body_len);
 
     if (hdr_pos <= 0 || hdr_pos >= (int)sizeof(req_hdr)) {
         ESP_LOGE(TAG, "  request header too long");
@@ -729,7 +814,8 @@ static upload_result_t shq_upload_file(esp_tls_t *tls,
 
     /* Stream file data with on-the-fly MD5 */
     uint8_t *chunk = heap_caps_malloc(SHQ_READ_BUF, MALLOC_CAP_SPIRAM);
-    if (!chunk) chunk = malloc(SHQ_READ_BUF);
+    if (!chunk)
+        chunk = malloc(SHQ_READ_BUF);
     if (!chunk) {
         ESP_LOGE(TAG, "  cannot alloc chunk buffer for %s", filename);
         fclose(f);
@@ -808,8 +894,7 @@ static upload_result_t shq_upload_file(esp_tls_t *tls,
         return UPLOAD_FAILED;
     }
 
-    ESP_LOGI(TAG, "  uploaded %s (%u bytes, hash=%s)", filename,
-             (unsigned)file_size, md5_hex);
+    ESP_LOGI(TAG, "  uploaded %s (%u bytes, hash=%s)", filename, (unsigned)file_size, md5_hex);
     return UPLOAD_OK;
 }
 
@@ -827,9 +912,9 @@ static upload_result_t shq_upload_file(esp_tls_t *tls,
 
 static bool s_probe_active;
 static uploader_config_t s_prepared_config;
-static esp_tls_t *s_tls;                  /* live for the whole run */
+static esp_tls_t *s_tls; /* live for the whole run */
 static char s_import_id[32];
-static int  s_day_files;                  /* files sent in the current import */
+static int s_day_files; /* files sent in the current import */
 
 static bool shq_is_configured(void)
 {
@@ -867,9 +952,10 @@ static upload_result_t shq_prepare(void)
     }
     int fd = -1;
     if (esp_tls_get_conn_sockfd(s_tls, &fd) != ESP_OK || fd < 0 ||
-        fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK) < 0 ||
-        uploader_should_cancel()) {
-        esp_tls_conn_destroy(s_tls); s_tls = NULL; return UPLOAD_CANCELLED;
+        fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK) < 0 || uploader_should_cancel()) {
+        esp_tls_conn_destroy(s_tls);
+        s_tls = NULL;
+        return UPLOAD_CANCELLED;
     }
     return UPLOAD_OK;
 }
@@ -877,11 +963,13 @@ static upload_result_t shq_prepare(void)
 static upload_result_t shq_session_begin(void)
 {
     const uploader_config_t cfg = s_prepared_config;
-    if (!s_tls || uploader_should_cancel()) return UPLOAD_CANCELLED;
+    if (!s_tls || uploader_should_cancel())
+        return UPLOAD_CANCELLED;
     ESP_LOGI(TAG, "TLS connected to %s", SHQ_HOST);
     if (s_probe_active) {
         uploader_test_stage(UPLOAD_STAGE_CONNECT, true, "SleepHQ TLS connected");
-        uploader_test_stage(UPLOAD_STAGE_AUTH_MOUNT, false, "Checking credentials and account access");
+        uploader_test_stage(
+            UPLOAD_STAGE_AUTH_MOUNT, false, "Checking credentials and account access");
     }
 
     if (shq_authenticate(s_tls, &cfg) != ESP_OK) {
@@ -903,7 +991,8 @@ static upload_result_t shq_session_begin(void)
 
 static void shq_session_end(void)
 {
-    if (!s_tls) return;
+    if (!s_tls)
+        return;
     esp_tls_conn_destroy(s_tls);
     s_tls = NULL;
     s_import_id[0] = '\0';
@@ -920,7 +1009,7 @@ static void shq_session_end(void)
 
 static bool shq_test(const uploader_config_t *cfgp, char *msg, size_t msg_len)
 {
-    uploader_config_t cfg = *cfgp;   /* by value — see smb_test */
+    uploader_config_t cfg = *cfgp; /* by value — see smb_test */
     if (!cfg.shq_client_id[0] || !cfg.shq_client_secret[0]) {
         snprintf(msg, msg_len, "Client ID and Client Secret are required");
         return false;
@@ -942,7 +1031,8 @@ static bool shq_test(const uploader_config_t *cfgp, char *msg, size_t msg_len)
     }
 
     char *token = heap_caps_malloc(SHQ_TOKEN_MAX, MALLOC_CAP_SPIRAM);
-    if (!token) token = malloc(SHQ_TOKEN_MAX);
+    if (!token)
+        token = malloc(SHQ_TOKEN_MAX);
     if (!token) {
         snprintf(msg, msg_len, "Out of memory");
         esp_tls_conn_destroy(tls);
@@ -951,8 +1041,7 @@ static bool shq_test(const uploader_config_t *cfgp, char *msg, size_t msg_len)
 
     int expires_s = 0;
     char err[128];
-    esp_err_t rc = shq_request_token(tls, &cfg, token, SHQ_TOKEN_MAX, &expires_s,
-                                     err, sizeof(err));
+    esp_err_t rc = shq_request_token(tls, &cfg, token, SHQ_TOKEN_MAX, &expires_s, err, sizeof(err));
     esp_tls_conn_destroy(tls);
     memset(token, 0, SHQ_TOKEN_MAX);
     free(token);
@@ -966,14 +1055,17 @@ static bool shq_test(const uploader_config_t *cfgp, char *msg, size_t msg_len)
      * scaling by sizeof(StackType_t) here -- the reflex when porting the idiom
      * -- would report four times the true headroom, which is the direction that
      * hides a problem rather than raising one. */
-    ESP_LOGI(TAG, "sleephq: connection test finished with %u bytes of stack headroom",
+    ESP_LOGI(TAG,
+             "sleephq: connection test finished with %u bytes of stack headroom",
              (unsigned)uxTaskGetStackHighWaterMark(NULL));
 
     if (rc != ESP_OK) {
         snprintf(msg, msg_len, "%s", err);
         return false;
     }
-    snprintf(msg, msg_len, "Signed in to SleepHQ, API key accepted (token valid for %d min)",
+    snprintf(msg,
+             msg_len,
+             "Signed in to SleepHQ, API key accepted (token valid for %d min)",
              expires_s / 60);
     return true;
 }
@@ -981,8 +1073,10 @@ static bool shq_test(const uploader_config_t *cfgp, char *msg, size_t msg_len)
 static upload_result_t shq_day_begin(const char *day)
 {
     (void)day;
-    if (!s_tls || uploader_should_cancel()) return UPLOAD_CANCELLED;
-    s_import_id[0] = '\0'; s_day_files = 0;
+    if (!s_tls || uploader_should_cancel())
+        return UPLOAD_CANCELLED;
+    s_import_id[0] = '\0';
+    s_day_files = 0;
     if (shq_create_import(s_tls, s_import_id, sizeof(s_import_id), false) != ESP_OK)
         return UPLOAD_ERR_TRANSIENT;
     return UPLOAD_OK;
@@ -991,8 +1085,10 @@ static upload_result_t shq_day_begin(const char *day)
 static upload_result_t shq_ox_day_begin(const char *day)
 {
     (void)day;
-    if (!s_tls || uploader_should_cancel()) return UPLOAD_CANCELLED;
-    s_import_id[0] = '\0'; s_day_files = 0;
+    if (!s_tls || uploader_should_cancel())
+        return UPLOAD_CANCELLED;
+    s_import_id[0] = '\0';
+    s_day_files = 0;
     if (shq_create_import(s_tls, s_import_id, sizeof(s_import_id), true) != ESP_OK)
         return UPLOAD_ERR_TRANSIENT;
     return UPLOAD_OK;
@@ -1000,18 +1096,19 @@ static upload_result_t shq_ox_day_begin(const char *day)
 
 static upload_result_t shq_put_oximetry(const upload_ox_ref_t *ref)
 {
-    if (!s_tls || !s_import_id[0] || !ref) return UPLOAD_ERR_TRANSIENT;
+    if (!s_tls || !s_import_id[0] || !ref)
+        return UPLOAD_ERR_TRANSIENT;
     for (int i = 0; i < ref->n_files; i++) {
         const char *rel = ref->relative_paths[i];
-        if (strcmp(rel, "source/source.bin") != 0 &&
-            strcmp(rel, "source/source.vld") != 0) continue;
+        if (strcmp(rel, "source/source.bin") != 0 && strcmp(rel, "source/source.vld") != 0)
+            continue;
         char subpath[96];
         snprintf(subpath, sizeof(subpath), "/OXYMETRY/%s", ref->day);
         char filename[128];
-        snprintf(filename, sizeof(filename), "%s",
-                 ref->source_name[0] ? ref->source_name : "oximetry");
-        if (shq_upload_file(s_tls, s_import_id, ref->local_paths[i], subpath,
-                            filename, true) != UPLOAD_OK)
+        snprintf(
+            filename, sizeof(filename), "%s", ref->source_name[0] ? ref->source_name : "oximetry");
+        if (shq_upload_file(s_tls, s_import_id, ref->local_paths[i], subpath, filename, true) !=
+            UPLOAD_OK)
             return UPLOAD_ERR_TRANSIENT;
         s_day_files++;
         return UPLOAD_OK;
@@ -1021,18 +1118,18 @@ static upload_result_t shq_put_oximetry(const upload_ox_ref_t *ref)
 
 static upload_result_t shq_put_group(const char *day, const upload_group_ref_t *g)
 {
-    if (!s_tls || !s_import_id[0] || !g) return UPLOAD_ERR_TRANSIENT;
+    if (!s_tls || !s_import_id[0] || !g)
+        return UPLOAD_ERR_TRANSIENT;
 
     char remote_subpath[64];
     snprintf(remote_subpath, sizeof(remote_subpath), "/DATALOG/%s", day);
 
     for (int i = 0; i < g->n_files; i++) {
         char local[512];
-        snprintf(local, sizeof(local), "%s/%s/%s", SD_SDCARD_DATALOG, day,
-                 g->files[i]);
+        snprintf(local, sizeof(local), "%s/%s/%s", SD_SDCARD_DATALOG, day, g->files[i]);
 
-        if (shq_upload_file(s_tls, s_import_id, local, remote_subpath,
-                            g->files[i], false) != UPLOAD_OK) {
+        if (shq_upload_file(s_tls, s_import_id, local, remote_subpath, g->files[i], false) !=
+            UPLOAD_OK) {
             ESP_LOGW(TAG, "  failed to upload %s", g->files[i]);
             return UPLOAD_ERR_TRANSIENT;
         }
@@ -1042,17 +1139,17 @@ static upload_result_t shq_put_group(const char *day, const upload_group_ref_t *
     return UPLOAD_OK;
 }
 
-static upload_result_t shq_put_bundle(const char *day,
-                                     const upload_bundle_ref_t *b, bool changed)
+static upload_result_t shq_put_bundle(const char *day, const upload_bundle_ref_t *b, bool changed)
 {
     (void)day;
-    (void)changed;   /* always required inside an import — see header note */
-    if (!s_tls || !s_import_id[0] || !b) return UPLOAD_ERR_TRANSIENT;
+    (void)changed; /* always required inside an import — see header note */
+    if (!s_tls || !s_import_id[0] || !b)
+        return UPLOAD_ERR_TRANSIENT;
 
     for (int i = 0; i < b->n_files; i++) {
         const char *subpath = b->in_settings[i] ? "/SETTINGS" : "";
-        if (shq_upload_file(s_tls, s_import_id, b->paths[i], subpath,
-                            b->names[i], false) != UPLOAD_OK) {
+        if (shq_upload_file(s_tls, s_import_id, b->paths[i], subpath, b->names[i], false) !=
+            UPLOAD_OK) {
             ESP_LOGW(TAG, "  failed to upload %s", b->names[i]);
             return UPLOAD_ERR_TRANSIENT;
         }
@@ -1064,7 +1161,8 @@ static upload_result_t shq_put_bundle(const char *day,
 
 static upload_result_t shq_day_end(const char *day, bool any_uploaded)
 {
-    if (!s_tls || !s_import_id[0]) return UPLOAD_ERR_TRANSIENT;
+    if (!s_tls || !s_import_id[0])
+        return UPLOAD_ERR_TRANSIENT;
 
     /* An import with no files would leave an empty record in the user's
      * SleepHQ history; skip processing it. */
@@ -1075,7 +1173,8 @@ static upload_result_t shq_day_end(const char *day, bool any_uploaded)
     }
 
     esp_err_t err = shq_process_import(s_tls, s_import_id);
-    if (err == ESP_OK) err = shq_wait_import(s_tls, s_import_id);
+    if (err == ESP_OK)
+        err = shq_wait_import(s_tls, s_import_id);
     s_import_id[0] = '\0';
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "import processing failed for day %s, resetting TLS connection", day);
@@ -1089,7 +1188,7 @@ static upload_result_t shq_day_end(const char *day, bool any_uploaded)
 const upload_backend_t sleephq_backend = {
     .id = "sleephq",
     .label = "SleepHQ Cloud",
-    .bundle_only_ok = false,    /* would create an import with no sessions */
+    .bundle_only_ok = false, /* would create an import with no sessions */
     .is_configured = shq_is_configured,
     .prepare = shq_prepare,
     .session_begin = shq_session_begin,
@@ -1112,18 +1211,23 @@ esp_err_t uploader_sleephq_probe(void)
     s_token_expires = 0; /* force actual credential verification */
     s_probe_active = true;
     upload_result_t result = shq_prepare();
-    if (result == UPLOAD_OK) result = shq_session_begin();
+    if (result == UPLOAD_OK)
+        result = shq_session_begin();
     s_probe_active = false;
     if (result != UPLOAD_OK) {
         shq_session_end();
         uploader_test_snapshot_t observed;
         uploader_test_snapshot(&observed);
         uploader_test_failed(observed.stage,
-            result == UPLOAD_ERR_PERMANENT ? "SleepHQ authentication failed" : "SleepHQ connection or account lookup failed");
+                             result == UPLOAD_ERR_PERMANENT
+                                 ? "SleepHQ authentication failed"
+                                 : "SleepHQ connection or account lookup failed");
         return ESP_FAIL;
     }
     uploader_test_stage(UPLOAD_STAGE_CONNECT, true, "TLS connection established");
-    uploader_test_stage(UPLOAD_STAGE_AUTH_MOUNT, true, "Credentials and account access accepted; no recording sent");
+    uploader_test_stage(UPLOAD_STAGE_AUTH_MOUNT,
+                        true,
+                        "Credentials and account access accepted; no recording sent");
     shq_session_end();
     return ESP_OK;
 }

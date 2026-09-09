@@ -31,11 +31,10 @@
 static const char *TAG = "psram_task";
 
 #define PSRAM_REAPER_QUEUE_DEPTH 8
-#define PSRAM_REAPER_PRIORITY    (configMAX_PRIORITIES - 1)
+#define PSRAM_REAPER_PRIORITY (configMAX_PRIORITIES - 1)
 
 static StaticQueue_t s_reaper_queue_control;
-static uint8_t s_reaper_queue_storage[
-    PSRAM_REAPER_QUEUE_DEPTH * sizeof(TaskHandle_t)];
+static uint8_t s_reaper_queue_storage[PSRAM_REAPER_QUEUE_DEPTH * sizeof(TaskHandle_t)];
 static QueueHandle_t s_reaper_queue;
 static StaticTask_t s_reaper_task_control;
 static StackType_t s_reaper_task_stack[configMINIMAL_STACK_SIZE];
@@ -46,8 +45,7 @@ static void psram_task_reaper(void *arg)
     (void)arg;
     while (true) {
         TaskHandle_t victim = NULL;
-        if (xQueueReceive(s_reaper_queue, &victim, portMAX_DELAY) == pdTRUE &&
-            victim != NULL) {
+        if (xQueueReceive(s_reaper_queue, &victim, portMAX_DELAY) == pdTRUE && victim != NULL) {
             /* This is deliberately never a self-delete. ESP-IDF therefore
              * reclaims the WithCaps buffers directly and does not allocate its
              * temporary cleanup task. */
@@ -61,18 +59,23 @@ esp_err_t psram_task_init(void)
     if (s_reaper_task != NULL)
         return ESP_OK;
 
-    s_reaper_queue = xQueueCreateStatic(
-        PSRAM_REAPER_QUEUE_DEPTH, sizeof(TaskHandle_t),
-        s_reaper_queue_storage, &s_reaper_queue_control);
+    s_reaper_queue = xQueueCreateStatic(PSRAM_REAPER_QUEUE_DEPTH,
+                                        sizeof(TaskHandle_t),
+                                        s_reaper_queue_storage,
+                                        &s_reaper_queue_control);
     if (s_reaper_queue == NULL) {
         ESP_LOGE(TAG, "failed to create retained task-reaper queue");
         return ESP_ERR_NO_MEM;
     }
 
-    s_reaper_task = xTaskCreateStaticPinnedToCore(
-        psram_task_reaper, "psram_reaper", configMINIMAL_STACK_SIZE, NULL,
-        PSRAM_REAPER_PRIORITY, s_reaper_task_stack, &s_reaper_task_control,
-        tskNO_AFFINITY);
+    s_reaper_task = xTaskCreateStaticPinnedToCore(psram_task_reaper,
+                                                  "psram_reaper",
+                                                  configMINIMAL_STACK_SIZE,
+                                                  NULL,
+                                                  PSRAM_REAPER_PRIORITY,
+                                                  s_reaper_task_stack,
+                                                  &s_reaper_task_control,
+                                                  tskNO_AFFINITY);
     if (s_reaper_task == NULL) {
         ESP_LOGE(TAG, "failed to create retained task reaper");
         s_reaper_queue = NULL;
@@ -93,8 +96,10 @@ TaskHandle_t psram_task_create(TaskFunction_t task_func,
     /* xTaskCreateStaticPinnedToCore() cannot reclaim caller-provided buffers
      * when a task deletes itself. ESP-IDF's WithCaps pair records the PSRAM
      * stack/internal-TCB ownership; our retained reaper performs deletion. */
-    if (out_stack) *out_stack = NULL;
-    if (out_tcb) *out_tcb = NULL;
+    if (out_stack)
+        *out_stack = NULL;
+    if (out_tcb)
+        *out_tcb = NULL;
 
     if (s_reaper_task == NULL) {
         ESP_LOGE(TAG, "cannot create %s before psram_task_init", name);
@@ -102,13 +107,19 @@ TaskHandle_t psram_task_create(TaskFunction_t task_func,
     }
 
     TaskHandle_t h = NULL;
-    BaseType_t created = xTaskCreatePinnedToCoreWithCaps(
-        task_func, name, stack_size, arg, priority, &h, core_id,
-        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    BaseType_t created = xTaskCreatePinnedToCoreWithCaps(task_func,
+                                                         name,
+                                                         stack_size,
+                                                         arg,
+                                                         priority,
+                                                         &h,
+                                                         core_id,
+                                                         MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (created != pdPASS || !h) {
         ESP_LOGE(TAG,
                  "failed to allocate %s: stack=%u PSRAM free=%u, internal free=%u",
-                 name, (unsigned)stack_size,
+                 name,
+                 (unsigned)stack_size,
                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
         return NULL;

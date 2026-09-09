@@ -86,39 +86,36 @@ static const char *TAG = "as11_ble";
 /*  GATT / FIG constants                                              */
 /* ------------------------------------------------------------------ */
 /* Service fd56, TX a6220002, RX a6220003 (128-bit), CCCD 0x2902. */
-static const ble_uuid16_t UUID_SERVICE =
-    BLE_UUID16_INIT(0xfd56);
-static const ble_uuid128_t UUID_TX =
-    BLE_UUID128_INIT(0xaa, 0x44, 0x20, 0x9d, 0x08, 0xcb, 0xae, 0xaf,
-                     0x20, 0x4b, 0xf1, 0x35, 0x02, 0x00, 0x22, 0xa6);
-static const ble_uuid128_t UUID_RX =
-    BLE_UUID128_INIT(0xaa, 0x44, 0x20, 0x9d, 0x08, 0xcb, 0xae, 0xaf,
-                     0x20, 0x4b, 0xf1, 0x35, 0x03, 0x00, 0x22, 0xa6);
+static const ble_uuid16_t UUID_SERVICE = BLE_UUID16_INIT(0xfd56);
+static const ble_uuid128_t UUID_TX = BLE_UUID128_INIT(
+    0xaa, 0x44, 0x20, 0x9d, 0x08, 0xcb, 0xae, 0xaf, 0x20, 0x4b, 0xf1, 0x35, 0x02, 0x00, 0x22, 0xa6);
+static const ble_uuid128_t UUID_RX = BLE_UUID128_INIT(
+    0xaa, 0x44, 0x20, 0x9d, 0x08, 0xcb, 0xae, 0xaf, 0x20, 0x4b, 0xf1, 0x35, 0x03, 0x00, 0x22, 0xa6);
 
-#define DEVICE_NAME_PREFIX  "ResMed"
+#define DEVICE_NAME_PREFIX "ResMed"
 
-#define FIG_SYNC            0xCAFEBABEu
-#define FIG_HEADER_LEN      12               /* bytes 0x04..0x0f */
-#define FIG_VCID_TX         0x0393           /* plaintext, key-exchange only */
-#define FIG_VCID_TX_ENC     0x0397           /* encrypted TX (RPC requests) */
-#define FIG_VCID_RX_ENC     0x0396           /* encrypted RX (notifications/responses) */
+#define FIG_SYNC 0xCAFEBABEu
+#define FIG_HEADER_LEN 12      /* bytes 0x04..0x0f */
+#define FIG_VCID_TX 0x0393     /* plaintext, key-exchange only */
+#define FIG_VCID_TX_ENC 0x0397 /* encrypted TX (RPC requests) */
+#define FIG_VCID_RX_ENC 0x0396 /* encrypted RX (notifications/responses) */
 
-#define RX_BUF_MAX          16384
-#define TX_PAYLOAD_MAX      1024
+#define RX_BUF_MAX 16384
+#define TX_PAYLOAD_MAX 1024
 
 /* ------------------------------------------------------------------ */
 /*  NVS                                                               */
 /* ------------------------------------------------------------------ */
-#define NVS_NS              "as11"
-#define NVS_K_ADDR          "ble_addr"
-#define NVS_K_NAME          "ble_name"
-#define NVS_K_CLIENTID      "client_id"
-#define NVS_K_PAIRKEY       "pair_key"      /* masterPairKey, 64 hex */
+#define NVS_NS "as11"
+#define NVS_K_ADDR "ble_addr"
+#define NVS_K_NAME "ble_name"
+#define NVS_K_CLIENTID "client_id"
+#define NVS_K_PAIRKEY "pair_key" /* masterPairKey, 64 hex */
 
 /* ------------------------------------------------------------------ */
 /*  Scan cache                                                        */
 /* ------------------------------------------------------------------ */
-#define SCAN_MAX  12
+#define SCAN_MAX 12
 struct scan_entry {
     ble_addr_t addr;
     char name[32];
@@ -135,8 +132,8 @@ static volatile bool s_host_ready;
 static uint8_t s_own_addr_type;
 
 static uint16_t s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
-static uint16_t s_tx_handle;          /* value handle of TX char */
-static uint16_t s_rx_handle;          /* value handle of RX char */
+static uint16_t s_tx_handle; /* value handle of TX char */
+static uint16_t s_rx_handle; /* value handle of RX char */
 static uint16_t s_svc_start, s_svc_end;
 static uint16_t s_cccd_handle;
 static uint16_t s_mtu = 23;
@@ -171,7 +168,8 @@ static uint32_t as11_clock_capture_invalidate(void)
     return generation;
 }
 
-static bool as11_clock_capture_store(uint32_t generation, int64_t as11_ms,
+static bool as11_clock_capture_store(uint32_t generation,
+                                     int64_t as11_ms,
                                      int64_t wall_ms,
                                      time_source_t wall_source)
 {
@@ -203,36 +201,36 @@ static uint16_t s_devname_handle;    /* 0x2a00 Device Name */
 static uint16_t s_appearance_handle; /* 0x2a01 Appearance */
 static uint16_t s_steehl_handles[3]; /* 3 Steehl vendor chars */
 
-static SemaphoreHandle_t s_op_sem;    /* generic GATT op completion */
+static SemaphoreHandle_t s_op_sem; /* generic GATT op completion */
 static volatile int s_op_status;
 static SemaphoreHandle_t s_connect_sem;
 static volatile int s_connect_status;
-static SemaphoreHandle_t s_resp_sem;  /* JSON RPC response arrived */
-static cJSON *s_resp_json;            /* owned; freed by waiter */
+static SemaphoreHandle_t s_resp_sem; /* JSON RPC response arrived */
+static cJSON *s_resp_json;           /* owned; freed by waiter */
 static portMUX_TYPE s_response_lock = portMUX_INITIALIZER_UNLOCKED;
 static uint32_t s_rpc_serial, s_expected_response_id;
 static cJSON *s_response_original_id;
-static SemaphoreHandle_t s_cmd_mtx;   /* serialization mutex for RPC requests */
+static SemaphoreHandle_t s_cmd_mtx; /* serialization mutex for RPC requests */
 
-static uint8_t *s_rx_buf;          /* PSRAM-allocated, RX_BUF_MAX bytes */
+static uint8_t *s_rx_buf; /* PSRAM-allocated, RX_BUF_MAX bytes */
 static int s_rx_len;
 
 /* Notification processing queue — offloads heavy work from NimBLE host task.
  * The host task just copies raw notification bytes and enqueues them;
  * a dedicated task does FIG parsing, AES decrypt, cJSON, and dispatch. */
-#define NOTIF_QUEUE_LEN  64
+#define NOTIF_QUEUE_LEN 64
 typedef struct {
     uint8_t *data;
-    int      len;
+    int len;
     uint32_t epoch;
 } notif_item_t;
 static QueueHandle_t s_notif_queue = NULL;
 /* Backlog metrics — see BLE_GAP_EVENT_NOTIFY_RX. */
 static UBaseType_t s_notif_hwm = 0;
-static uint32_t    s_notif_dropped = 0;
-static uint32_t    s_notif_dropped_bytes = 0;
-static uint32_t    s_notif_alloc_fail = 0;
-static TaskHandle_t  s_notif_task  = NULL;
+static uint32_t s_notif_dropped = 0;
+static uint32_t s_notif_dropped_bytes = 0;
+static uint32_t s_notif_alloc_fail = 0;
+static TaskHandle_t s_notif_task = NULL;
 static uint32_t s_notif_epoch;
 static bool s_notif_loss_pending, s_notif_drop_until_connect;
 
@@ -248,35 +246,34 @@ static void notif_mark_loss(void)
         ble_gap_terminate(s_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
 }
 
-
 /* Spool publication and fragment mutation are serialized by a dedicated
  * mutex, never held while waiting for BLE/network responses. Withdrawal waits
  * for any in-flight decoder before freeing the collector or its semaphore. */
 static SemaphoreHandle_t s_spool_mtx;
 static bool s_spool_tainted;
-#define SPOOL_MAX_FRAGS   32
-#define SPOOL_FRAG_MAX    2808          /* matches AS11 max fragment size */
+#define SPOOL_MAX_FRAGS 32
+#define SPOOL_FRAG_MAX 2808 /* matches AS11 max fragment size */
 
 typedef struct {
-    int      seq;
+    int seq;
     uint8_t *data;
-    int      len;
+    int len;
 } spool_frag_t;
 
 typedef struct {
     spool_frag_t frags[SPOOL_MAX_FRAGS];
-    int      frag_count;
-    char     status[48];                /* SPOOL_INCOMPLETE / SPOOL_COMPLETE / ... */
-    char     next_addr_json[256];       /* nextSpoolAddress for multi-round pulls */
-    bool     done;                      /* set when status != SPOOL_INCOMPLETE */
-    bool     failed;
-    SemaphoreHandle_t sem;              /* given when done */
+    int frag_count;
+    char status[48];          /* SPOOL_INCOMPLETE / SPOOL_COMPLETE / ... */
+    char next_addr_json[256]; /* nextSpoolAddress for multi-round pulls */
+    bool done;                /* set when status != SPOOL_INCOMPLETE */
+    bool failed;
+    SemaphoreHandle_t sem; /* given when done */
 } spool_collector_t;
 
 static spool_collector_t *s_spool_collector = NULL;
 
 /* Encrypted session state (set after reconnect or pairing). */
-static uint8_t s_session_key[32];       /* AES-256 key */
+static uint8_t s_session_key[32]; /* AES-256 key */
 static bool s_session_encrypted = false;
 
 /* When true, the next BLE_GAP_EVENT_DISCONNECT will NOT trigger
@@ -299,11 +296,11 @@ static struct {
 
 static char s_target_name[32];
 static ble_addr_t s_target_addr;
-#define SERVER_PK_MAX  600
-#define SALT_MAX       160
-static char *s_server_pk;       /* PSRAM; serverPk from StartKeyExchange */
-static char *s_salt;            /* PSRAM; salt from StartKeyExchange */
-static bool s_kex_ready;        /* serverPk + salt captured */
+#define SERVER_PK_MAX 600
+#define SALT_MAX 160
+static char *s_server_pk; /* PSRAM; serverPk from StartKeyExchange */
+static char *s_salt;      /* PSRAM; salt from StartKeyExchange */
+static bool s_kex_ready;  /* serverPk + salt captured */
 static char s_passkey[16];
 
 /* State machine + last error (guarded by s_state_mtx). */
@@ -316,22 +313,21 @@ static char s_error[96];
 /* ------------------------------------------------------------------ */
 #define SRP_PAD 256
 /* Device-specific 2048-bit modulus N (verified against reference client). */
-static const char SRP_N_HEX[] =
-    "AC6BDB41324A9A9BF166DE5E1389582FAF72B6651987EE07FC3192943DB56050"
-    "A37329CBB4A099ED8193E0757767A13DD52312AB4B03310DCD7F48A9DA04FD50"
-    "E8083969EDB767B0CF6095179A163AB3661A05FBD5FAAAE82918A9962F0B93B8"
-    "55F97993EC975EEAA80D740ADBF4FF747359D041D5C33EA71D281E446B14773B"
-    "CA97B43A23FB801676BD207A436C6481F1D2B9078717461A5B9D32E688F87748"
-    "544523B524B0D57D5EA77A2775D2ECFA032CFBDBF52FB3786160279004E57AE6"
-    "AF874E7303CE53299CCC041C7BC308D82A5698F3A8D0C38271AE35F8E9DBFBB6"
-    "94B5C803D89F7AE435DE236D525F54759B65E372FCD68EF20FA7111F9E4AFF73";
+static const char SRP_N_HEX[] = "AC6BDB41324A9A9BF166DE5E1389582FAF72B6651987EE07FC3192943DB56050"
+                                "A37329CBB4A099ED8193E0757767A13DD52312AB4B03310DCD7F48A9DA04FD50"
+                                "E8083969EDB767B0CF6095179A163AB3661A05FBD5FAAAE82918A9962F0B93B8"
+                                "55F97993EC975EEAA80D740ADBF4FF747359D041D5C33EA71D281E446B14773B"
+                                "CA97B43A23FB801676BD207A436C6481F1D2B9078717461A5B9D32E688F87748"
+                                "544523B524B0D57D5EA77A2775D2ECFA032CFBDBF52FB3786160279004E57AE6"
+                                "AF874E7303CE53299CCC041C7BC308D82A5698F3A8D0C38271AE35F8E9DBFBB6"
+                                "94B5C803D89F7AE435DE236D525F54759B65E372FCD68EF20FA7111F9E4AFF73";
 
 struct srp_ctx {
     bool active;
     mbedtls_mpi N, g, a, A;
-    uint8_t A_pad[SRP_PAD];   /* A serialized, 256 bytes BE */
+    uint8_t A_pad[SRP_PAD]; /* A serialized, 256 bytes BE */
     char client_id[64];
-    char master_key_hex[65];  /* K hex (64 chars) */
+    char master_key_hex[65]; /* K hex (64 chars) */
 };
 static struct srp_ctx s_srp;
 
@@ -365,7 +361,7 @@ static void bytes_to_hex(const uint8_t *in, size_t n, char *out_upper)
 {
     static const char H[] = "0123456789ABCDEF";
     for (size_t i = 0; i < n; i++) {
-        out_upper[i * 2]     = H[in[i] >> 4];
+        out_upper[i * 2] = H[in[i] >> 4];
         out_upper[i * 2 + 1] = H[in[i] & 0x0F];
     }
     out_upper[n * 2] = '\0';
@@ -374,19 +370,25 @@ static void bytes_to_hex(const uint8_t *in, size_t n, char *out_upper)
 static int hex_to_bytes(const char *hex, uint8_t *out, size_t out_max)
 {
     size_t n = strlen(hex);
-    if (n % 2) return -1;
+    if (n % 2)
+        return -1;
     n /= 2;
-    if (n > out_max) return -1;
+    if (n > out_max)
+        return -1;
     for (size_t i = 0; i < n; i++) {
         char hi = hex[i * 2], lo = hex[i * 2 + 1];
         int v = 0;
         for (int k = 0; k < 2; k++) {
             char c = k ? lo : hi;
             int d;
-            if (c >= '0' && c <= '9') d = c - '0';
-            else if (c >= 'a' && c <= 'f') d = c - 'a' + 10;
-            else if (c >= 'A' && c <= 'F') d = c - 'A' + 10;
-            else return -1;
+            if (c >= '0' && c <= '9')
+                d = c - '0';
+            else if (c >= 'a' && c <= 'f')
+                d = c - 'a' + 10;
+            else if (c >= 'A' && c <= 'F')
+                d = c - 'A' + 10;
+            else
+                return -1;
             v = (v << 4) | d;
         }
         out[i] = (uint8_t)v;
@@ -395,8 +397,7 @@ static int hex_to_bytes(const char *hex, uint8_t *out, size_t out_max)
 }
 
 /* SHA-256 over a list of (ptr,len) segments. */
-static void sha256_segs(const uint8_t *const *segs, const size_t *lens,
-                        int n, uint8_t out[32])
+static void sha256_segs(const uint8_t *const *segs, const size_t *lens, int n, uint8_t out[32])
 {
     mbedtls_sha256_context c;
     mbedtls_sha256_init(&c);
@@ -409,9 +410,8 @@ static void sha256_segs(const uint8_t *const *segs, const size_t *lens,
 }
 
 /* HMAC-SHA256(key, data) -> out[32]. */
-static void hmac_sha256(const uint8_t *key, size_t key_len,
-                        const uint8_t *data, size_t data_len,
-                        uint8_t out[32])
+static void hmac_sha256(
+    const uint8_t *key, size_t key_len, const uint8_t *data, size_t data_len, uint8_t out[32])
 {
     const mbedtls_md_info_t *info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
     mbedtls_md_hmac(info, key, key_len, data, data_len, out);
@@ -420,21 +420,26 @@ static void hmac_sha256(const uint8_t *key, size_t key_len,
 /* AES-256-CBC encrypt with random IV.
  * Wire format: [IV (16 bytes)][ciphertext([u16 len][payload][zero pad to 16])]
  * Returns total output length (16 + padded_len) or -1 on error. */
-static int aes_cbc_encrypt(const uint8_t *key, const uint8_t *plaintext,
-                           int plen, uint8_t *out, int out_max)
+static int aes_cbc_encrypt(
+    const uint8_t *key, const uint8_t *plaintext, int plen, uint8_t *out, int out_max)
 {
     /* Frame: 2-byte LE length prefix + payload + zero padding to 16-byte boundary */
     int framed_len = 2 + plen;
     int pad_len = (16 - framed_len % 16) % 16;
     int padded_len = framed_len + pad_len;
-    ESP_LOGD(TAG, "aes_cbc_encrypt: plen=%d framed=%d pad=%d padded=%d out_max=%d",
-             plen, framed_len, pad_len, padded_len, out_max);
+    ESP_LOGD(TAG,
+             "aes_cbc_encrypt: plen=%d framed=%d pad=%d padded=%d out_max=%d",
+             plen,
+             framed_len,
+             pad_len,
+             padded_len,
+             out_max);
     if (16 + padded_len > out_max) {
         ESP_LOGE(TAG, "aes_cbc_encrypt: output too large: %d > %d", 16 + padded_len, out_max);
         return -1;
     }
 
-    uint8_t *framed = out + 16;  /* ciphertext starts after IV */
+    uint8_t *framed = out + 16; /* ciphertext starts after IV */
     framed[0] = plen & 0xFF;
     framed[1] = (plen >> 8) & 0xFF;
     memcpy(framed + 2, plaintext, plen);
@@ -455,8 +460,7 @@ static int aes_cbc_encrypt(const uint8_t *key, const uint8_t *plaintext,
         mbedtls_aes_free(&aes);
         return -1;
     }
-    int rc = mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, padded_len,
-                                   iv, framed, framed);
+    int rc = mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, padded_len, iv, framed, framed);
     mbedtls_aes_free(&aes);
     if (rc != 0) {
         ESP_LOGE(TAG, "aes_cbc_encrypt: crypt_cbc failed rc=%d", rc);
@@ -469,27 +473,30 @@ static int aes_cbc_encrypt(const uint8_t *key, const uint8_t *plaintext,
  * Input: [IV (16 bytes)][ciphertext]
  * Output: plaintext (without the 2-byte length prefix), written to out.
  * Returns plaintext length or -1 on error. */
-static int aes_cbc_decrypt(const uint8_t *key, const uint8_t *data,
-                           int data_len, uint8_t *out, int out_max)
+static int aes_cbc_decrypt(
+    const uint8_t *key, const uint8_t *data, int data_len, uint8_t *out, int out_max)
 {
-    if (data_len < 32 || (data_len - 16) % 16 != 0) return -1;
+    if (data_len < 32 || (data_len - 16) % 16 != 0)
+        return -1;
 
     const uint8_t *iv = data;
     int ct_len = data_len - 16;
-    uint8_t *pt = out;  /* decrypt in-place into out */
+    uint8_t *pt = out; /* decrypt in-place into out */
 
     mbedtls_aes_context aes;
     mbedtls_aes_init(&aes);
     mbedtls_aes_setkey_dec(&aes, key, 256);
-    int rc = mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, ct_len,
-                                   (uint8_t *)iv, data + 16, pt);
+    int rc = mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, ct_len, (uint8_t *)iv, data + 16, pt);
     mbedtls_aes_free(&aes);
-    if (rc != 0) return -1;
+    if (rc != 0)
+        return -1;
 
     /* Read the 2-byte LE length prefix to get actual payload length */
-    if (ct_len < 2) return -1;
+    if (ct_len < 2)
+        return -1;
     int plen = pt[0] | (pt[1] << 8);
-    if (plen < 0 || plen > ct_len - 2 || plen > out_max) return -1;
+    if (plen < 0 || plen > ct_len - 2 || plen > out_max)
+        return -1;
 
     /* Move payload to start of out buffer */
     memmove(out, pt + 2, plen);
@@ -498,19 +505,25 @@ static int aes_cbc_decrypt(const uint8_t *key, const uint8_t *data,
 
 static void addr_to_str(const ble_addr_t *a, char *out /* >=18 */)
 {
-    snprintf(out, 18, "%02X:%02X:%02X:%02X:%02X:%02X",
-             a->val[5], a->val[4], a->val[3],
-             a->val[2], a->val[1], a->val[0]);
+    snprintf(out,
+             18,
+             "%02X:%02X:%02X:%02X:%02X:%02X",
+             a->val[5],
+             a->val[4],
+             a->val[3],
+             a->val[2],
+             a->val[1],
+             a->val[0]);
 }
 
 static bool str_to_addr(const char *s, ble_addr_t *a)
 {
     unsigned v[6];
-    if (sscanf(s, "%x:%x:%x:%x:%x:%x",
-               &v[0], &v[1], &v[2], &v[3], &v[4], &v[5]) != 6) {
+    if (sscanf(s, "%x:%x:%x:%x:%x:%x", &v[0], &v[1], &v[2], &v[3], &v[4], &v[5]) != 6) {
         return false;
     }
-    for (int i = 0; i < 6; i++) a->val[5 - i] = (uint8_t)v[i];
+    for (int i = 0; i < 6; i++)
+        a->val[5 - i] = (uint8_t)v[i];
     a->type = BLE_ADDR_PUBLIC;
     return true;
 }
@@ -526,8 +539,7 @@ static inline uint32_t crc32_ieee(const uint8_t *d, size_t n)
 }
 
 /* Encode a FIG packet into out (caller supplies buffer >= 16+len). */
-static int fig_encode(uint16_t vcid, const uint8_t *payload, uint16_t len,
-                      uint8_t *out)
+static int fig_encode(uint16_t vcid, const uint8_t *payload, uint16_t len, uint8_t *out)
 {
     out[0] = FIG_SYNC & 0xFF;
     out[1] = (FIG_SYNC >> 8) & 0xFF;
@@ -539,8 +551,8 @@ static int fig_encode(uint16_t vcid, const uint8_t *payload, uint16_t len,
     out[6] = len & 0xFF;
     out[7] = (len >> 8) & 0xFF;
     uint32_t pcrc = crc32_ieee(payload, len);
-    out[8]  = pcrc & 0xFF;
-    out[9]  = (pcrc >> 8) & 0xFF;
+    out[8] = pcrc & 0xFF;
+    out[9] = (pcrc >> 8) & 0xFF;
     out[10] = (pcrc >> 16) & 0xFF;
     out[11] = (pcrc >> 24) & 0xFF;
     uint32_t hcrc = crc32_ieee(&out[4], 8);
@@ -560,8 +572,8 @@ static int fig_take_packet(uint8_t *payload_out, int payload_max, uint16_t *vcid
         /* find sync */
         int idx = -1;
         for (int i = 0; i + 4 <= s_rx_len; i++) {
-            if (s_rx_buf[i] == 0xBE && s_rx_buf[i + 1] == 0xBA &&
-                s_rx_buf[i + 2] == 0xFE && s_rx_buf[i + 3] == 0xCA) {
+            if (s_rx_buf[i] == 0xBE && s_rx_buf[i + 1] == 0xBA && s_rx_buf[i + 2] == 0xFE &&
+                s_rx_buf[i + 3] == 0xCA) {
                 idx = i;
                 break;
             }
@@ -579,7 +591,9 @@ static int fig_take_packet(uint8_t *payload_out, int payload_max, uint16_t *vcid
             s_rx_len -= idx;
         }
         if (s_rx_len < 4 + FIG_HEADER_LEN) {
-            ESP_LOGD(TAG, "fig_take_packet: sync found, but waiting for header (%d bytes total)", s_rx_len);
+            ESP_LOGD(TAG,
+                     "fig_take_packet: sync found, but waiting for header (%d bytes total)",
+                     s_rx_len);
             return -1;
         }
 
@@ -589,7 +603,10 @@ static int fig_take_packet(uint8_t *payload_out, int payload_max, uint16_t *vcid
         uint32_t hcrc = hdr[8] | (hdr[9] << 8) | (hdr[10] << 16) | (hdr[11] << 24);
         uint32_t calc_hcrc = crc32_ieee(hdr, 8);
         if (calc_hcrc != hcrc) {
-            ESP_LOGW(TAG, "fig_take_packet: bad header CRC: calc=0x%08x expected=0x%08x", (unsigned)calc_hcrc, (unsigned)hcrc);
+            ESP_LOGW(TAG,
+                     "fig_take_packet: bad header CRC: calc=0x%08x expected=0x%08x",
+                     (unsigned)calc_hcrc,
+                     (unsigned)hcrc);
             /* bad header: skip this sync and retry */
             memmove(s_rx_buf, s_rx_buf + 4, s_rx_len - 4);
             s_rx_len -= 4;
@@ -597,14 +614,19 @@ static int fig_take_packet(uint8_t *payload_out, int payload_max, uint16_t *vcid
         }
         int total = 4 + FIG_HEADER_LEN + plen;
         if (s_rx_len < total) {
-            ESP_LOGD(TAG, "fig_take_packet: header OK, waiting for full payload (need %d, have %d)", total, s_rx_len);
-            return -1;   /* wait for more */
+            ESP_LOGD(TAG,
+                     "fig_take_packet: header OK, waiting for full payload (need %d, have %d)",
+                     total,
+                     s_rx_len);
+            return -1; /* wait for more */
         }
 
         int n = plen;
-        if (n > payload_max) n = payload_max;
+        if (n > payload_max)
+            n = payload_max;
         memcpy(payload_out, &s_rx_buf[16], n);
-        if (vcid_out) *vcid_out = vcid;
+        if (vcid_out)
+            *vcid_out = vcid;
 
         memmove(s_rx_buf, s_rx_buf + total, s_rx_len - total);
         s_rx_len -= total;
@@ -616,20 +638,25 @@ static int fig_take_packet(uint8_t *payload_out, int payload_max, uint16_t *vcid
 /* ------------------------------------------------------------------ */
 /*  GATT callbacks                                                    */
 /* ------------------------------------------------------------------ */
-static int on_write_done(uint16_t conn, const struct ble_gatt_error *err,
-                         struct ble_gatt_attr *attr, void *arg)
+static int on_write_done(uint16_t conn,
+                         const struct ble_gatt_error *err,
+                         struct ble_gatt_attr *attr,
+                         void *arg)
 {
-    (void)conn; (void)attr; (void)arg;
+    (void)conn;
+    (void)attr;
+    (void)arg;
     s_op_status = err ? err->status : 0;
     xSemaphoreGive(s_op_sem);
     return 0;
 }
 
-static int on_mtu(uint16_t conn, const struct ble_gatt_error *err,
-                  uint16_t mtu, void *arg)
+static int on_mtu(uint16_t conn, const struct ble_gatt_error *err, uint16_t mtu, void *arg)
 {
-    (void)conn; (void)arg;
-    if (err && err->status == 0) s_mtu = mtu;
+    (void)conn;
+    (void)arg;
+    if (err && err->status == 0)
+        s_mtu = mtu;
     s_op_status = err ? err->status : 0;
     xSemaphoreGive(s_op_sem);
     return 0;
@@ -639,10 +666,13 @@ static int on_mtu(uint16_t conn, const struct ble_gatt_error *err,
  * as BlueZ's automatic database discovery (Read By Group Type for all
  * primary services).  We don't store the results; we just need the AS11
  * to see the full discovery sequence before we start RPCs. */
-static int on_all_svc(uint16_t conn, const struct ble_gatt_error *err,
-                      const struct ble_gatt_svc *svc, void *arg)
+static int on_all_svc(uint16_t conn,
+                      const struct ble_gatt_error *err,
+                      const struct ble_gatt_svc *svc,
+                      void *arg)
 {
-    (void)conn; (void)arg;
+    (void)conn;
+    (void)arg;
     if (err && err->status == 0 && svc) {
         if (ble_uuid_cmp(&svc->uuid.u, &UUID_SERVICE.u) == 0) {
             s_svc_start = svc->start_handle;
@@ -661,26 +691,26 @@ static int on_all_svc(uint16_t conn, const struct ble_gatt_error *err,
 }
 
 /* Steehl characteristic UUIDs (128-bit, same as in do_connect_and_discover). */
-static const ble_uuid128_t UUID_STEEHL_1 =
-    BLE_UUID128_INIT(0xbc,0x67,0x8e,0x50,0xc7,0x1d,0x2e,0x8d,
-                     0x56,0x4a,0xa2,0xd8,0xac,0x85,0x50,0x3d);
-static const ble_uuid128_t UUID_STEEHL_2 =
-    BLE_UUID128_INIT(0x82,0x20,0x5c,0xf5,0xe9,0x65,0x1a,0xb1,
-                     0xfa,0x4b,0x98,0x27,0x4f,0xc4,0x81,0x16);
-static const ble_uuid128_t UUID_STEEHL_3 =
-    BLE_UUID128_INIT(0x1c,0x7a,0xb2,0xac,0xf2,0x1b,0x15,0x9b,
-                     0x86,0x4a,0x23,0xc8,0xa4,0x3b,0xe3,0xe5);
+static const ble_uuid128_t UUID_STEEHL_1 = BLE_UUID128_INIT(
+    0xbc, 0x67, 0x8e, 0x50, 0xc7, 0x1d, 0x2e, 0x8d, 0x56, 0x4a, 0xa2, 0xd8, 0xac, 0x85, 0x50, 0x3d);
+static const ble_uuid128_t UUID_STEEHL_2 = BLE_UUID128_INIT(
+    0x82, 0x20, 0x5c, 0xf5, 0xe9, 0x65, 0x1a, 0xb1, 0xfa, 0x4b, 0x98, 0x27, 0x4f, 0xc4, 0x81, 0x16);
+static const ble_uuid128_t UUID_STEEHL_3 = BLE_UUID128_INIT(
+    0x1c, 0x7a, 0xb2, 0xac, 0xf2, 0x1b, 0x15, 0x9b, 0x86, 0x4a, 0x23, 0xc8, 0xa4, 0x3b, 0xe3, 0xe5);
 
 /* Full characteristic discovery callback — captures handles for Device Name,
  * Appearance, and Steehl vendor chars so we can Read by Handle (ATT 0x0a)
  * instead of Read By UUID (ATT 0x08), matching the BlueZ btmon trace. */
-static int on_all_chr(uint16_t conn, const struct ble_gatt_error *err,
-                      const struct ble_gatt_chr *chr, void *arg)
+static int on_all_chr(uint16_t conn,
+                      const struct ble_gatt_error *err,
+                      const struct ble_gatt_chr *chr,
+                      void *arg)
 {
-    (void)conn; (void)arg;
+    (void)conn;
+    (void)arg;
     if (err && err->status == 0 && chr) {
-        const ble_uuid16_t uuid_devname  = BLE_UUID16_INIT(0x2a00);
-        const ble_uuid16_t uuid_appear   = BLE_UUID16_INIT(0x2a01);
+        const ble_uuid16_t uuid_devname = BLE_UUID16_INIT(0x2a00);
+        const ble_uuid16_t uuid_appear = BLE_UUID16_INIT(0x2a01);
         if (ble_uuid_cmp(&chr->uuid.u, &uuid_devname.u) == 0) {
             s_devname_handle = chr->val_handle;
         } else if (ble_uuid_cmp(&chr->uuid.u, &uuid_appear.u) == 0) {
@@ -707,10 +737,13 @@ static int on_all_chr(uint16_t conn, const struct ble_gatt_error *err,
     return 0;
 }
 
-static int on_steehl_read(uint16_t conn_handle, const struct ble_gatt_error *error,
-                          struct ble_gatt_attr *attr, void *arg)
+static int on_steehl_read(uint16_t conn_handle,
+                          const struct ble_gatt_error *error,
+                          struct ble_gatt_attr *attr,
+                          void *arg)
 {
-    (void)conn_handle; (void)arg;
+    (void)conn_handle;
+    (void)arg;
     if (error && error->status == 0 && attr) {
         ESP_LOGI(TAG, "Steehl read success: len=%d", attr->om ? OS_MBUF_PKTLEN(attr->om) : 0);
         s_op_status = 0;
@@ -725,11 +758,15 @@ static int on_steehl_read(uint16_t conn_handle, const struct ble_gatt_error *err
     return 0;
 }
 
-static int on_dsc(uint16_t conn, const struct ble_gatt_error *err,
-                  uint16_t chr_val_handle, const struct ble_gatt_dsc *dsc,
+static int on_dsc(uint16_t conn,
+                  const struct ble_gatt_error *err,
+                  uint16_t chr_val_handle,
+                  const struct ble_gatt_dsc *dsc,
                   void *arg)
 {
-    (void)conn; (void)chr_val_handle; (void)arg;
+    (void)conn;
+    (void)chr_val_handle;
+    (void)arg;
     if (err && err->status == 0 && dsc) {
         char uuid_str[37];
         ble_uuid_to_str(&dsc->uuid.u, uuid_str);
@@ -760,11 +797,14 @@ static void rpc_accept_response(cJSON *msg)
     portENTER_CRITICAL(&s_response_lock);
     if (cJSON_IsNumber(id) && s_expected_response_id &&
         id->valuedouble == (double)s_expected_response_id && !s_resp_json) {
-        s_resp_json = msg; accepted = true;
+        s_resp_json = msg;
+        accepted = true;
     }
     portEXIT_CRITICAL(&s_response_lock);
-    if (accepted) xSemaphoreGive(s_resp_sem);
-    else cJSON_Delete(msg);
+    if (accepted)
+        xSemaphoreGive(s_resp_sem);
+    else
+        cJSON_Delete(msg);
 }
 
 static void handle_notify(const uint8_t *data, int len);
@@ -773,7 +813,10 @@ static void handle_notify(const uint8_t *data, int len);
  * admission retry waits; later lifecycle notifications continue to dispatch. */
 #define PENDING_STREAM_COUNT 32
 #define PENDING_STREAM_BYTES (64 * 1024)
-static struct { char *json; int len; } s_pending_stream[PENDING_STREAM_COUNT];
+static struct {
+    char *json;
+    int len;
+} s_pending_stream[PENDING_STREAM_COUNT];
 static unsigned s_pending_head, s_pending_count;
 static size_t s_pending_bytes;
 static void pending_stream_clear(void)
@@ -791,25 +834,37 @@ static void pending_stream_replay(void)
     for (unsigned i = 0; i < 4 && s_pending_count; ++i) {
         char *json = s_pending_stream[s_pending_head].json;
         int len = s_pending_stream[s_pending_head].len;
-        if (!session_writer_try_stream_data_raw(json, len)) break;
-        free(json); s_pending_bytes -= len;
+        if (!session_writer_try_stream_data_raw(json, len))
+            break;
+        free(json);
+        s_pending_bytes -= len;
         s_pending_head = (s_pending_head + 1) % PENDING_STREAM_COUNT;
         --s_pending_count;
     }
 }
 static void pending_stream_submit(const char *json, int len)
 {
-    if (!s_pending_count && session_writer_try_stream_data_raw(json, len)) return;
+    if (!s_pending_count && session_writer_try_stream_data_raw(json, len))
+        return;
     if (len <= 0 || s_pending_count == PENDING_STREAM_COUNT ||
         (size_t)len > PENDING_STREAM_BYTES - s_pending_bytes) {
-        pending_stream_clear(); notif_mark_loss(); return;
+        pending_stream_clear();
+        notif_mark_loss();
+        return;
     }
     char *copy = heap_caps_malloc((size_t)len + 1, MALLOC_CAP_SPIRAM);
-    if (!copy) { pending_stream_clear(); notif_mark_loss(); return; }
-    memcpy(copy, json, len); copy[len] = '\0';
+    if (!copy) {
+        pending_stream_clear();
+        notif_mark_loss();
+        return;
+    }
+    memcpy(copy, json, len);
+    copy[len] = '\0';
     unsigned tail = (s_pending_head + s_pending_count) % PENDING_STREAM_COUNT;
-    s_pending_stream[tail].json = copy; s_pending_stream[tail].len = len;
-    ++s_pending_count; s_pending_bytes += len;
+    s_pending_stream[tail].json = copy;
+    s_pending_stream[tail].len = len;
+    ++s_pending_count;
+    s_pending_bytes += len;
 }
 
 static void notif_proc_task(void *arg)
@@ -819,12 +874,16 @@ static void notif_proc_task(void *arg)
     uint32_t owner_epoch = 0;
     for (;;) {
         if (__atomic_exchange_n(&s_notif_loss_pending, false, __ATOMIC_ACQ_REL)) {
-            pending_stream_clear(); s_rx_len = 0;
+            pending_stream_clear();
+            s_rx_len = 0;
             session_writer_on_transport_loss();
         }
         if (xQueueReceive(s_notif_queue, &item, pdMS_TO_TICKS(20)) == pdTRUE) {
             uint32_t epoch = __atomic_load_n(&s_notif_epoch, __ATOMIC_ACQUIRE);
-            if (owner_epoch != epoch) { s_rx_len = 0; owner_epoch = epoch; }
+            if (owner_epoch != epoch) {
+                s_rx_len = 0;
+                owner_epoch = epoch;
+            }
             if (item.epoch == epoch &&
                 !__atomic_load_n(&s_notif_drop_until_connect, __ATOMIC_ACQUIRE))
                 handle_notify(item.data, item.len);
@@ -850,8 +909,10 @@ static void handle_notify(const uint8_t *data, int len)
 
     static uint8_t *payload = NULL;
     static uint8_t *decrypted = NULL;
-    if (!payload)   payload   = heap_caps_malloc(RX_BUF_MAX, MALLOC_CAP_SPIRAM);
-    if (!decrypted) decrypted = heap_caps_malloc(RX_BUF_MAX, MALLOC_CAP_SPIRAM);
+    if (!payload)
+        payload = heap_caps_malloc(RX_BUF_MAX, MALLOC_CAP_SPIRAM);
+    if (!decrypted)
+        decrypted = heap_caps_malloc(RX_BUF_MAX, MALLOC_CAP_SPIRAM);
     if (!payload || !decrypted) {
         ESP_LOGE(TAG, "handle_notify: failed to allocate PSRAM decrypt buffers");
         notif_mark_loss();
@@ -862,18 +923,18 @@ static void handle_notify(const uint8_t *data, int len)
     int n;
     while ((n = fig_take_packet(payload, RX_BUF_MAX - 1, &vcid)) >= 0) {
         if (__atomic_load_n(&s_notif_drop_until_connect, __ATOMIC_ACQUIRE)) {
-            s_rx_len = 0; break;
+            s_rx_len = 0;
+            break;
         }
         ESP_LOGD(TAG, "FIG packet received: vcid=0x%04x len=%d", vcid, n);
         ESP_LOG_BUFFER_HEX_LEVEL(TAG, payload, n > 64 ? 64 : n, ESP_LOG_DEBUG);
 
         /* Decrypt encrypted payloads (VCID 0x0396) using the session key. */
         const uint8_t *parse_ptr = payload;
-        int            parse_len = n;
+        int parse_len = n;
 
         if (vcid == FIG_VCID_RX_ENC && s_session_encrypted) {
-            int dlen = aes_cbc_decrypt(s_session_key, payload, n,
-                                       decrypted, RX_BUF_MAX - 1);
+            int dlen = aes_cbc_decrypt(s_session_key, payload, n, decrypted, RX_BUF_MAX - 1);
             if (dlen < 0) {
                 notif_mark_loss();
                 ESP_LOGW(TAG, "AES decrypt failed for vcid=0x%04x len=%d", vcid, n);
@@ -907,7 +968,7 @@ static void handle_notify(const uint8_t *data, int len)
             if (inner > 0 && inner <= (uint16_t)(parse_len - 2)) {
                 ESP_LOGD(TAG, "stripping 2-byte length prefix (%u), retrying JSON parse", inner);
                 parse_ptr += 2;
-                parse_len  = inner;
+                parse_len = inner;
                 msg = cJSON_ParseWithLength((const char *)parse_ptr, parse_len);
             }
         }
@@ -959,20 +1020,21 @@ static void handle_notify(const uint8_t *data, int len)
                         if (b64_len > 0 && b64_len <= ((SPOOL_FRAG_MAX + 2) / 3) * 4) {
                             size_t dec_max = (b64_len / 4) * 3 + 4;
                             uint8_t *frag = heap_caps_malloc(dec_max, MALLOC_CAP_SPIRAM);
-                            if (!frag) frag = malloc(dec_max);
+                            if (!frag)
+                                frag = malloc(dec_max);
                             if (frag) {
                                 size_t dec_len = 0;
                                 int rc = mbedtls_base64_decode(
-                                    frag, dec_max, &dec_len,
-                                    (const unsigned char *)b64, b64_len);
+                                    frag, dec_max, &dec_len, (const unsigned char *)b64, b64_len);
                                 if (rc == 0 && dec_len > 0) {
                                     int idx = collector->frag_count++;
-                                    collector->frags[idx].seq =
-                                        seq_j ? seq_j->valueint : idx;
+                                    collector->frags[idx].seq = seq_j ? seq_j->valueint : idx;
                                     collector->frags[idx].data = frag;
                                     collector->frags[idx].len = (int)dec_len;
-                                    ESP_LOGI(TAG, "spool frag %d: seq=%d len=%d",
-                                             idx, collector->frags[idx].seq,
+                                    ESP_LOGI(TAG,
+                                             "spool frag %d: seq=%d len=%d",
+                                             idx,
+                                             collector->frags[idx].seq,
                                              (int)dec_len);
                                 } else if (rc != 0) {
                                     collector->failed = true;
@@ -982,21 +1044,22 @@ static void handle_notify(const uint8_t *data, int len)
                                     /* rc == 0 but dec_len == 0 — empty payload */
                                     free(frag);
                                 }
-                            } else collector->failed = true;
+                            } else
+                                collector->failed = true;
                         }
                     }
 
                     /* Check completion status */
                     if (status_j && cJSON_IsString(status_j)) {
-                        strlcpy(collector->status,
-                                status_j->valuestring,
-                                sizeof(collector->status));
+                        strlcpy(
+                            collector->status, status_j->valuestring, sizeof(collector->status));
                         /* Capture nextSpoolAddress for multi-round pulls */
                         cJSON *next_j = cJSON_GetObjectItem(params, "nextSpoolAddress");
                         if (next_j) {
                             char *ns = cJSON_PrintUnformatted(next_j);
                             if (ns) {
-                                strlcpy(collector->next_addr_json, ns,
+                                strlcpy(collector->next_addr_json,
+                                        ns,
                                         sizeof(collector->next_addr_json));
                                 free(ns);
                             }
@@ -1017,7 +1080,8 @@ static void handle_notify(const uint8_t *data, int len)
             ESP_LOGD(TAG, "notification: %s", m);
             uint32_t stream_epoch = session_writer_stream_epoch();
             session_writer_on_notification(NULL, msg);
-            if (stream_epoch != session_writer_stream_epoch()) pending_stream_clear();
+            if (stream_epoch != session_writer_stream_epoch())
+                pending_stream_clear();
             cJSON_Delete(msg);
             continue;
         }
@@ -1035,8 +1099,15 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         struct ble_hs_adv_fields f;
         char addr_str[18];
         const uint8_t *addr = event->disc.addr.val;
-        snprintf(addr_str, sizeof(addr_str), "%02x:%02x:%02x:%02x:%02x:%02x",
-                 addr[5], addr[4], addr[3], addr[2], addr[1], addr[0]);
+        snprintf(addr_str,
+                 sizeof(addr_str),
+                 "%02x:%02x:%02x:%02x:%02x:%02x",
+                 addr[5],
+                 addr[4],
+                 addr[3],
+                 addr[2],
+                 addr[1],
+                 addr[0]);
 
         const uint8_t *raw = event->disc.data;
         int raw_len = event->disc.length_data;
@@ -1048,12 +1119,16 @@ static int gap_event(struct ble_gap_event *event, void *arg)
              * 0x1b) that is 1 byte short, causing rc=10 (BLE_HS_EBADDATA)
              * even though the name field earlier in the payload is valid.
              * Manually walk the AD structures to salvage what we can. */
-            ESP_LOGD(TAG, "Scan report from %s: parse failed (rc=%d), "
-                     "trying manual AD parse", addr_str, rc);
+            ESP_LOGD(TAG,
+                     "Scan report from %s: parse failed (rc=%d), "
+                     "trying manual AD parse",
+                     addr_str,
+                     rc);
             memset(&f, 0, sizeof(f));
-            for (int off = 0; off + 1 < raw_len; ) {
+            for (int off = 0; off + 1 < raw_len;) {
                 uint8_t ad_len = raw[off];
-                if (ad_len == 0 || off + 1 + ad_len > raw_len) break;
+                if (ad_len == 0 || off + 1 + ad_len > raw_len)
+                    break;
                 uint8_t ad_type = raw[off + 1];
                 const uint8_t *ad_data = raw + off + 2;
                 int ad_data_len = ad_len - 1;
@@ -1105,12 +1180,14 @@ static int gap_event(struct ble_gap_event *event, void *arg)
                  * "ResMed AS11") and the scan response now carries the real
                  * device name (e.g. "ResMed 436648"), update it.  Never
                  * overwrite a real name with the fallback. */
-                if (name[0] != '\0' &&
-                    strncmp(name, "ResMed AS11", 11) != 0) {
+                if (name[0] != '\0' && strncmp(name, "ResMed AS11", 11) != 0) {
                     strlcpy(s_scan[i].name, name, sizeof(s_scan[i].name));
                 }
-                ESP_LOGD(TAG, "Scan update: %s (name: '%s', rssi: %d)",
-                         addr_str, s_scan[i].name, event->disc.rssi);
+                ESP_LOGD(TAG,
+                         "Scan update: %s (name: '%s', rssi: %d)",
+                         addr_str,
+                         s_scan[i].name,
+                         event->disc.rssi);
                 return 0;
             }
         }
@@ -1163,13 +1240,17 @@ static int gap_event(struct ble_gap_event *event, void *arg)
          * recursive auto-reconnect when session setup fails. */
         if (s_pair_cache.valid && !s_manual_disconnect &&
             strcmp(s_state, AS11_STATUS_PAIRED) == 0) {
-            ESP_LOGI(TAG, "auto-reconnect: unexpected disconnect while paired, "
-                         "launching reconnect");
-            psram_task_create(auto_reconnect_task, "as11_reconn", 8192,
-                              NULL, 5, tskNO_AFFINITY, NULL, NULL);
+            ESP_LOGI(TAG,
+                     "auto-reconnect: unexpected disconnect while paired, "
+                     "launching reconnect");
+            psram_task_create(
+                auto_reconnect_task, "as11_reconn", 8192, NULL, 5, tskNO_AFFINITY, NULL, NULL);
         } else {
-            ESP_LOGI(TAG, "auto-reconnect: skipped (pairing=%d manual=%d state=%s)",
-                     s_pair_cache.valid, s_manual_disconnect, s_state);
+            ESP_LOGI(TAG,
+                     "auto-reconnect: skipped (pairing=%d manual=%d state=%s)",
+                     s_pair_cache.valid,
+                     s_manual_disconnect,
+                     s_state);
         }
         s_manual_disconnect = false;
         return 0;
@@ -1202,18 +1283,23 @@ static int gap_event(struct ble_gap_event *event, void *arg)
             if (depth > s_notif_hwm) {
                 s_notif_hwm = depth;
                 if (depth >= (NOTIF_QUEUE_LEN * 3) / 4) {
-                    ESP_LOGW(TAG, "notif queue high-water %u/%u",
-                             (unsigned)depth, (unsigned)NOTIF_QUEUE_LEN);
+                    ESP_LOGW(TAG,
+                             "notif queue high-water %u/%u",
+                             (unsigned)depth,
+                             (unsigned)NOTIF_QUEUE_LEN);
                 }
             }
 
             uint8_t *notif_data = heap_caps_malloc(notif_len, MALLOC_CAP_SPIRAM);
-            if (!notif_data) notif_data = malloc(notif_len);
+            if (!notif_data)
+                notif_data = malloc(notif_len);
             if (notif_data) {
                 int rc = os_mbuf_copydata(event->notify_rx.om, 0, notif_len, notif_data);
                 if (rc == 0) {
-                    notif_item_t item = { .data = notif_data, .len = notif_len,
-                        .epoch = __atomic_load_n(&s_notif_epoch, __ATOMIC_ACQUIRE) };
+                    notif_item_t item = {.data = notif_data,
+                                         .len = notif_len,
+                                         .epoch =
+                                             __atomic_load_n(&s_notif_epoch, __ATOMIC_ACQUIRE)};
                     if (xQueueSend(s_notif_queue, &item, 0) != pdTRUE) {
                         notif_mark_loss();
                         /* Queue full: account/discard queued old-generation data. */
@@ -1225,9 +1311,10 @@ static int gap_event(struct ble_gap_event *event, void *arg)
                             free(dropped.data);
                         }
                         if (xQueueSend(s_notif_queue, &item, 0) == pdTRUE) {
-                            notif_data = NULL;  /* owned by queue now */
+                            notif_data = NULL; /* owned by queue now */
                             lifecycle_accounted = false;
-                            ESP_LOGW(TAG, "notif queue full, dropped 1 item "
+                            ESP_LOGW(TAG,
+                                     "notif queue full, dropped 1 item "
                                      "(total %u items / %u bytes)",
                                      (unsigned)s_notif_dropped,
                                      (unsigned)s_notif_dropped_bytes);
@@ -1238,19 +1325,22 @@ static int gap_event(struct ble_gap_event *event, void *arg)
                             lifecycle_accounted = false;
                         }
                     } else {
-                        notif_data = NULL;  /* owned by queue now */
+                        notif_data = NULL; /* owned by queue now */
                         lifecycle_accounted = false;
                     }
                 } else {
                     notif_mark_loss();
                     ESP_LOGE(TAG, "os_mbuf_copydata failed: %d", rc);
                 }
-                if (notif_data) free(notif_data);
+                if (notif_data)
+                    free(notif_data);
             } else {
                 s_notif_alloc_fail++;
                 notif_mark_loss();
-                ESP_LOGE(TAG, "failed to allocate notif_data (%u bytes, "
-                         "%u alloc failures)", (unsigned)notif_len,
+                ESP_LOGE(TAG,
+                         "failed to allocate notif_data (%u bytes, "
+                         "%u alloc failures)",
+                         (unsigned)notif_len,
                          (unsigned)s_notif_alloc_fail);
             }
         }
@@ -1275,7 +1365,8 @@ static int gap_event(struct ble_gap_event *event, void *arg)
 /* Clear any stale operation semaphore tokens from timed-out callbacks. */
 static void clear_op_sem(void)
 {
-    while (xSemaphoreTake(s_op_sem, 0) == pdTRUE) { /* drain */ }
+    while (xSemaphoreTake(s_op_sem, 0) == pdTRUE) { /* drain */
+    }
 }
 
 static int wait_op(int timeout_ms)
@@ -1305,19 +1396,31 @@ static char *rpc_prepare(const char *json)
 {
     clear_response();
     cJSON *request = cJSON_Parse(json);
-    if (!cJSON_IsObject(request)) { cJSON_Delete(request); return NULL; }
+    if (!cJSON_IsObject(request)) {
+        cJSON_Delete(request);
+        return NULL;
+    }
     cJSON *id = cJSON_GetObjectItemCaseSensitive(request, "id");
     cJSON *original = id ? cJSON_Duplicate(id, true) : NULL;
-    if (id && !original) { cJSON_Delete(request); return NULL; }
+    if (id && !original) {
+        cJSON_Delete(request);
+        return NULL;
+    }
     uint32_t wire_id = ++s_rpc_serial;
-    if (!wire_id || wire_id > INT32_MAX) wire_id = s_rpc_serial = 1;
+    if (!wire_id || wire_id > INT32_MAX)
+        wire_id = s_rpc_serial = 1;
     cJSON_DeleteItemFromObjectCaseSensitive(request, "id");
     if (!cJSON_AddNumberToObject(request, "id", wire_id)) {
-        cJSON_Delete(original); cJSON_Delete(request); return NULL;
+        cJSON_Delete(original);
+        cJSON_Delete(request);
+        return NULL;
     }
     char *wire = cJSON_PrintUnformatted(request);
     cJSON_Delete(request);
-    if (!wire) { cJSON_Delete(original); return NULL; }
+    if (!wire) {
+        cJSON_Delete(original);
+        return NULL;
+    }
     portENTER_CRITICAL(&s_response_lock);
     s_expected_response_id = wire_id;
     s_response_original_id = original;
@@ -1328,11 +1431,16 @@ static char *rpc_prepare(const char *json)
 static esp_err_t send_fig(uint16_t vcid, const char *json)
 {
     uint8_t *pkt = fig_tx_pkt();
-    if (!pkt) return ESP_ERR_NO_MEM;
+    if (!pkt)
+        return ESP_ERR_NO_MEM;
     char *wire = rpc_prepare(json);
-    if (!wire) return ESP_ERR_NO_MEM;
+    if (!wire)
+        return ESP_ERR_NO_MEM;
     size_t plen = strlen(wire);
-    if (plen > TX_PAYLOAD_MAX) { free(wire); return ESP_ERR_INVALID_SIZE; }
+    if (plen > TX_PAYLOAD_MAX) {
+        free(wire);
+        return ESP_ERR_INVALID_SIZE;
+    }
     int total = fig_encode(vcid, (const uint8_t *)wire, (uint16_t)plen, pkt);
     free(wire);
 
@@ -1348,9 +1456,11 @@ static esp_err_t send_fig(uint16_t vcid, const char *json)
     ESP_LOGI(TAG, "send_fig: chunk_size=%d (mtu=%d)", chunk, s_mtu);
     for (int off = 0; off < total; off += chunk) {
         int n = total - off;
-        if (n > chunk) n = chunk;
+        if (n > chunk)
+            n = chunk;
         clear_op_sem();
-        int rc = ble_gattc_write_flat(s_conn_handle, s_tx_handle, pkt + off, n, on_write_done, NULL);
+        int rc =
+            ble_gattc_write_flat(s_conn_handle, s_tx_handle, pkt + off, n, on_write_done, NULL);
         if (rc != 0) {
             ESP_LOGE(TAG, "write chunk start failed rc=%d off=%d", rc, off);
             return ESP_FAIL;
@@ -1366,13 +1476,18 @@ static esp_err_t send_fig(uint16_t vcid, const char *json)
 /* Send a raw binary FIG packet (for encrypted payloads).  Once a GATT write
  * has been accepted locally, a later timeout/error is indeterminate: the AS11
  * may already have received enough of the request to act on it. */
-static esp_err_t send_fig_raw(uint16_t vcid, const uint8_t *data, int len,
+static esp_err_t send_fig_raw(uint16_t vcid,
+                              const uint8_t *data,
+                              int len,
                               bool *may_have_reached_peer)
 {
-    if (may_have_reached_peer) *may_have_reached_peer = false;
+    if (may_have_reached_peer)
+        *may_have_reached_peer = false;
     uint8_t *pkt = fig_tx_pkt();
-    if (!pkt) return ESP_ERR_NO_MEM;
-    if (len > TX_PAYLOAD_MAX) return ESP_ERR_INVALID_SIZE;
+    if (!pkt)
+        return ESP_ERR_NO_MEM;
+    if (len > TX_PAYLOAD_MAX)
+        return ESP_ERR_INVALID_SIZE;
     int total = fig_encode(vcid, data, (uint16_t)len, pkt);
 
     ESP_LOGI(TAG, "send_fig_raw: VCID=0x%04x payload=%d total=%d", vcid, len, total);
@@ -1380,14 +1495,17 @@ static esp_err_t send_fig_raw(uint16_t vcid, const uint8_t *data, int len,
     int chunk = s_mtu > 3 ? s_mtu - 3 : 20;
     for (int off = 0; off < total; off += chunk) {
         int n = total - off;
-        if (n > chunk) n = chunk;
+        if (n > chunk)
+            n = chunk;
         clear_op_sem();
-        int rc = ble_gattc_write_flat(s_conn_handle, s_tx_handle, pkt + off, n, on_write_done, NULL);
+        int rc =
+            ble_gattc_write_flat(s_conn_handle, s_tx_handle, pkt + off, n, on_write_done, NULL);
         if (rc != 0) {
             ESP_LOGE(TAG, "write chunk failed rc=%d off=%d", rc, off);
             return ESP_FAIL;
         }
-        if (may_have_reached_peer) *may_have_reached_peer = true;
+        if (may_have_reached_peer)
+            *may_have_reached_peer = true;
         if (wait_op(5000) != 0) {
             ESP_LOGE(TAG, "write chunk timeout off=%d", off);
             return ESP_FAIL;
@@ -1399,10 +1517,10 @@ static esp_err_t send_fig_raw(uint16_t vcid, const uint8_t *data, int len,
 /* Send an encrypted JSON-RPC request on VCID 0x0397.
  * Encrypts with AES-256-CBC using the session key, then sends via send_fig_raw.
  * Returns ESP_OK on success. Caller should call wait_response() to get reply. */
-static esp_err_t send_rpc_encrypted_tracked(const char *json,
-                                             bool *may_have_reached_peer)
+static esp_err_t send_rpc_encrypted_tracked(const char *json, bool *may_have_reached_peer)
 {
-    if (may_have_reached_peer) *may_have_reached_peer = false;
+    if (may_have_reached_peer)
+        *may_have_reached_peer = false;
     if (!s_session_encrypted) {
         ESP_LOGE(TAG, "send_rpc_encrypted: no session key");
         return ESP_ERR_INVALID_STATE;
@@ -1410,14 +1528,18 @@ static esp_err_t send_rpc_encrypted_tracked(const char *json,
     uint8_t *enc = heap_caps_malloc(TX_PAYLOAD_MAX, MALLOC_CAP_SPIRAM);
     if (!enc) {
         enc = malloc(TX_PAYLOAD_MAX);
-        if (!enc) return ESP_ERR_NO_MEM;
+        if (!enc)
+            return ESP_ERR_NO_MEM;
         ESP_LOGW(TAG, "send_rpc_encrypted: fell back to default malloc (PSRAM?)");
     }
 
     char *wire = rpc_prepare(json);
-    if (!wire) { free(enc); return ESP_ERR_NO_MEM; }
-    int enc_len = aes_cbc_encrypt(s_session_key, (const uint8_t *)wire,
-                                  (int)strlen(wire), enc, TX_PAYLOAD_MAX);
+    if (!wire) {
+        free(enc);
+        return ESP_ERR_NO_MEM;
+    }
+    int enc_len = aes_cbc_encrypt(
+        s_session_key, (const uint8_t *)wire, (int)strlen(wire), enc, TX_PAYLOAD_MAX);
     free(wire);
     if (enc_len < 0) {
         free(enc);
@@ -1425,8 +1547,7 @@ static esp_err_t send_rpc_encrypted_tracked(const char *json,
         return ESP_FAIL;
     }
 
-    esp_err_t ret = send_fig_raw(FIG_VCID_TX_ENC, enc, enc_len,
-                                 may_have_reached_peer);
+    esp_err_t ret = send_fig_raw(FIG_VCID_TX_ENC, enc, enc_len, may_have_reached_peer);
     free(enc);
     return ret;
 }
@@ -1445,8 +1566,10 @@ static void clear_response(void)
     s_response_original_id = NULL;
     s_expected_response_id = 0;
     portEXIT_CRITICAL(&s_response_lock);
-    cJSON_Delete(old); cJSON_Delete(id);
-    while (xSemaphoreTake(s_resp_sem, 0) == pdTRUE) { }
+    cJSON_Delete(old);
+    cJSON_Delete(id);
+    while (xSemaphoreTake(s_resp_sem, 0) == pdTRUE) {
+    }
 }
 
 /* A wakeup may belong to a withdrawn request. Only the protected response
@@ -1466,11 +1589,15 @@ static cJSON *wait_response(int timeout_ms)
         }
         portEXIT_CRITICAL(&s_response_lock);
         if (result) {
-            if (id) cJSON_ReplaceItemInObjectCaseSensitive(result, "id", id);
+            if (id)
+                cJSON_ReplaceItemInObjectCaseSensitive(result, "id", id);
             return result;
         }
         int64_t remaining = deadline - esp_timer_get_time();
-        if (remaining <= 0) { clear_response(); return NULL; }
+        if (remaining <= 0) {
+            clear_response();
+            return NULL;
+        }
         xSemaphoreTake(s_resp_sem, pdMS_TO_TICKS((remaining + 999) / 1000));
     }
 }
@@ -1480,7 +1607,8 @@ static cJSON *wait_response(int timeout_ms)
 /* ------------------------------------------------------------------ */
 static void srp_free(void)
 {
-    if (!s_srp.active) return;
+    if (!s_srp.active)
+        return;
     mbedtls_mpi_free(&s_srp.N);
     mbedtls_mpi_free(&s_srp.g);
     mbedtls_mpi_free(&s_srp.a);
@@ -1500,12 +1628,15 @@ static esp_err_t srp_begin(void)
     mbedtls_mpi_init(&s_srp.A);
     s_srp.active = true;
 
-    if (mbedtls_mpi_read_string(&s_srp.N, 16, SRP_N_HEX) != 0) return ESP_FAIL;
-    if (mbedtls_mpi_lset(&s_srp.g, 2) != 0) return ESP_FAIL;
+    if (mbedtls_mpi_read_string(&s_srp.N, 16, SRP_N_HEX) != 0)
+        return ESP_FAIL;
+    if (mbedtls_mpi_lset(&s_srp.g, 2) != 0)
+        return ESP_FAIL;
 
     uint8_t rnd[32];
     esp_fill_random(rnd, sizeof(rnd));
-    if (mbedtls_mpi_read_binary(&s_srp.a, rnd, sizeof(rnd)) != 0) return ESP_FAIL;
+    if (mbedtls_mpi_read_binary(&s_srp.a, rnd, sizeof(rnd)) != 0)
+        return ESP_FAIL;
 
     int64_t t1 = esp_timer_get_time();
     mbedtls_mpi RR;
@@ -1514,89 +1645,118 @@ static esp_err_t srp_begin(void)
     mbedtls_mpi_free(&RR);
     int64_t t2 = esp_timer_get_time();
     ESP_LOGI(TAG, "srp_begin: modexp took %lld ms", (t2 - t1) / 1000);
-    if (rc != 0) return ESP_FAIL;
+    if (rc != 0)
+        return ESP_FAIL;
 
-    if (mbedtls_mpi_write_binary(&s_srp.A, s_srp.A_pad, SRP_PAD) != 0) return ESP_FAIL;
+    if (mbedtls_mpi_write_binary(&s_srp.A, s_srp.A_pad, SRP_PAD) != 0)
+        return ESP_FAIL;
     ESP_LOGI(TAG, "srp_begin: total %lld ms", (esp_timer_get_time() - t0) / 1000);
     return ESP_OK;
 }
 
 /* Complete SRP: compute S, K, M1; verify server M2; outputs hex M1 and K. */
-static esp_err_t srp_compute(const char *server_pk_hex, const char *salt_hex,
+static esp_err_t srp_compute(const char *server_pk_hex,
+                             const char *salt_hex,
                              const char *passkey,
-                             char m1_hex_out[65], char *server_conf_check /*64+1*/)
+                             char m1_hex_out[65],
+                             char *server_conf_check /*64+1*/)
 {
     esp_err_t result = ESP_FAIL;
     uint8_t N_pad[SRP_PAD], g_pad[SRP_PAD], B_pad[SRP_PAD];
     uint8_t salt[64];
     int salt_len = hex_to_bytes(salt_hex, salt, sizeof(salt));
-    if (salt_len < 0) return ESP_FAIL;
+    if (salt_len < 0)
+        return ESP_FAIL;
 
     mbedtls_mpi B, k, x, u, gx, kgx, base, exp, ux, S, RR, tmp;
-    mbedtls_mpi_init(&B); mbedtls_mpi_init(&k); mbedtls_mpi_init(&x);
-    mbedtls_mpi_init(&u); mbedtls_mpi_init(&gx); mbedtls_mpi_init(&kgx);
-    mbedtls_mpi_init(&base); mbedtls_mpi_init(&exp); mbedtls_mpi_init(&ux);
-    mbedtls_mpi_init(&S); mbedtls_mpi_init(&RR); mbedtls_mpi_init(&tmp);
+    mbedtls_mpi_init(&B);
+    mbedtls_mpi_init(&k);
+    mbedtls_mpi_init(&x);
+    mbedtls_mpi_init(&u);
+    mbedtls_mpi_init(&gx);
+    mbedtls_mpi_init(&kgx);
+    mbedtls_mpi_init(&base);
+    mbedtls_mpi_init(&exp);
+    mbedtls_mpi_init(&ux);
+    mbedtls_mpi_init(&S);
+    mbedtls_mpi_init(&RR);
+    mbedtls_mpi_init(&tmp);
 
-    if (mbedtls_mpi_read_string(&B, 16, server_pk_hex) != 0) goto done;
-    if (mbedtls_mpi_write_binary(&s_srp.N, N_pad, SRP_PAD) != 0) goto done;
-    if (mbedtls_mpi_write_binary(&s_srp.g, g_pad, SRP_PAD) != 0) goto done;
-    if (mbedtls_mpi_write_binary(&B, B_pad, SRP_PAD) != 0) goto done;
+    if (mbedtls_mpi_read_string(&B, 16, server_pk_hex) != 0)
+        goto done;
+    if (mbedtls_mpi_write_binary(&s_srp.N, N_pad, SRP_PAD) != 0)
+        goto done;
+    if (mbedtls_mpi_write_binary(&s_srp.g, g_pad, SRP_PAD) != 0)
+        goto done;
+    if (mbedtls_mpi_write_binary(&B, B_pad, SRP_PAD) != 0)
+        goto done;
 
     /* k = H(pad(N) || pad(g)) */
     uint8_t kbuf[32];
     {
-        const uint8_t *segs[] = { N_pad, g_pad };
-        size_t lens[] = { SRP_PAD, SRP_PAD };
+        const uint8_t *segs[] = {N_pad, g_pad};
+        size_t lens[] = {SRP_PAD, SRP_PAD};
         sha256_segs(segs, lens, 2, kbuf);
     }
-    if (mbedtls_mpi_read_binary(&k, kbuf, 32) != 0) goto done;
+    if (mbedtls_mpi_read_binary(&k, kbuf, 32) != 0)
+        goto done;
 
     /* x = H(salt || H(passkey_ascii)) */
     uint8_t hpk[32], xbuf[32];
     {
-        const uint8_t *segs[] = { (const uint8_t *)passkey };
-        size_t lens[] = { strlen(passkey) };
+        const uint8_t *segs[] = {(const uint8_t *)passkey};
+        size_t lens[] = {strlen(passkey)};
         sha256_segs(segs, lens, 1, hpk);
-        const uint8_t *segs2[] = { salt, hpk };
-        size_t lens2[] = { (size_t)salt_len, 32 };
+        const uint8_t *segs2[] = {salt, hpk};
+        size_t lens2[] = {(size_t)salt_len, 32};
         sha256_segs(segs2, lens2, 2, xbuf);
     }
-    if (mbedtls_mpi_read_binary(&x, xbuf, 32) != 0) goto done;
+    if (mbedtls_mpi_read_binary(&x, xbuf, 32) != 0)
+        goto done;
 
     /* u = H(pad(A) || pad(B)) */
     uint8_t ubuf[32];
     {
-        const uint8_t *segs[] = { s_srp.A_pad, B_pad };
-        size_t lens[] = { SRP_PAD, SRP_PAD };
+        const uint8_t *segs[] = {s_srp.A_pad, B_pad};
+        size_t lens[] = {SRP_PAD, SRP_PAD};
         sha256_segs(segs, lens, 2, ubuf);
     }
-    if (mbedtls_mpi_read_binary(&u, ubuf, 32) != 0) goto done;
+    if (mbedtls_mpi_read_binary(&u, ubuf, 32) != 0)
+        goto done;
 
     /* S = (B - k * g^x)^(a + u*x) mod N */
     int64_t te1 = esp_timer_get_time();
-    if (mbedtls_mpi_exp_mod(&gx, &s_srp.g, &x, &s_srp.N, &RR) != 0) goto done; /* g^x */
+    if (mbedtls_mpi_exp_mod(&gx, &s_srp.g, &x, &s_srp.N, &RR) != 0)
+        goto done; /* g^x */
     int64_t te2 = esp_timer_get_time();
     ESP_LOGI(TAG, "srp_compute: g^x modexp took %lld ms", (te2 - te1) / 1000);
-    if (mbedtls_mpi_mul_mpi(&kgx, &k, &gx) != 0) goto done;                     /* k*g^x */
-    if (mbedtls_mpi_mod_mpi(&kgx, &kgx, &s_srp.N) != 0) goto done;
-    if (mbedtls_mpi_sub_mpi(&base, &B, &kgx) != 0) goto done;                   /* B - k*g^x */
-    if (mbedtls_mpi_mod_mpi(&base, &base, &s_srp.N) != 0) goto done;            /* normalise (handles negative) */
-    if (mbedtls_mpi_mul_mpi(&ux, &u, &x) != 0) goto done;                       /* u*x */
-    if (mbedtls_mpi_add_mpi(&exp, &s_srp.a, &ux) != 0) goto done;               /* a + u*x */
+    if (mbedtls_mpi_mul_mpi(&kgx, &k, &gx) != 0)
+        goto done; /* k*g^x */
+    if (mbedtls_mpi_mod_mpi(&kgx, &kgx, &s_srp.N) != 0)
+        goto done;
+    if (mbedtls_mpi_sub_mpi(&base, &B, &kgx) != 0)
+        goto done; /* B - k*g^x */
+    if (mbedtls_mpi_mod_mpi(&base, &base, &s_srp.N) != 0)
+        goto done; /* normalise (handles negative) */
+    if (mbedtls_mpi_mul_mpi(&ux, &u, &x) != 0)
+        goto done; /* u*x */
+    if (mbedtls_mpi_add_mpi(&exp, &s_srp.a, &ux) != 0)
+        goto done; /* a + u*x */
     int64_t te3 = esp_timer_get_time();
-    if (mbedtls_mpi_exp_mod(&S, &base, &exp, &s_srp.N, &RR) != 0) goto done;
+    if (mbedtls_mpi_exp_mod(&S, &base, &exp, &s_srp.N, &RR) != 0)
+        goto done;
     int64_t te4 = esp_timer_get_time();
     ESP_LOGI(TAG, "srp_compute: S modexp took %lld ms", (te4 - te3) / 1000);
 
     uint8_t S_pad[SRP_PAD];
-    if (mbedtls_mpi_write_binary(&S, S_pad, SRP_PAD) != 0) goto done;
+    if (mbedtls_mpi_write_binary(&S, S_pad, SRP_PAD) != 0)
+        goto done;
 
     /* K = H(pad(S)) */
     uint8_t K[32];
     {
-        const uint8_t *segs[] = { S_pad };
-        size_t lens[] = { SRP_PAD };
+        const uint8_t *segs[] = {S_pad};
+        size_t lens[] = {SRP_PAD};
         sha256_segs(segs, lens, 1, K);
     }
     bytes_to_hex(K, 32, s_srp.master_key_hex);
@@ -1604,16 +1764,19 @@ static esp_err_t srp_compute(const char *server_pk_hex, const char *salt_hex,
     /* M1 = H((H(N) xor H(g)) || salt || pad(A) || pad(B) || K) */
     uint8_t hN[32], hG[32], hxor[32];
     {
-        const uint8_t *sN[] = { N_pad }; size_t lN[] = { SRP_PAD };
+        const uint8_t *sN[] = {N_pad};
+        size_t lN[] = {SRP_PAD};
         sha256_segs(sN, lN, 1, hN);
-        const uint8_t *sG[] = { g_pad }; size_t lG[] = { SRP_PAD };
+        const uint8_t *sG[] = {g_pad};
+        size_t lG[] = {SRP_PAD};
         sha256_segs(sG, lG, 1, hG);
-        for (int i = 0; i < 32; i++) hxor[i] = hN[i] ^ hG[i];
+        for (int i = 0; i < 32; i++)
+            hxor[i] = hN[i] ^ hG[i];
     }
     uint8_t M1[32];
     {
-        const uint8_t *segs[] = { hxor, salt, s_srp.A_pad, B_pad, K };
-        size_t lens[] = { 32, (size_t)salt_len, SRP_PAD, SRP_PAD, 32 };
+        const uint8_t *segs[] = {hxor, salt, s_srp.A_pad, B_pad, K};
+        size_t lens[] = {32, (size_t)salt_len, SRP_PAD, SRP_PAD, 32};
         sha256_segs(segs, lens, 5, M1);
     }
     bytes_to_hex(M1, 32, m1_hex_out);
@@ -1622,18 +1785,26 @@ static esp_err_t srp_compute(const char *server_pk_hex, const char *salt_hex,
      * verified against the device's serverConfirmation from a live pairing). */
     uint8_t M2[32];
     {
-        const uint8_t *segs[] = { s_srp.A_pad, M1, K };
-        size_t lens[] = { SRP_PAD, 32, 32 };
+        const uint8_t *segs[] = {s_srp.A_pad, M1, K};
+        size_t lens[] = {SRP_PAD, 32, 32};
         sha256_segs(segs, lens, 3, M2);
     }
     bytes_to_hex(M2, 32, server_conf_check);
 
     result = ESP_OK;
 done:
-    mbedtls_mpi_free(&B); mbedtls_mpi_free(&k); mbedtls_mpi_free(&x);
-    mbedtls_mpi_free(&u); mbedtls_mpi_free(&gx); mbedtls_mpi_free(&kgx);
-    mbedtls_mpi_free(&base); mbedtls_mpi_free(&exp); mbedtls_mpi_free(&ux);
-    mbedtls_mpi_free(&S); mbedtls_mpi_free(&RR); mbedtls_mpi_free(&tmp);
+    mbedtls_mpi_free(&B);
+    mbedtls_mpi_free(&k);
+    mbedtls_mpi_free(&x);
+    mbedtls_mpi_free(&u);
+    mbedtls_mpi_free(&gx);
+    mbedtls_mpi_free(&kgx);
+    mbedtls_mpi_free(&base);
+    mbedtls_mpi_free(&exp);
+    mbedtls_mpi_free(&ux);
+    mbedtls_mpi_free(&S);
+    mbedtls_mpi_free(&RR);
+    mbedtls_mpi_free(&tmp);
     return result;
 }
 
@@ -1653,7 +1824,8 @@ static esp_err_t do_save_pairing_nvs(void *arg)
     struct nvs_pair_arg local = *a;
     nvs_handle_t h;
     esp_err_t e = nvs_open(NVS_NS, NVS_READWRITE, &h);
-    if (e != ESP_OK) return e;
+    if (e != ESP_OK)
+        return e;
     nvs_set_str(h, NVS_K_ADDR, local.addr);
     nvs_set_str(h, NVS_K_NAME, local.name);
     nvs_set_str(h, NVS_K_CLIENTID, local.client_id);
@@ -1684,13 +1856,15 @@ static void pair_cache_load(void)
     memset(&s_pair_cache, 0, sizeof(s_pair_cache));
     nvs_handle_t h;
     nvs_writer_lock();
-    if (nvs_open(NVS_NS, NVS_READONLY, &h) != ESP_OK) { nvs_writer_unlock(); return; }
-    bool ok = nvs_get_str_opt(h, NVS_K_CLIENTID, s_pair_cache.client_id,
-                              sizeof(s_pair_cache.client_id));
+    if (nvs_open(NVS_NS, NVS_READONLY, &h) != ESP_OK) {
+        nvs_writer_unlock();
+        return;
+    }
+    bool ok =
+        nvs_get_str_opt(h, NVS_K_CLIENTID, s_pair_cache.client_id, sizeof(s_pair_cache.client_id));
     nvs_get_str_opt(h, NVS_K_ADDR, s_pair_cache.addr, sizeof(s_pair_cache.addr));
     nvs_get_str_opt(h, NVS_K_NAME, s_pair_cache.name, sizeof(s_pair_cache.name));
-    nvs_get_str_opt(h, NVS_K_PAIRKEY, s_pair_cache.pair_key,
-                    sizeof(s_pair_cache.pair_key));
+    nvs_get_str_opt(h, NVS_K_PAIRKEY, s_pair_cache.pair_key, sizeof(s_pair_cache.pair_key));
     nvs_close(h);
     nvs_writer_unlock();
     s_pair_cache.valid = ok;
@@ -1724,13 +1898,19 @@ static esp_err_t do_connect_and_discover(void)
     s_devname_handle = s_appearance_handle = 0;
     s_steehl_handles[0] = s_steehl_handles[1] = s_steehl_handles[2] = 0;
 
-    int rc = ble_gap_connect(s_own_addr_type, &s_target_addr, 30000, NULL,
-                             gap_event, NULL);
-    if (rc != 0) { set_error("connect start failed"); return ESP_FAIL; }
-    if (xSemaphoreTake(s_connect_sem, pdMS_TO_TICKS(31000)) != pdTRUE) {
-        set_error("connect timeout"); return ESP_FAIL;
+    int rc = ble_gap_connect(s_own_addr_type, &s_target_addr, 30000, NULL, gap_event, NULL);
+    if (rc != 0) {
+        set_error("connect start failed");
+        return ESP_FAIL;
     }
-    if (s_connect_status != 0) { set_error("connection failed"); return ESP_FAIL; }
+    if (xSemaphoreTake(s_connect_sem, pdMS_TO_TICKS(31000)) != pdTRUE) {
+        set_error("connect timeout");
+        return ESP_FAIL;
+    }
+    if (s_connect_status != 0) {
+        set_error("connection failed");
+        return ESP_FAIL;
+    }
     ESP_LOGI(TAG, "Connected, conn_handle=%d", s_conn_handle);
 
     /* 1. Exchange MTU.
@@ -1755,7 +1935,8 @@ static esp_err_t do_connect_and_discover(void)
     ESP_LOGI(TAG, "Full service discovery done");
 
     if (s_svc_start == 0 || s_svc_end == 0) {
-        set_error("ResMed service not found"); return ESP_FAIL;
+        set_error("ResMed service not found");
+        return ESP_FAIL;
     }
     ESP_LOGI(TAG, "ResMed service: 0x%04x-0x%04x", s_svc_start, s_svc_end);
 
@@ -1768,7 +1949,8 @@ static esp_err_t do_connect_and_discover(void)
 
     ESP_LOGI(TAG, "TX handle=%d, RX handle=%d", s_tx_handle, s_rx_handle);
     if (s_tx_handle == 0 || s_rx_handle == 0) {
-        set_error("TX/RX characteristic not found"); return ESP_FAIL;
+        set_error("TX/RX characteristic not found");
+        return ESP_FAIL;
     }
 
     /* 4. Descriptor discovery (Find Information) for RX CCCD.
@@ -1777,26 +1959,35 @@ static esp_err_t do_connect_and_discover(void)
     clear_op_sem();
     if (ble_gattc_disc_all_dscs(s_conn_handle, s_rx_handle, s_svc_end, on_dsc, NULL) != 0 ||
         wait_op(10000) != 0) {
-        set_error("CCCD not found"); return ESP_FAIL;
+        set_error("CCCD not found");
+        return ESP_FAIL;
     }
     ESP_LOGI(TAG, "RX CCCD handle=%d", s_cccd_handle);
 
     /* 5. Write Client Supported Features (0x2B29) at handle 0x0008 */
     {
-        uint8_t csf_val[1] = { 0x05 };
+        uint8_t csf_val[1] = {0x05};
         clear_op_sem();
         rc = ble_gattc_write_flat(s_conn_handle, 0x0008, csf_val, 1, on_write_done, NULL);
-        if (rc != 0) { ESP_LOGW(TAG, "CSF write start failed rc=%d", rc); }
-        else { wait_op(5000); ESP_LOGI(TAG, "CSF written (handle 0x0008)"); }
+        if (rc != 0) {
+            ESP_LOGW(TAG, "CSF write start failed rc=%d", rc);
+        } else {
+            wait_op(5000);
+            ESP_LOGI(TAG, "CSF written (handle 0x0008)");
+        }
     }
 
     /* 6. Subscribe to Service Changed (Indicate) at handle 0x0004 */
     {
-        uint8_t sc_val[2] = { 0x02, 0x00 };
+        uint8_t sc_val[2] = {0x02, 0x00};
         clear_op_sem();
         rc = ble_gattc_write_flat(s_conn_handle, 0x0004, sc_val, 2, on_write_done, NULL);
-        if (rc != 0) { ESP_LOGW(TAG, "Service Changed sub failed rc=%d", rc); }
-        else { wait_op(5000); ESP_LOGI(TAG, "Service Changed subscribed (handle 0x0004)"); }
+        if (rc != 0) {
+            ESP_LOGW(TAG, "Service Changed sub failed rc=%d", rc);
+        } else {
+            wait_op(5000);
+            ESP_LOGI(TAG, "Service Changed subscribed (handle 0x0004)");
+        }
     }
 
     /* 7. Read Device Name, Appearance, and Steehl characteristics by handle.
@@ -1816,7 +2007,8 @@ static esp_err_t do_connect_and_discover(void)
     }
     for (int i = 0; i < 3; i++) {
         if (s_steehl_handles[i]) {
-            ESP_LOGI(TAG, "Reading Steehl characteristic %d (handle %d)...", i + 1, s_steehl_handles[i]);
+            ESP_LOGI(
+                TAG, "Reading Steehl characteristic %d (handle %d)...", i + 1, s_steehl_handles[i]);
             clear_op_sem();
             ble_gattc_read(s_conn_handle, s_steehl_handles[i], on_steehl_read, NULL);
             wait_op(5000);
@@ -1825,18 +2017,22 @@ static esp_err_t do_connect_and_discover(void)
 
     /* 8. Re-write Service Changed CCCD (BlueZ does this twice in the trace) */
     {
-        uint8_t sc_val[2] = { 0x02, 0x00 };
+        uint8_t sc_val[2] = {0x02, 0x00};
         clear_op_sem();
         rc = ble_gattc_write_flat(s_conn_handle, 0x0004, sc_val, 2, on_write_done, NULL);
-        if (rc == 0) { wait_op(5000); ESP_LOGI(TAG, "Service Changed re-subscribed"); }
+        if (rc == 0) {
+            wait_op(5000);
+            ESP_LOGI(TAG, "Service Changed re-subscribed");
+        }
     }
 
     /* 9. Enable notifications: write 0x0001 to RX CCCD */
-    uint8_t cccd_val[2] = { 0x01, 0x00 };
+    uint8_t cccd_val[2] = {0x01, 0x00};
     clear_op_sem();
-    if (ble_gattc_write_flat(s_conn_handle, s_cccd_handle, cccd_val, 2,
-                             on_write_done, NULL) != 0 || wait_op(5000) != 0) {
-        set_error("enable notify failed"); return ESP_FAIL;
+    if (ble_gattc_write_flat(s_conn_handle, s_cccd_handle, cccd_val, 2, on_write_done, NULL) != 0 ||
+        wait_op(5000) != 0) {
+        set_error("enable notify failed");
+        return ESP_FAIL;
     }
     ESP_LOGI(TAG, "Notifications enabled on handle %d", s_cccd_handle);
     return ESP_OK;
@@ -1849,7 +2045,7 @@ static void pair_task(void *arg)
     (void)arg;
     /* Use the built-in public MAC address to guarantee compatibility with the CPAP BLE stack */
     s_own_addr_type = BLE_OWN_ADDR_PUBLIC;
-    
+
     set_state(AS11_STATUS_CONNECTING);
 
     if (do_connect_and_discover() != ESP_OK) {
@@ -1859,8 +2055,6 @@ static void pair_task(void *arg)
         psram_task_delete(NULL);
         return;
     }
-
-
 
     int64_t pair_t0 = esp_timer_get_time();
     if (srp_begin() != ESP_OK) {
@@ -1877,16 +2071,19 @@ static void pair_task(void *arg)
     ESP_LOGI(TAG, "Sending StartKeyExchange...");
     bytes_to_hex(s_srp.A_pad, SRP_PAD, A_hex);
     char *json = heap_caps_malloc(800, MALLOC_CAP_SPIRAM);
-    if (!json) json = malloc(800);
+    if (!json)
+        json = malloc(800);
     if (!json) {
         set_error("StartKeyExchange: out of memory");
         ble_gap_terminate(s_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
         psram_task_delete(NULL);
         return;
     }
-    snprintf(json, 800,
+    snprintf(json,
+             800,
              "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"StartKeyExchange\","
-             "\"params\":{\"clientPk\":\"%s\"}}", A_hex);
+             "\"params\":{\"clientPk\":\"%s\"}}",
+             A_hex);
     clear_response();
     esp_err_t se = send_fig(FIG_VCID_TX, json);
     free(json);
@@ -1940,7 +2137,9 @@ static void confirm_task(void *arg)
     set_state(AS11_STATUS_CONFIRMING);
 
     if (s_conn_handle == BLE_HS_CONN_HANDLE_NONE) {
-        set_error("not connected"); psram_task_delete(NULL); return;
+        set_error("not connected");
+        psram_task_delete(NULL);
+        return;
     }
     /* The StartKeyExchange response may still be arriving if the user
      * entered the PIN quickly.  Wait up to 5 s for s_kex_ready. */
@@ -1948,25 +2147,29 @@ static void confirm_task(void *arg)
         vTaskDelay(pdMS_TO_TICKS(100));
     }
     if (!s_kex_ready || !s_server_pk || !s_salt) {
-        set_error("no key-exchange state"); psram_task_delete(NULL); return;
+        set_error("no key-exchange state");
+        psram_task_delete(NULL);
+        return;
     }
 
     char m1_hex[65];
     char m2_expected[65];
     int64_t conf_t0 = esp_timer_get_time();
-    if (srp_compute(s_server_pk, s_salt, s_passkey,
-                    m1_hex, m2_expected) != ESP_OK) {
+    if (srp_compute(s_server_pk, s_salt, s_passkey, m1_hex, m2_expected) != ESP_OK) {
         set_error("SRP computation failed");
         ble_gap_terminate(s_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
         psram_task_delete(NULL);
         return;
     }
-    ESP_LOGI(TAG, "confirm_task: srp_compute took %lld ms", (esp_timer_get_time() - conf_t0) / 1000);
+    ESP_LOGI(
+        TAG, "confirm_task: srp_compute took %lld ms", (esp_timer_get_time() - conf_t0) / 1000);
 
     char json[256];
-    snprintf(json, sizeof(json),
+    snprintf(json,
+             sizeof(json),
              "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"ConfirmKeyExchange\","
-             "\"params\":{\"clientConfirmation\":\"%s\"}}", m1_hex);
+             "\"params\":{\"clientConfirmation\":\"%s\"}}",
+             m1_hex);
     clear_response();
     if (send_fig(FIG_VCID_TX, json) != ESP_OK) {
         set_error("ConfirmKeyExchange send failed");
@@ -1978,7 +2181,8 @@ static void confirm_task(void *arg)
 
     int64_t resp_t0 = esp_timer_get_time();
     cJSON *resp = wait_response(15000);
-    ESP_LOGI(TAG, "confirm_task: wait_response took %lld ms", (esp_timer_get_time() - resp_t0) / 1000);
+    ESP_LOGI(
+        TAG, "confirm_task: wait_response took %lld ms", (esp_timer_get_time() - resp_t0) / 1000);
     if (!resp) {
         set_error("no ConfirmKeyExchange response");
         ble_gap_terminate(s_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
@@ -2005,8 +2209,7 @@ static void confirm_task(void *arg)
     }
     /* verify server proof (M2) */
     if (strcasecmp(sconf->valuestring, m2_expected) != 0) {
-        ESP_LOGE(TAG, "server proof mismatch: got %s expected %s",
-                 sconf->valuestring, m2_expected);
+        ESP_LOGE(TAG, "server proof mismatch: got %s expected %s", sconf->valuestring, m2_expected);
         cJSON_Delete(resp);
         set_error("server proof mismatch");
         ble_gap_terminate(s_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
@@ -2059,7 +2262,8 @@ static esp_err_t do_setup_encrypted_session(const char *cid_str,
                                             const char *pair_key_hex,
                                             bool *out_hard_fail)
 {
-    if (out_hard_fail) *out_hard_fail = false;
+    if (out_hard_fail)
+        *out_hard_fail = false;
 
     /* ---- Encrypted session establishment ----
      * 1. RequestSession(clientId) -> {challenge, nonce}  [plaintext RPC]
@@ -2071,17 +2275,22 @@ static esp_err_t do_setup_encrypted_session(const char *cid_str,
     if (hex_to_bytes(pair_key_hex, K_bytes, sizeof(K_bytes)) != 32) {
         ESP_LOGE(TAG, "reconnect: bad pair key");
         set_error("bad pair key in cache");
-        if (out_hard_fail) *out_hard_fail = true;
+        if (out_hard_fail)
+            *out_hard_fail = true;
         return ESP_ERR_INVALID_ARG;
     }
 
     /* 1. RequestSession */
     char *rpc = heap_caps_malloc(512, MALLOC_CAP_SPIRAM);
-    if (!rpc) rpc = malloc(512);
-    if (!rpc) return ESP_ERR_NO_MEM;
-    snprintf(rpc, 512,
+    if (!rpc)
+        rpc = malloc(512);
+    if (!rpc)
+        return ESP_ERR_NO_MEM;
+    snprintf(rpc,
+             512,
              "{\"id\":10,\"jsonrpc\":\"2.0\",\"method\":\"RequestSession\","
-             "\"params\":{\"clientId\":\"%s\"}}", cid_str);
+             "\"params\":{\"clientId\":\"%s\"}}",
+             cid_str);
     clear_response();
     esp_err_t se = send_fig(FIG_VCID_TX, rpc);
     free(rpc);
@@ -2102,7 +2311,8 @@ static esp_err_t do_setup_encrypted_session(const char *cid_str,
         ESP_LOGE(TAG, "reconnect: RequestSession missing challenge/nonce");
         cJSON_Delete(resp);
         set_error("bad RequestSession response");
-        if (out_hard_fail) *out_hard_fail = true;
+        if (out_hard_fail)
+            *out_hard_fail = true;
         return ESP_ERR_INVALID_RESPONSE;
     }
 
@@ -2113,7 +2323,8 @@ static esp_err_t do_setup_encrypted_session(const char *cid_str,
         ESP_LOGE(TAG, "reconnect: bad challenge hex");
         cJSON_Delete(resp);
         set_error("bad challenge hex in session setup");
-        if (out_hard_fail) *out_hard_fail = true;
+        if (out_hard_fail)
+            *out_hard_fail = true;
         return ESP_ERR_INVALID_RESPONSE;
     }
 
@@ -2126,19 +2337,22 @@ static esp_err_t do_setup_encrypted_session(const char *cid_str,
     char nonce_hex_saved[130];
     strlcpy(nonce_hex_saved, nonce_j->valuestring, sizeof(nonce_hex_saved));
 
-    ESP_LOGI(TAG, "reconnect: challenge=%s... response=%s...",
-             challenge_j->valuestring, response_hex);
+    ESP_LOGI(
+        TAG, "reconnect: challenge=%s... response=%s...", challenge_j->valuestring, response_hex);
 
     /* 3. CheckSessionIntegrity */
     rpc = heap_caps_malloc(512, MALLOC_CAP_SPIRAM);
-    if (!rpc) rpc = malloc(512);
+    if (!rpc)
+        rpc = malloc(512);
     if (!rpc) {
         cJSON_Delete(resp);
         return ESP_ERR_NO_MEM;
     }
-    snprintf(rpc, 512,
+    snprintf(rpc,
+             512,
              "{\"id\":11,\"jsonrpc\":\"2.0\",\"method\":\"CheckSessionIntegrity\","
-             "\"params\":{\"response\":\"%s\"}}", response_hex);
+             "\"params\":{\"response\":\"%s\"}}",
+             response_hex);
     clear_response();
     se = send_fig(FIG_VCID_TX, rpc);
     free(rpc);
@@ -2155,11 +2369,11 @@ static esp_err_t do_setup_encrypted_session(const char *cid_str,
     }
     cJSON *err = cJSON_GetObjectItem(resp, "error");
     if (err) {
-        ESP_LOGE(TAG, "reconnect: CheckSessionIntegrity error: %s",
-                 cJSON_PrintUnformatted(err));
+        ESP_LOGE(TAG, "reconnect: CheckSessionIntegrity error: %s", cJSON_PrintUnformatted(err));
         cJSON_Delete(resp);
         set_error("device rejected session integrity");
-        if (out_hard_fail) *out_hard_fail = true;
+        if (out_hard_fail)
+            *out_hard_fail = true;
         return ESP_ERR_INVALID_RESPONSE;
     }
     ESP_LOGI(TAG, "reconnect: session integrity verified");
@@ -2171,13 +2385,14 @@ static esp_err_t do_setup_encrypted_session(const char *cid_str,
     if (nonce_len <= 0) {
         ESP_LOGE(TAG, "reconnect: bad nonce hex");
         set_error("bad nonce hex in session setup");
-        if (out_hard_fail) *out_hard_fail = true;
+        if (out_hard_fail)
+            *out_hard_fail = true;
         return ESP_ERR_INVALID_RESPONSE;
     }
 
     {
-        const uint8_t *segs[] = { K_bytes, nonce_bytes };
-        size_t lens[] = { 32, (size_t)nonce_len };
+        const uint8_t *segs[] = {K_bytes, nonce_bytes};
+        size_t lens[] = {32, (size_t)nonce_len};
         sha256_segs(segs, lens, 2, s_session_key);
     }
     s_session_encrypted = true;
@@ -2241,8 +2456,10 @@ static void reconnect_task(void *arg)
     int setup_failures = 0;
     while (1) {
         if (!s_pair_cache.valid || s_manual_disconnect) {
-            ESP_LOGI(TAG, "reconnect: aborted (pairing=%d manual=%d)",
-                     s_pair_cache.valid, s_manual_disconnect);
+            ESP_LOGI(TAG,
+                     "reconnect: aborted (pairing=%d manual=%d)",
+                     s_pair_cache.valid,
+                     s_manual_disconnect);
             set_state(AS11_STATUS_IDLE);
             psram_task_delete(NULL);
             return;
@@ -2266,8 +2483,10 @@ static void reconnect_task(void *arg)
                 vTaskDelay(pdMS_TO_TICKS(delay_s * 1000));
             }
             if (!s_pair_cache.valid || s_manual_disconnect) {
-                ESP_LOGI(TAG, "reconnect: aborted (pairing=%d manual=%d)",
-                         s_pair_cache.valid, s_manual_disconnect);
+                ESP_LOGI(TAG,
+                         "reconnect: aborted (pairing=%d manual=%d)",
+                         s_pair_cache.valid,
+                         s_manual_disconnect);
                 set_state(AS11_STATUS_IDLE);
                 psram_task_delete(NULL);
                 return;
@@ -2276,8 +2495,10 @@ static void reconnect_task(void *arg)
                 connected = true;
                 break;
             }
-            ESP_LOGW(TAG, "reconnect: connect/discover attempt %d/3 failed: %s",
-                     attempt, as11_ble_get_error());
+            ESP_LOGW(TAG,
+                     "reconnect: connect/discover attempt %d/3 failed: %s",
+                     attempt,
+                     as11_ble_get_error());
             if (s_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
                 ble_gap_terminate(s_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
                 s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
@@ -2288,9 +2509,11 @@ static void reconnect_task(void *arg)
         int slow_attempt = 0;
         while (!connected) {
             if (!s_pair_cache.valid || s_manual_disconnect) {
-                ESP_LOGI(TAG, "reconnect: aborted during slow retry "
-                             "(pairing=%d manual=%d)",
-                         s_pair_cache.valid, s_manual_disconnect);
+                ESP_LOGI(TAG,
+                         "reconnect: aborted during slow retry "
+                         "(pairing=%d manual=%d)",
+                         s_pair_cache.valid,
+                         s_manual_disconnect);
                 set_state(AS11_STATUS_IDLE);
                 psram_task_delete(NULL);
                 return;
@@ -2299,7 +2522,8 @@ static void reconnect_task(void *arg)
             ESP_LOGI(TAG, "reconnect: waiting 60s before slow retry %d...", slow_attempt);
             for (int i = 0; i < 60; i++) {
                 vTaskDelay(pdMS_TO_TICKS(1000));
-                if (!s_pair_cache.valid || s_manual_disconnect) break;
+                if (!s_pair_cache.valid || s_manual_disconnect)
+                    break;
             }
             if (!s_pair_cache.valid || s_manual_disconnect) {
                 ESP_LOGI(TAG, "reconnect: aborted during slow retry wait");
@@ -2313,8 +2537,8 @@ static void reconnect_task(void *arg)
                 connected = true;
                 break;
             }
-            ESP_LOGW(TAG, "reconnect: slow retry %d failed: %s",
-                     slow_attempt, as11_ble_get_error());
+            ESP_LOGW(
+                TAG, "reconnect: slow retry %d failed: %s", slow_attempt, as11_ble_get_error());
             if (s_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
                 ble_gap_terminate(s_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
                 s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
@@ -2339,8 +2563,11 @@ static void reconnect_task(void *arg)
         }
 
         setup_failures++;
-        ESP_LOGE(TAG, "reconnect: session setup failed (%s, attempt %d, hard=%d)",
-                 esp_err_to_name(err), setup_failures, hard_fail);
+        ESP_LOGE(TAG,
+                 "reconnect: session setup failed (%s, attempt %d, hard=%d)",
+                 esp_err_to_name(err),
+                 setup_failures,
+                 hard_fail);
 
         if (s_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
             ble_gap_terminate(s_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
@@ -2359,7 +2586,8 @@ static void reconnect_task(void *arg)
         set_state(AS11_STATUS_IDLE);
         for (int i = 0; i < 5; i++) {
             vTaskDelay(pdMS_TO_TICKS(1000));
-            if (!s_pair_cache.valid || s_manual_disconnect) break;
+            if (!s_pair_cache.valid || s_manual_disconnect)
+                break;
         }
     }
 
@@ -2369,12 +2597,14 @@ static void reconnect_task(void *arg)
     /* ---- Test encrypted channel: Get device identity ---- */
     char *rpc = heap_caps_malloc(512, MALLOC_CAP_SPIRAM);
     cJSON *resp = NULL;
-    if (!rpc) rpc = malloc(512);
+    if (!rpc)
+        rpc = malloc(512);
     if (!rpc) {
         ESP_LOGW(TAG, "reconnect: Get (test) skipped, out of memory");
         goto after_get_test;
     }
-    snprintf(rpc, 512,
+    snprintf(rpc,
+             512,
              "{\"id\":12,\"jsonrpc\":\"1.0\",\"method\":\"Get\","
              "\"params\":[\"ProductGeographicIdentifier\",\"HardwareIdentifier\"]}");
     clear_response();
@@ -2406,14 +2636,17 @@ after_get_test:
         if (rec == ESP_OK) {
             ESP_LOGI(TAG, "reconnect: time recovered from AS11 + drift (degraded mode)");
         } else {
-            ESP_LOGW(TAG, "reconnect: AS11 drift recovery failed (%s), "
-                     "blocking until NTP syncs", esp_err_to_name(rec));
+            ESP_LOGW(TAG,
+                     "reconnect: AS11 drift recovery failed (%s), "
+                     "blocking until NTP syncs",
+                     esp_err_to_name(rec));
             while (!time_is_usable()) {
                 vTaskDelay(pdMS_TO_TICKS(500));
             }
         }
     }
-    ESP_LOGI(TAG, "reconnect: time usable (source=%d), proceeding with stream setup",
+    ESP_LOGI(TAG,
+             "reconnect: time usable (source=%d), proceeding with stream setup",
              (int)time_source_get());
 
     /* ---- Subscribe to therapy events (encrypted) ----
@@ -2432,12 +2665,14 @@ after_get_test:
      *     providing a more accurate EDF start alignment than MaskOn.
      * Rationale: https://github.com/ilyakruchinin/SomnoTrace/issues/20#issuecomment-4975037843 */
     rpc = heap_caps_malloc(700, MALLOC_CAP_SPIRAM);
-    if (!rpc) rpc = malloc(700);
+    if (!rpc)
+        rpc = malloc(700);
     if (!rpc) {
         ESP_LOGW(TAG, "reconnect: SubscribeEvent skipped, out of memory");
         goto after_subscribe;
     }
-    snprintf(rpc, 700,
+    snprintf(rpc,
+             700,
              "{\"id\":13,\"jsonrpc\":\"1.0\",\"method\":\"SubscribeEvent\","
              "\"params\":{\"dataIds\":["
              "\"TherapyEvents-RespiratoryEvents\","
@@ -2475,18 +2710,21 @@ after_subscribe:
              * provenance; the next reconnect can produce a measured drift. */
             time_source_t wall_source = time_source_get();
             int64_t wall_ms = (int64_t)time(NULL) * 1000;
-            bool stored = as11_clock_capture_store(capture_generation,
-                                                   as11_ms, wall_ms,
-                                                   wall_source);
+            bool stored =
+                as11_clock_capture_store(capture_generation, as11_ms, wall_ms, wall_source);
             if (!stored) {
-                ESP_LOGW(TAG, "reconnect: link changed during AS11 clock "
-                              "capture; discarding stale result");
+                ESP_LOGW(TAG,
+                         "reconnect: link changed during AS11 clock "
+                         "capture; discarding stale result");
             } else if (wall_source == TIME_SRC_NTP) {
-                ESP_LOGI(TAG, "reconnect: AS11 clock captured: %lld ms (NTP=%lld)",
-                         (long long)as11_ms, (long long)wall_ms);
+                ESP_LOGI(TAG,
+                         "reconnect: AS11 clock captured: %lld ms (NTP=%lld)",
+                         (long long)as11_ms,
+                         (long long)wall_ms);
             } else {
-                ESP_LOGW(TAG, "reconnect: AS11 clock captured against "
-                              "non-NTP source=%d; measured drift unavailable",
+                ESP_LOGW(TAG,
+                         "reconnect: AS11 clock captured against "
+                         "non-NTP source=%d; measured drift unavailable",
                          (int)wall_source);
             }
         } else {
@@ -2503,12 +2741,14 @@ after_subscribe:
      * Unsupported signals return valid:false in the StartStream response.
      * sampleIntervalMs:40 applies to all; reportIntervalMs:200 gives 5 reports/s. */
     rpc = heap_caps_malloc(600, MALLOC_CAP_SPIRAM);
-    if (!rpc) rpc = malloc(600);
+    if (!rpc)
+        rpc = malloc(600);
     if (!rpc) {
         ESP_LOGW(TAG, "reconnect: StartStream skipped, out of memory");
         goto after_start_stream;
     }
-    snprintf(rpc, 600,
+    snprintf(rpc,
+             600,
              "{\"id\":14,\"jsonrpc\":\"1.0\",\"method\":\"StartStream\","
              "\"params\":{\"dataIds\":["
              "\"_RFL\",\"_MKP\","
@@ -2524,9 +2764,9 @@ after_subscribe:
         resp = wait_response(10000);
         if (resp) {
             char *resp_str = cJSON_PrintUnformatted(resp);
-            ESP_LOGI(TAG, "reconnect: StartStream response: %s",
-                     resp_str ? resp_str : "(null)");
-            if (resp_str) free(resp_str);
+            ESP_LOGI(TAG, "reconnect: StartStream response: %s", resp_str ? resp_str : "(null)");
+            if (resp_str)
+                free(resp_str);
             cJSON_Delete(resp);
         } else {
             ESP_LOGW(TAG, "reconnect: StartStream timeout (non-fatal)");
@@ -2536,9 +2776,9 @@ after_subscribe:
 after_start_stream:
 
     set_state(AS11_STATUS_PAIRED);
-    #if CONFIG_ESP_COEX_SW_COEXIST_ENABLE
+#if CONFIG_ESP_COEX_SW_COEXIST_ENABLE
     esp_coex_status_bit_set(ESP_COEX_BLE_ST_MESH_TRAFFIC, true);
-    #endif
+#endif
     ESP_LOGI(TAG, "reconnect: connected to %s, session established, streams started", addr_str);
 
     psram_task_delete(NULL);
@@ -2562,9 +2802,11 @@ static void auto_reconnect_task(void *arg)
         ESP_LOGI(TAG, "auto-reconnect in %ds...", i);
         vTaskDelay(pdMS_TO_TICKS(1000));
         if (!s_pair_cache.valid || s_manual_disconnect) {
-            ESP_LOGI(TAG, "auto-reconnect: aborted during wait "
-                         "(pairing=%d manual=%d)",
-                     s_pair_cache.valid, s_manual_disconnect);
+            ESP_LOGI(TAG,
+                     "auto-reconnect: aborted during wait "
+                     "(pairing=%d manual=%d)",
+                     s_pair_cache.valid,
+                     s_manual_disconnect);
             psram_task_delete(NULL);
             return;
         }
@@ -2575,7 +2817,6 @@ static void auto_reconnect_task(void *arg)
      * task is cleaned up when reconnect_task finishes. */
     reconnect_task(arg);
 }
-
 
 static void on_sync(void)
 {
@@ -2613,14 +2854,15 @@ static void host_task(void *param)
 
 esp_err_t as11_ble_init(void)
 {
-    s_state_mtx  = xSemaphoreCreateMutex();
-    s_cmd_mtx    = xSemaphoreCreateMutex();
+    s_state_mtx = xSemaphoreCreateMutex();
+    s_cmd_mtx = xSemaphoreCreateMutex();
     s_spool_mtx = xSemaphoreCreateMutex();
-    s_op_sem     = xSemaphoreCreateBinary();
+    s_op_sem = xSemaphoreCreateBinary();
     s_connect_sem = xSemaphoreCreateBinary();
-    s_resp_sem   = xSemaphoreCreateBinary();
-    s_scan_done  = xSemaphoreCreateBinary();
-    if (!s_state_mtx || !s_cmd_mtx || !s_spool_mtx || !s_op_sem || !s_connect_sem || !s_resp_sem || !s_scan_done) {
+    s_resp_sem = xSemaphoreCreateBinary();
+    s_scan_done = xSemaphoreCreateBinary();
+    if (!s_state_mtx || !s_cmd_mtx || !s_spool_mtx || !s_op_sem || !s_connect_sem || !s_resp_sem ||
+        !s_scan_done) {
         return ESP_ERR_NO_MEM;
     }
 
@@ -2643,8 +2885,10 @@ esp_err_t as11_ble_init(void)
 
     /* Create notification queue and processing task */
     s_notif_queue = xQueueCreate(NOTIF_QUEUE_LEN, sizeof(notif_item_t));
-    if (!s_notif_queue) return ESP_ERR_NO_MEM;
-    s_notif_task = psram_task_create(notif_proc_task, "notif_proc", 8192, NULL, 10, tskNO_AFFINITY, NULL, NULL);
+    if (!s_notif_queue)
+        return ESP_ERR_NO_MEM;
+    s_notif_task = psram_task_create(
+        notif_proc_task, "notif_proc", 8192, NULL, 10, tskNO_AFFINITY, NULL, NULL);
     ESP_LOGI(TAG, "notification processing task started");
 
     esp_err_t ret = nimble_port_init();
@@ -2658,7 +2902,7 @@ esp_err_t as11_ble_init(void)
     /* Quiet NimBLE's per-byte HCI hex dumps — warnings/errors only. */
     esp_log_level_set("NimBLE", ESP_LOG_WARN);
     esp_log_level_set("NimBLE_HCI", ESP_LOG_WARN);
-    
+
     nimble_port_freertos_init(host_task);
     ESP_LOGI(TAG, "BLE initialised");
 
@@ -2690,17 +2934,18 @@ uint8_t as11_ble_get_own_addr_type(void)
 
 esp_err_t as11_ble_scan(int timeout_sec)
 {
-    if (!s_host_ready) return ESP_ERR_INVALID_STATE;
+    if (!s_host_ready)
+        return ESP_ERR_INVALID_STATE;
     s_scan_count = 0;
     set_state(AS11_STATUS_SCANNING);
 
     struct ble_gap_disc_params dp = {
-        .itvl = 96,            /* 60 ms */
-        .window = 96,          /* 60 ms (100% duty cycle for best coexistence) */
+        .itvl = 96,   /* 60 ms */
+        .window = 96, /* 60 ms (100% duty cycle for best coexistence) */
         .filter_policy = 0,
         .limited = 0,
-        .passive = 0,          /* active scan to collect names */
-        .filter_duplicates = 0,  /* need both ADV_IND (name) and SCAN_RSP (UUID) */
+        .passive = 0,           /* active scan to collect names */
+        .filter_duplicates = 0, /* need both ADV_IND (name) and SCAN_RSP (UUID) */
     };
     /* drain stale completion signal */
     xSemaphoreTake(s_scan_done, 0);
@@ -2732,8 +2977,10 @@ cJSON *as11_ble_get_scan_results(void)
 
 esp_err_t as11_ble_start_pair(const char *addr_str)
 {
-    if (!s_host_ready) return ESP_ERR_INVALID_STATE;
-    if (!addr_str) return ESP_ERR_INVALID_ARG;
+    if (!s_host_ready)
+        return ESP_ERR_INVALID_STATE;
+    if (!addr_str)
+        return ESP_ERR_INVALID_ARG;
 
     /* resolve address type/bytes from the scan cache if possible */
     bool found = false;
@@ -2748,12 +2995,14 @@ esp_err_t as11_ble_start_pair(const char *addr_str)
         }
     }
     if (!found) {
-        if (!str_to_addr(addr_str, &s_target_addr)) return ESP_ERR_INVALID_ARG;
+        if (!str_to_addr(addr_str, &s_target_addr))
+            return ESP_ERR_INVALID_ARG;
         strlcpy(s_target_name, "AirSense 11", sizeof(s_target_name));
     }
 
     s_error[0] = '\0';
-    TaskHandle_t h = psram_task_create(pair_task, "as11_pair", 8192, NULL, 5, tskNO_AFFINITY, NULL, NULL);
+    TaskHandle_t h =
+        psram_task_create(pair_task, "as11_pair", 8192, NULL, 5, tskNO_AFFINITY, NULL, NULL);
     if (!h) {
         return ESP_ERR_NO_MEM;
     }
@@ -2762,9 +3011,11 @@ esp_err_t as11_ble_start_pair(const char *addr_str)
 
 esp_err_t as11_ble_confirm_pair(const char *passkey)
 {
-    if (!passkey || !*passkey) return ESP_ERR_INVALID_ARG;
+    if (!passkey || !*passkey)
+        return ESP_ERR_INVALID_ARG;
     strlcpy(s_passkey, passkey, sizeof(s_passkey));
-    TaskHandle_t h = psram_task_create(confirm_task, "as11_confirm", 8192, NULL, 5, tskNO_AFFINITY, NULL, NULL);
+    TaskHandle_t h =
+        psram_task_create(confirm_task, "as11_confirm", 8192, NULL, 5, tskNO_AFFINITY, NULL, NULL);
     if (!h) {
         return ESP_ERR_NO_MEM;
     }
@@ -2791,7 +3042,8 @@ bool as11_ble_is_paired(void)
 
 cJSON *as11_ble_get_paired_info(void)
 {
-    if (!s_pair_cache.valid) return NULL;
+    if (!s_pair_cache.valid)
+        return NULL;
     cJSON *o = cJSON_CreateObject();
     cJSON_AddStringToObject(o, "addr", s_pair_cache.addr);
     cJSON_AddStringToObject(o, "name", s_pair_cache.name);
@@ -2804,7 +3056,8 @@ static esp_err_t do_forget_nvs(void *arg)
     (void)arg;
     nvs_handle_t h;
     esp_err_t e = nvs_open(NVS_NS, NVS_READWRITE, &h);
-    if (e != ESP_OK) return e;
+    if (e != ESP_OK)
+        return e;
     nvs_erase_all(h);
     e = nvs_commit(h);
     nvs_close(h);
@@ -2857,19 +3110,21 @@ esp_err_t as11_ble_stop_stream(void)
  * drift = NTP_time - AS11_time (positive = AS11 clock is behind). */
 esp_err_t as11_ble_get_clock_drift(int64_t *out_drift_ms)
 {
-    if (!out_drift_ms) return ESP_ERR_INVALID_ARG;
+    if (!out_drift_ms)
+        return ESP_ERR_INVALID_ARG;
     as11_clock_capture_t capture = as11_clock_capture_load();
     if (!capture.available) {
         ESP_LOGW(TAG, "get_clock_drift: no AS11 clock capture available");
         return ESP_ERR_INVALID_STATE;
     }
     if (capture.wall_source != TIME_SRC_NTP) {
-        ESP_LOGW(TAG, "get_clock_drift: capture wall source=%d is not NTP",
-                 (int)capture.wall_source);
+        ESP_LOGW(
+            TAG, "get_clock_drift: capture wall source=%d is not NTP", (int)capture.wall_source);
         return ESP_ERR_INVALID_STATE;
     }
     *out_drift_ms = capture.wall_ms - capture.as11_ms;
-    ESP_LOGI(TAG, "get_clock_drift: drift=%lld ms (NTP=%lld AS11=%lld)",
+    ESP_LOGI(TAG,
+             "get_clock_drift: drift=%lld ms (NTP=%lld AS11=%lld)",
              (long long)*out_drift_ms,
              (long long)capture.wall_ms,
              (long long)capture.as11_ms);
@@ -2882,7 +3137,8 @@ esp_err_t as11_ble_get_clock_drift(int64_t *out_drift_ms)
  * Returns ESP_FAIL if the RPC fails or the response can't be parsed. */
 static esp_err_t get_datetime_locked(int64_t *out_epoch_ms)
 {
-    if (!out_epoch_ms) return ESP_ERR_INVALID_ARG;
+    if (!out_epoch_ms)
+        return ESP_ERR_INVALID_ARG;
     if (!s_session_encrypted) {
         ESP_LOGW(TAG, "get_datetime: no encrypted session");
         return ESP_ERR_INVALID_STATE;
@@ -2909,9 +3165,15 @@ static esp_err_t get_datetime_locked(int64_t *out_epoch_ms)
             /* Parse ISO 8601: "2026-06-25T15:08:00.000Z" */
             struct tm tm = {0};
             int ms = 0;
-            int parsed = sscanf(dt->valuestring, "%d-%d-%dT%d:%d:%d.%dZ",
-                                &tm.tm_year, &tm.tm_mon, &tm.tm_mday,
-                                &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &ms);
+            int parsed = sscanf(dt->valuestring,
+                                "%d-%d-%dT%d:%d:%d.%dZ",
+                                &tm.tm_year,
+                                &tm.tm_mon,
+                                &tm.tm_mday,
+                                &tm.tm_hour,
+                                &tm.tm_min,
+                                &tm.tm_sec,
+                                &ms);
             if (parsed >= 6) {
                 tm.tm_year -= 1900;
                 tm.tm_mon -= 1;
@@ -2932,11 +3194,14 @@ static esp_err_t get_datetime_locked(int64_t *out_epoch_ms)
                         days++;
                 }
                 days += tm.tm_mday - 1;
-                int64_t epoch = (int64_t)days * 86400 + tm.tm_hour * 3600 + tm.tm_min * 60 + tm.tm_sec;
+                int64_t epoch =
+                    (int64_t)days * 86400 + tm.tm_hour * 3600 + tm.tm_min * 60 + tm.tm_sec;
                 *out_epoch_ms = epoch * 1000 + ms;
                 ret = ESP_OK;
-                ESP_LOGI(TAG, "get_datetime: AS11 clock = %s (%lld ms)",
-                         dt->valuestring, (long long)*out_epoch_ms);
+                ESP_LOGI(TAG,
+                         "get_datetime: AS11 clock = %s (%lld ms)",
+                         dt->valuestring,
+                         (long long)*out_epoch_ms);
             }
         }
     }
@@ -2944,7 +3209,8 @@ static esp_err_t get_datetime_locked(int64_t *out_epoch_ms)
     if (ret != ESP_OK) {
         char *s = cJSON_Print(resp);
         ESP_LOGW(TAG, "get_datetime: parse failed: %s", s ? s : "?");
-        if (s) free(s);
+        if (s)
+            free(s);
     }
 
     cJSON_Delete(resp);
@@ -2960,7 +3226,6 @@ esp_err_t as11_ble_get_datetime(int64_t *out_epoch_ms)
     xSemaphoreGive(s_cmd_mtx);
     return result;
 }
-
 
 /* ── Spool RPC ────────────────────────────────────────────────────────
  *
@@ -2995,7 +3260,8 @@ static int frag_cmp(const void *a, const void *b)
 static void spool_withdraw(spool_collector_t *collector, bool aborting)
 {
     xSemaphoreTake(s_spool_mtx, portMAX_DELAY);
-    if (s_spool_collector == collector) s_spool_collector = NULL;
+    if (s_spool_collector == collector)
+        s_spool_collector = NULL;
     xSemaphoreGive(s_spool_mtx);
     vSemaphoreDelete(collector->sem);
     collector->sem = NULL;
@@ -3012,8 +3278,10 @@ static void spool_withdraw(spool_collector_t *collector, bool aborting)
 }
 
 static esp_err_t spool_one_round(const char *spool_addr_json,
-                                 uint8_t **round_data, size_t *round_len,
-                                 char *next_addr_out, size_t next_addr_max)
+                                 uint8_t **round_data,
+                                 size_t *round_len,
+                                 char *next_addr_out,
+                                 size_t next_addr_max)
 {
     *round_data = NULL;
     *round_len = 0;
@@ -3023,10 +3291,12 @@ static esp_err_t spool_one_round(const char *spool_addr_json,
      * PullSpoolFragments can generate any fragments for this round. */
     spool_collector_t coll = {0};
     coll.sem = xSemaphoreCreateBinary();
-    if (!coll.sem) return ESP_ERR_NO_MEM;
+    if (!coll.sem)
+        return ESP_ERR_NO_MEM;
     /* 1. StartSpool RPC */
     char rpc[512];
-    snprintf(rpc, sizeof(rpc),
+    snprintf(rpc,
+             sizeof(rpc),
              "{\"id\":30,\"jsonrpc\":\"1.0\",\"method\":\"StartSpool\","
              "\"params\":{\"spoolAddress\":%s,\"maxSpoolSize\":100000}}",
              spool_addr_json);
@@ -3048,7 +3318,8 @@ static esp_err_t spool_one_round(const char *spool_addr_json,
     if (!spool_id_j || !cJSON_IsNumber(spool_id_j)) {
         char *s = cJSON_Print(resp);
         ESP_LOGE(TAG, "spool: StartSpool bad response: %s", s ? s : "?");
-        if (s) free(s);
+        if (s)
+            free(s);
         cJSON_Delete(resp);
         spool_withdraw(&coll, true);
         return ESP_FAIL;
@@ -3062,7 +3333,8 @@ static esp_err_t spool_one_round(const char *spool_addr_json,
     xSemaphoreGive(s_spool_mtx);
 
     /* 2. PullSpoolFragments RPC — triggers SpoolFragment notifications */
-    snprintf(rpc, sizeof(rpc),
+    snprintf(rpc,
+             sizeof(rpc),
              "{\"id\":31,\"jsonrpc\":\"1.0\",\"method\":\"PullSpoolFragments\","
              "\"params\":{\"spoolId\":%d,\"maxFragmentSize\":2808,\"maxNotifications\":0}}",
              spool_id);
@@ -3076,7 +3348,8 @@ static esp_err_t spool_one_round(const char *spool_addr_json,
     /* The PullSpoolFragments response is an ack; fragments arrive as
      * separate SpoolFragment notifications.  Wait for the collector. */
     resp = wait_response(5000);
-    if (resp) cJSON_Delete(resp);  /* ack response, not needed */
+    if (resp)
+        cJSON_Delete(resp); /* ack response, not needed */
 
     /* 3. Wait for all fragments to arrive */
     if (xSemaphoreTake(coll.sem, pdMS_TO_TICKS(30000)) != pdTRUE) {
@@ -3091,16 +3364,16 @@ static esp_err_t spool_one_round(const char *spool_addr_json,
     /* Clear collector before processing (new fragments would be lost) */
     spool_withdraw(&coll, false);
     if (coll.failed) {
-        for (int i = 0; i < coll.frag_count; ++i) free(coll.frags[i].data);
+        for (int i = 0; i < coll.frag_count; ++i)
+            free(coll.frags[i].data);
         return ESP_FAIL;
     }
 
-    ESP_LOGI(TAG, "spool: collected %d fragments, status=%s",
-             coll.frag_count, coll.status);
+    ESP_LOGI(TAG, "spool: collected %d fragments, status=%s", coll.frag_count, coll.status);
 
     /* 4. Sort fragments by seq and concatenate */
     if (coll.frag_count == 0) {
-        return ESP_OK;  /* empty spool — valid (e.g. no events) */
+        return ESP_OK; /* empty spool — valid (e.g. no events) */
     }
 
     qsort(coll.frags, coll.frag_count, sizeof(spool_frag_t), frag_cmp);
@@ -3111,10 +3384,12 @@ static esp_err_t spool_one_round(const char *spool_addr_json,
     }
 
     uint8_t *data = heap_caps_malloc(total, MALLOC_CAP_SPIRAM);
-    if (!data) data = malloc(total);
+    if (!data)
+        data = malloc(total);
     if (!data) {
         ESP_LOGE(TAG, "spool: malloc %u failed", (unsigned)total);
-        for (int i = 0; i < coll.frag_count; i++) free(coll.frags[i].data);
+        for (int i = 0; i < coll.frag_count; i++)
+            free(coll.frags[i].data);
         return ESP_ERR_NO_MEM;
     }
 
@@ -3129,16 +3404,17 @@ static esp_err_t spool_one_round(const char *spool_addr_json,
     *round_len = total;
 
     /* Check for multi-round continuation */
-    if (strcmp(coll.status, "SPOOL_COMPLETE_MORE_DATA_PENDING") == 0 &&
-        coll.next_addr_json[0]) {
+    if (strcmp(coll.status, "SPOOL_COMPLETE_MORE_DATA_PENDING") == 0 && coll.next_addr_json[0]) {
         strlcpy(next_addr_out, coll.next_addr_json, next_addr_max);
     }
 
     return ESP_OK;
 }
 
-static esp_err_t spool_pull_locked(const char *spool_type, const char *from_dt,
-                              uint8_t **out_data, size_t *out_len)
+static esp_err_t spool_pull_locked(const char *spool_type,
+                                   const char *from_dt,
+                                   uint8_t **out_data,
+                                   size_t *out_len)
 {
     if (!spool_type || !from_dt || !out_data || !out_len) {
         return ESP_ERR_INVALID_ARG;
@@ -3154,9 +3430,8 @@ static esp_err_t spool_pull_locked(const char *spool_type, const char *from_dt,
     /* Build initial spool address JSON:
      * {"<spool_type>":{"fromDateTime":"<from_dt>"}} */
     char addr_json[256];
-    snprintf(addr_json, sizeof(addr_json),
-             "{\"%s\":{\"fromDateTime\":\"%s\"}}",
-             spool_type, from_dt);
+    snprintf(
+        addr_json, sizeof(addr_json), "{\"%s\":{\"fromDateTime\":\"%s\"}}", spool_type, from_dt);
 
     /* Accumulate data across multiple rounds */
     uint8_t *all_data = NULL;
@@ -3171,8 +3446,8 @@ static esp_err_t spool_pull_locked(const char *spool_type, const char *from_dt,
         size_t round_len = 0;
         char next_addr[256] = {0};
 
-        esp_err_t ret = spool_one_round(addr_json, &round_data, &round_len,
-                                        next_addr, sizeof(next_addr));
+        esp_err_t ret =
+            spool_one_round(addr_json, &round_data, &round_len, next_addr, sizeof(next_addr));
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "spool_pull: round %d failed", round);
             free(all_data);
@@ -3184,8 +3459,7 @@ static esp_err_t spool_pull_locked(const char *spool_type, const char *from_dt,
             /* Append to accumulated data */
             uint8_t *new_data = realloc(all_data, all_len + round_len);
             if (!new_data) {
-                ESP_LOGE(TAG, "spool_pull: realloc %u failed",
-                         (unsigned)(all_len + round_len));
+                ESP_LOGE(TAG, "spool_pull: realloc %u failed", (unsigned)(all_len + round_len));
                 free(all_data);
                 free(round_data);
                 return ESP_ERR_NO_MEM;
@@ -3200,7 +3474,7 @@ static esp_err_t spool_pull_locked(const char *spool_type, const char *from_dt,
         if (next_addr[0]) {
             strlcpy(addr_json, next_addr, sizeof(addr_json));
         } else {
-            break;  /* SPOOL_COMPLETE — done */
+            break; /* SPOOL_COMPLETE — done */
         }
 
         if (round >= 10) {
@@ -3211,20 +3485,25 @@ static esp_err_t spool_pull_locked(const char *spool_type, const char *from_dt,
 
     *out_data = all_data;
     *out_len = all_len;
-    ESP_LOGI(TAG, "spool_pull: %s done, %u bytes in %d round(s)",
-             spool_type, (unsigned)all_len, round);
+    ESP_LOGI(
+        TAG, "spool_pull: %s done, %u bytes in %d round(s)", spool_type, (unsigned)all_len, round);
     return ESP_OK;
 }
 
-esp_err_t as11_ble_spool_pull(const char *spool_type, const char *from_dt,
-                            uint8_t **out_data, size_t *out_len)
+esp_err_t as11_ble_spool_pull(const char *spool_type,
+                              const char *from_dt,
+                              uint8_t **out_data,
+                              size_t *out_len)
 {
-    if (!out_data || !out_len) return ESP_ERR_INVALID_ARG;
-    *out_data = NULL; *out_len = 0;
+    if (!out_data || !out_len)
+        return ESP_ERR_INVALID_ARG;
+    *out_data = NULL;
+    *out_len = 0;
     if (!s_cmd_mtx || xSemaphoreTake(s_cmd_mtx, pdMS_TO_TICKS(10000)) != pdTRUE)
         return ESP_ERR_TIMEOUT;
-    esp_err_t result = __atomic_load_n(&s_spool_tainted, __ATOMIC_ACQUIRE) ? ESP_ERR_INVALID_STATE
-        : spool_pull_locked(spool_type, from_dt, out_data, out_len);
+    esp_err_t result = __atomic_load_n(&s_spool_tainted, __ATOMIC_ACQUIRE)
+                           ? ESP_ERR_INVALID_STATE
+                           : spool_pull_locked(spool_type, from_dt, out_data, out_len);
     clear_response();
     xSemaphoreGive(s_cmd_mtx);
     return result;
@@ -3232,7 +3511,8 @@ esp_err_t as11_ble_spool_pull(const char *spool_type, const char *from_dt,
 
 cJSON *as11_ble_get_values(const char *const *keys, int n_keys)
 {
-    if (!keys || n_keys <= 0) return NULL;
+    if (!keys || n_keys <= 0)
+        return NULL;
     if (!s_session_encrypted || strcmp(as11_ble_get_status(), AS11_STATUS_PAIRED) != 0) {
         ESP_LOGW(TAG, "get_values: encrypted session is not ready");
         return NULL;
@@ -3242,26 +3522,29 @@ cJSON *as11_ble_get_values(const char *const *keys, int n_keys)
     /* Worst case: each key is ~40 chars, plus quotes and comma */
     size_t buf_size = n_keys * 48 + 64;
     char *params = heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM);
-    if (!params) params = malloc(buf_size);
-    if (!params) return NULL;
+    if (!params)
+        params = malloc(buf_size);
+    if (!params)
+        return NULL;
 
     size_t pos = 0;
     pos += snprintf(params + pos, buf_size - pos, "[");
     for (int i = 0; i < n_keys; i++) {
-        if (i > 0) pos += snprintf(params + pos, buf_size - pos, ",");
+        if (i > 0)
+            pos += snprintf(params + pos, buf_size - pos, ",");
         pos += snprintf(params + pos, buf_size - pos, "\"%s\"", keys[i]);
     }
     pos += snprintf(params + pos, buf_size - pos, "]");
 
     /* Build full RPC */
     char rpc[512];
-    snprintf(rpc, sizeof(rpc),
+    snprintf(rpc,
+             sizeof(rpc),
              "{\"id\":40,\"jsonrpc\":\"1.0\",\"method\":\"Get\",\"params\":%s}",
              params);
     free(params);
 
-    if (!s_cmd_mtx ||
-        xSemaphoreTake(s_cmd_mtx, pdMS_TO_TICKS(10000)) != pdTRUE) {
+    if (!s_cmd_mtx || xSemaphoreTake(s_cmd_mtx, pdMS_TO_TICKS(10000)) != pdTRUE) {
         ESP_LOGW(TAG, "get_values: BLE command bus busy");
         return NULL;
     }
@@ -3284,7 +3567,8 @@ cJSON *as11_ble_get_values(const char *const *keys, int n_keys)
     if (err) {
         char *s = cJSON_Print(err);
         ESP_LOGW(TAG, "get_values: RPC error: %s", s ? s : "?");
-        if (s) free(s);
+        if (s)
+            free(s);
         cJSON_Delete(resp);
         xSemaphoreGive(s_cmd_mtx);
         return NULL;
@@ -3300,26 +3584,25 @@ cJSON *as11_ble_get_values(const char *const *keys, int n_keys)
     return result;
 }
 
-static esp_err_t therapy_command(const char *operation, const char *rpc,
-                                 bool *may_have_run)
+static esp_err_t therapy_command(const char *operation, const char *rpc, bool *may_have_run)
 {
-    if (may_have_run) *may_have_run = false;
+    if (may_have_run)
+        *may_have_run = false;
     if (!s_session_encrypted || strcmp(as11_ble_get_status(), AS11_STATUS_PAIRED) != 0) {
         ESP_LOGW(TAG, "%s: encrypted session is not ready", operation);
         return ESP_ERR_INVALID_STATE;
     }
 
-    if (!s_cmd_mtx ||
-        xSemaphoreTake(s_cmd_mtx, pdMS_TO_TICKS(10000)) != pdTRUE) {
+    if (!s_cmd_mtx || xSemaphoreTake(s_cmd_mtx, pdMS_TO_TICKS(10000)) != pdTRUE) {
         ESP_LOGW(TAG, "%s: BLE command bus busy", operation);
         return ESP_ERR_TIMEOUT;
     }
 
     clear_response();
     bool request_may_have_run = false;
-    esp_err_t send_result =
-        send_rpc_encrypted_tracked(rpc, &request_may_have_run);
-    if (may_have_run) *may_have_run = request_may_have_run;
+    esp_err_t send_result = send_rpc_encrypted_tracked(rpc, &request_may_have_run);
+    if (may_have_run)
+        *may_have_run = request_may_have_run;
     if (send_result != ESP_OK) {
         ESP_LOGW(TAG, "%s: send failed", operation);
         xSemaphoreGive(s_cmd_mtx);
@@ -3337,10 +3620,12 @@ static esp_err_t therapy_command(const char *operation, const char *rpc,
     if (err) {
         /* A received JSON-RPC error is a definitive rejection, not an
          * indeterminate post-send outcome. */
-        if (may_have_run) *may_have_run = false;
+        if (may_have_run)
+            *may_have_run = false;
         char *s = cJSON_Print(err);
         ESP_LOGW(TAG, "%s: RPC error: %s", operation, s ? s : "?");
-        if (s) free(s);
+        if (s)
+            free(s);
         cJSON_Delete(resp);
         xSemaphoreGive(s_cmd_mtx);
         return ESP_FAIL;
@@ -3355,18 +3640,16 @@ static esp_err_t therapy_command(const char *operation, const char *rpc,
 esp_err_t as11_ble_stop_therapy(void)
 {
     return therapy_command(
-        "stop_therapy",
-        "{\"id\":50,\"jsonrpc\":\"1.0\",\"method\":\"EnterStandby\"}",
-        NULL);
+        "stop_therapy", "{\"id\":50,\"jsonrpc\":\"1.0\",\"method\":\"EnterStandby\"}", NULL);
 }
 
 esp_err_t as11_ble_start_therapy_tracked(bool *may_have_started)
 {
-    if (!may_have_started) return ESP_ERR_INVALID_ARG;
-    return therapy_command(
-        "start_therapy",
-        "{\"id\":51,\"jsonrpc\":\"1.0\",\"method\":\"EnterTherapy\"}",
-        may_have_started);
+    if (!may_have_started)
+        return ESP_ERR_INVALID_ARG;
+    return therapy_command("start_therapy",
+                           "{\"id\":51,\"jsonrpc\":\"1.0\",\"method\":\"EnterTherapy\"}",
+                           may_have_started);
 }
 
 esp_err_t as11_ble_passthrough_rpc_tracked(const char *json_in,
@@ -3374,9 +3657,11 @@ esp_err_t as11_ble_passthrough_rpc_tracked(const char *json_in,
                                            uint32_t timeout_ms,
                                            bool *may_have_run)
 {
-    if (!may_have_run) return ESP_ERR_INVALID_ARG;
+    if (!may_have_run)
+        return ESP_ERR_INVALID_ARG;
     *may_have_run = false;
-    if (!json_in || !*json_in || !json_out) return ESP_ERR_INVALID_ARG;
+    if (!json_in || !*json_in || !json_out)
+        return ESP_ERR_INVALID_ARG;
     *json_out = NULL;
 
     if (!s_session_encrypted || strcmp(as11_ble_get_status(), AS11_STATUS_PAIRED) != 0) {
@@ -3390,8 +3675,7 @@ esp_err_t as11_ble_passthrough_rpc_tracked(const char *json_in,
     }
 
     clear_response();
-    esp_err_t send_result =
-        send_rpc_encrypted_tracked(json_in, may_have_run);
+    esp_err_t send_result = send_rpc_encrypted_tracked(json_in, may_have_run);
     if (send_result != ESP_OK) {
         ESP_LOGE(TAG, "passthrough_rpc: send_rpc_encrypted failed");
         xSemaphoreGive(s_cmd_mtx);

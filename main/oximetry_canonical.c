@@ -46,14 +46,14 @@
 
 static const char *TAG = "ox_canon";
 
-#define OX_ROOT       SD_OXYMETRY_DIR
-#define OX_DEVICES    OX_ROOT "/devices"
-#define OX_INBOX      OX_ROOT "/inbox"
-#define OX_STAGING    OX_ROOT "/staging"
+#define OX_ROOT SD_OXYMETRY_DIR
+#define OX_DEVICES OX_ROOT "/devices"
+#define OX_INBOX OX_ROOT "/inbox"
+#define OX_STAGING OX_ROOT "/staging"
 #define OX_RECORDINGS OX_ROOT "/recordings"
 #define OX_QUARANTINE OX_ROOT "/quarantine"
-#define OX_STATE      OX_ROOT "/state"
-#define OX_GEN        "generations"
+#define OX_STATE OX_ROOT "/state"
+#define OX_GEN "generations"
 
 #define OX_SOURCE_HEADER 10
 #define OX_SOURCE_TRAILER 48
@@ -61,7 +61,7 @@ static const char *TAG = "ox_canon";
 #define OX_SNT_HEADER_BYTES 64
 #define OX_MAX_CHANNELS 16
 
-#define OX_STATUS_SPO2_MISSING  (1u << 0)
+#define OX_STATUS_SPO2_MISSING (1u << 0)
 #define OX_STATUS_PULSE_MISSING (1u << 1)
 
 /* SNT v3 uses a fixed 64-byte header.  All multibyte fields are little-endian
@@ -93,17 +93,21 @@ static bool valid_recording_id(const char *id);
 
 static bool safe_component(const char *s, size_t max_len)
 {
-    if (!s || !s[0] || strlen(s) >= max_len) return false;
-    if (strcmp(s, ".") == 0 || strcmp(s, "..") == 0) return false;
+    if (!s || !s[0] || strlen(s) >= max_len)
+        return false;
+    if (strcmp(s, ".") == 0 || strcmp(s, "..") == 0)
+        return false;
     for (const unsigned char *p = (const unsigned char *)s; *p; p++) {
-        if (*p == '/' || *p == '\\' || *p < 0x20) return false;
+        if (*p == '/' || *p == '\\' || *p < 0x20)
+            return false;
     }
     return true;
 }
 
 static esp_err_t mkdir_one(const char *path)
 {
-    if (mkdir(path, 0775) == 0 || errno == EEXIST) return ESP_OK;
+    if (mkdir(path, 0775) == 0 || errno == EEXIST)
+        return ESP_OK;
     ESP_LOGW(TAG, "mkdir %s failed: %s", path, strerror(errno));
     return ESP_FAIL;
 }
@@ -111,31 +115,40 @@ static esp_err_t mkdir_one(const char *path)
 static esp_err_t ensure_path_tree(void)
 {
     const char *paths[] = {
-        OX_ROOT, OX_DEVICES, OX_INBOX, OX_STAGING, OX_RECORDINGS,
-        OX_QUARANTINE, OX_STATE,
+        OX_ROOT,
+        OX_DEVICES,
+        OX_INBOX,
+        OX_STAGING,
+        OX_RECORDINGS,
+        OX_QUARANTINE,
+        OX_STATE,
     };
     for (size_t i = 0; i < sizeof(paths) / sizeof(paths[0]); i++) {
-        if (mkdir_one(paths[i]) != ESP_OK) return ESP_FAIL;
+        if (mkdir_one(paths[i]) != ESP_OK)
+            return ESP_FAIL;
     }
     return ESP_OK;
 }
 
 esp_err_t oximetry_canonical_ensure_dirs(void)
 {
-    if (!sd_storage_is_ready()) return ESP_ERR_INVALID_STATE;
+    if (!sd_storage_is_ready())
+        return ESP_ERR_INVALID_STATE;
     return ensure_path_tree();
 }
 
 static esp_err_t write_json_atomic(const char *path, cJSON *json)
 {
-    if (!path || !json) return ESP_ERR_INVALID_ARG;
+    if (!path || !json)
+        return ESP_ERR_INVALID_ARG;
     char tmp[OXIMETRY_CANONICAL_MAX_PATH + 16];
     if (snprintf(tmp, sizeof(tmp), "%s.tmp", path) >= (int)sizeof(tmp))
         return ESP_ERR_INVALID_SIZE;
 
     char *text = cJSON_PrintUnformatted(json);
     if (!text || strlen(text) > OXIMETRY_CANONICAL_MAX_JSON_BYTES) {
-        if (text) cJSON_free(text);
+        if (text)
+            cJSON_free(text);
         return ESP_ERR_NO_MEM;
     }
 
@@ -146,8 +159,7 @@ static esp_err_t write_json_atomic(const char *path, cJSON *json)
         return ESP_FAIL;
     }
     size_t len = strlen(text);
-    bool ok = fwrite(text, 1, len, f) == len && fflush(f) == 0 &&
-              fsync(fileno(f)) == 0;
+    bool ok = fwrite(text, 1, len, f) == len && fflush(f) == 0 && fsync(fileno(f)) == 0;
     int close_rc = fclose(f);
     cJSON_free(text);
     if (!ok || close_rc != 0) {
@@ -175,9 +187,11 @@ static cJSON *read_json_file(const char *path)
         return NULL;
 
     FILE *f = fopen(path, "r");
-    if (!f) return NULL;
+    if (!f)
+        return NULL;
     char *buf = heap_caps_malloc((size_t)st.st_size + 1, MALLOC_CAP_SPIRAM);
-    if (!buf) buf = malloc((size_t)st.st_size + 1);
+    if (!buf)
+        buf = malloc((size_t)st.st_size + 1);
     if (!buf) {
         fclose(f);
         return NULL;
@@ -198,71 +212,80 @@ static const char *basename_safe(const char *path)
 
 static bool path_join2(char *out, size_t out_size, const char *a, const char *b)
 {
-    if (!out || !a || !b) return false;
+    if (!out || !a || !b)
+        return false;
     size_t alen = strlen(a), blen = strlen(b);
-    if (alen + 1 + blen + 1 > out_size) return false;
+    if (alen + 1 + blen + 1 > out_size)
+        return false;
     memcpy(out, a, alen);
     out[alen] = '/';
     memcpy(out + alen + 1, b, blen + 1);
     return true;
 }
 
-static bool path_join3(char *out, size_t out_size, const char *a,
-                       const char *b, const char *c)
+static bool path_join3(char *out, size_t out_size, const char *a, const char *b, const char *c)
 {
     char tmp[OXIMETRY_CANONICAL_MAX_PATH];
-    return path_join2(tmp, sizeof(tmp), a, b) &&
-           path_join2(out, out_size, tmp, c);
+    return path_join2(tmp, sizeof(tmp), a, b) && path_join2(out, out_size, tmp, c);
 }
 
-static bool path_join4(char *out, size_t out_size, const char *a,
-                       const char *b, const char *c, const char *d)
+static bool path_join4(
+    char *out, size_t out_size, const char *a, const char *b, const char *c, const char *d)
 {
     char tmp[OXIMETRY_CANONICAL_MAX_PATH];
-    return path_join3(tmp, sizeof(tmp), a, b, c) &&
-           path_join2(out, out_size, tmp, d);
+    return path_join3(tmp, sizeof(tmp), a, b, c) && path_join2(out, out_size, tmp, d);
 }
 
 static bool day_for_epoch(int64_t epoch_ms, char out[9])
 {
-    if (!out) return false;
+    if (!out)
+        return false;
     as11_time_noon_day(epoch_ms, out, 9);
     return strlen(out) == 8;
 }
 
 static int64_t civil_epoch_ms(int year, int mon, int day, int hour, int min, int sec)
 {
-    if (year < 2015 || year > 2099 || mon < 1 || mon > 12 || day < 1 || day > 31 ||
-        hour < 0 || hour > 23 || min < 0 || min > 59 || sec < 0 || sec > 59)
+    if (year < 2015 || year > 2099 || mon < 1 || mon > 12 || day < 1 || day > 31 || hour < 0 ||
+        hour > 23 || min < 0 || min > 59 || sec < 0 || sec > 59)
         return 0;
     struct tm tm = {0};
-    tm.tm_year = year - 1900; tm.tm_mon = mon - 1; tm.tm_mday = day;
-    tm.tm_hour = hour; tm.tm_min = min; tm.tm_sec = sec; tm.tm_isdst = -1;
+    tm.tm_year = year - 1900;
+    tm.tm_mon = mon - 1;
+    tm.tm_mday = day;
+    tm.tm_hour = hour;
+    tm.tm_min = min;
+    tm.tm_sec = sec;
+    tm.tm_isdst = -1;
     time_t t = mktime(&tm);
-    if (t == (time_t)-1) return 0;
+    if (t == (time_t)-1)
+        return 0;
     struct tm check;
     if (!localtime_r(&t, &check) || check.tm_year != tm.tm_year || check.tm_mon != tm.tm_mon ||
-        check.tm_mday != tm.tm_mday || check.tm_hour != tm.tm_hour ||
-        check.tm_min != tm.tm_min || check.tm_sec != tm.tm_sec)
+        check.tm_mday != tm.tm_mday || check.tm_hour != tm.tm_hour || check.tm_min != tm.tm_min ||
+        check.tm_sec != tm.tm_sec)
         return 0;
     return (int64_t)t * 1000;
 }
 
 static int64_t filename_epoch_ms(const char *name)
 {
-    if (!name || strlen(name) < 14) return 0;
-    for (int i = 0; i < 14; i++) if (name[i] < '0' || name[i] > '9') return 0;
+    if (!name || strlen(name) < 14)
+        return 0;
+    for (int i = 0; i < 14; i++)
+        if (name[i] < '0' || name[i] > '9')
+            return 0;
     int year, mon, day, hour, min, sec;
-    if (sscanf(name, "%4d%2d%2d%2d%2d%2d", &year, &mon, &day,
-               &hour, &min, &sec) != 6) return 0;
+    if (sscanf(name, "%4d%2d%2d%2d%2d%2d", &year, &mon, &day, &hour, &min, &sec) != 6)
+        return 0;
     return civil_epoch_ms(year, mon, day, hour, min, sec);
 }
 
-static bool copy_file_crc(const char *src, const char *dst, uint32_t *out_crc,
-                          uint64_t *out_size)
+static bool copy_file_crc(const char *src, const char *dst, uint32_t *out_crc, uint64_t *out_size)
 {
     FILE *in = fopen(src, "rb");
-    if (!in) return false;
+    if (!in)
+        return false;
     FILE *out = fopen(dst, "wb");
     if (!out) {
         fclose(in);
@@ -272,8 +295,13 @@ static bool copy_file_crc(const char *src, const char *dst, uint32_t *out_crc,
     /* Heap-allocate the I/O buffer to avoid 4 KB of stack usage on the
      * PSRAM-backed migration task. */
     uint8_t *buf = heap_caps_malloc(4096, MALLOC_CAP_SPIRAM);
-    if (!buf) buf = malloc(4096);
-    if (!buf) { fclose(in); fclose(out); return false; }
+    if (!buf)
+        buf = malloc(4096);
+    if (!buf) {
+        fclose(in);
+        fclose(out);
+        return false;
+    }
 
     uint32_t crc = 0;
     uint64_t total = 0;
@@ -289,52 +317,72 @@ static bool copy_file_crc(const char *src, const char *dst, uint32_t *out_crc,
             total += n;
         }
         if (n < 4096) {
-            if (ferror(in)) ok = false;
+            if (ferror(in))
+                ok = false;
             break;
         }
     }
-    if (ok && (fflush(out) != 0 || fsync(fileno(out)) != 0)) ok = false;
+    if (ok && (fflush(out) != 0 || fsync(fileno(out)) != 0))
+        ok = false;
     fclose(in);
-    if (fclose(out) != 0) ok = false;
-    if (!ok) unlink(dst);
+    if (fclose(out) != 0)
+        ok = false;
+    if (!ok)
+        unlink(dst);
     free(buf);
-    if (out_crc) *out_crc = crc;
-    if (out_size) *out_size = total;
+    if (out_crc)
+        *out_crc = crc;
+    if (out_size)
+        *out_size = total;
     return ok;
 }
 
 static bool file_crc_size(const char *path, uint32_t *out_crc, uint64_t *out_size)
 {
-    FILE *f = fopen(path, "rb"); if (!f) return false;
+    FILE *f = fopen(path, "rb");
+    if (!f)
+        return false;
     uint8_t *buf = heap_caps_malloc(4096, MALLOC_CAP_SPIRAM);
-    if (!buf) buf = malloc(4096);
-    if (!buf) { fclose(f); return false; }
-    uint32_t crc = 0; uint64_t total = 0; size_t n;
-    while ((n = fread(buf, 1, 4096, f)) > 0) {
-        crc = esp_rom_crc32_le(crc, buf, n); total += n;
+    if (!buf)
+        buf = malloc(4096);
+    if (!buf) {
+        fclose(f);
+        return false;
     }
-    bool ok = !ferror(f); fclose(f);
+    uint32_t crc = 0;
+    uint64_t total = 0;
+    size_t n;
+    while ((n = fread(buf, 1, 4096, f)) > 0) {
+        crc = esp_rom_crc32_le(crc, buf, n);
+        total += n;
+    }
+    bool ok = !ferror(f);
+    fclose(f);
     free(buf);
-    if (out_crc) *out_crc = crc;
-    if (out_size) *out_size = total;
+    if (out_crc)
+        *out_crc = crc;
+    if (out_size)
+        *out_size = total;
     return ok;
 }
 
-static bool write_snt3_format_a(const char *src, const char *dst,
-                                int64_t start_ms, uint32_t *out_count,
-                                uint32_t *out_crc)
+static bool write_snt3_format_a(
+    const char *src, const char *dst, int64_t start_ms, uint32_t *out_count, uint32_t *out_crc)
 {
     struct stat st;
     if (stat(src, &st) != 0 || st.st_size < OX_SOURCE_HEADER + OX_SOURCE_TRAILER)
         return false;
     uint64_t body = (uint64_t)st.st_size - OX_SOURCE_HEADER - OX_SOURCE_TRAILER;
-    if (body == 0 || body % 3 != 0 || body / 3 > UINT32_MAX) return false;
+    if (body == 0 || body % 3 != 0 || body / 3 > UINT32_MAX)
+        return false;
 
     FILE *in = fopen(src, "rb");
     FILE *out = fopen(dst, "wb");
     if (!in || !out) {
-        if (in) fclose(in);
-        if (out) fclose(out);
+        if (in)
+            fclose(in);
+        if (out)
+            fclose(out);
         return false;
     }
 
@@ -352,46 +400,51 @@ static bool write_snt3_format_a(const char *src, const char *dst,
     hdr.start_epoch_ms = start_ms;
     hdr.sample_count = (uint32_t)(body / 3);
     hdr.data_bytes = hdr.sample_count * hdr.n_channels * hdr.sample_bytes;
-    if (fwrite(&hdr, 1, sizeof(hdr), out) != sizeof(hdr)) goto fail;
+    if (fwrite(&hdr, 1, sizeof(hdr), out) != sizeof(hdr))
+        goto fail;
 
-    if (fseek(in, OX_SOURCE_HEADER, SEEK_SET) != 0) goto fail;
+    if (fseek(in, OX_SOURCE_HEADER, SEEK_SET) != 0)
+        goto fail;
     uint32_t crc = 0;
     for (uint32_t i = 0; i < hdr.sample_count; i++) {
         uint8_t raw[3];
         int16_t rec[OXIMETRY_CANONICAL_VITALS_CHANNELS];
-        if (fread(raw, 1, sizeof(raw), in) != sizeof(raw)) goto fail;
+        if (fread(raw, 1, sizeof(raw), in) != sizeof(raw))
+            goto fail;
         bool spo2_missing = raw[0] == 0 || raw[0] == 0xff;
         bool pulse_missing = raw[1] == 0 || raw[1] == 0xff;
-        rec[OXIMETRY_CANONICAL_VITALS_SPO2] = spo2_missing
-            ? OXIMETRY_CANONICAL_SNT_MISSING : (int16_t)raw[0] * 100;
-        rec[OXIMETRY_CANONICAL_VITALS_PULSE] = pulse_missing
-            ? OXIMETRY_CANONICAL_SNT_MISSING : (int16_t)raw[1] * 100;
+        rec[OXIMETRY_CANONICAL_VITALS_SPO2] =
+            spo2_missing ? OXIMETRY_CANONICAL_SNT_MISSING : (int16_t)raw[0] * 100;
+        rec[OXIMETRY_CANONICAL_VITALS_PULSE] =
+            pulse_missing ? OXIMETRY_CANONICAL_SNT_MISSING : (int16_t)raw[1] * 100;
         rec[OXIMETRY_CANONICAL_VITALS_MOTION_FLAGS] = raw[2];
         uint16_t status = (spo2_missing ? OX_STATUS_SPO2_MISSING : 0) |
                           (pulse_missing ? OX_STATUS_PULSE_MISSING : 0);
         rec[OXIMETRY_CANONICAL_VITALS_STATUS] = (int16_t)status;
         rec[OXIMETRY_CANONICAL_VITALS_SOURCE_STATUS] = (int16_t)raw[2];
-        if (fwrite(rec, sizeof(rec), 1, out) != 1) goto fail;
+        if (fwrite(rec, sizeof(rec), 1, out) != 1)
+            goto fail;
         crc = esp_rom_crc32_le(crc, (const uint8_t *)rec, sizeof(rec));
     }
 
-    if (fseek(in, st.st_size - OX_SOURCE_TRAILER + OX_TRAILER_MAGIC_OFFSET,
-              SEEK_SET) != 0) goto fail;
+    if (fseek(in, st.st_size - OX_SOURCE_TRAILER + OX_TRAILER_MAGIC_OFFSET, SEEK_SET) != 0)
+        goto fail;
     uint8_t magic[4];
-    if (fread(magic, 1, sizeof(magic), in) != sizeof(magic) ||
-        magic[0] != 0x48 || magic[1] != 0x12 || magic[2] != 0x5a ||
-        magic[3] != 0xda)
+    if (fread(magic, 1, sizeof(magic), in) != sizeof(magic) || magic[0] != 0x48 ||
+        magic[1] != 0x12 || magic[2] != 0x5a || magic[3] != 0xda)
         goto fail;
 
     hdr.data_crc32 = crc;
-    if (fseek(out, 0, SEEK_SET) != 0 ||
-        fwrite(&hdr, 1, sizeof(hdr), out) != sizeof(hdr) ||
+    if (fseek(out, 0, SEEK_SET) != 0 || fwrite(&hdr, 1, sizeof(hdr), out) != sizeof(hdr) ||
         fflush(out) != 0 || fsync(fileno(out)) != 0)
         goto fail;
     fclose(in);
-    if (fclose(out) != 0) return false;
-    if (out_count) *out_count = hdr.sample_count;
-    if (out_crc) *out_crc = crc;
+    if (fclose(out) != 0)
+        return false;
+    if (out_count)
+        *out_count = hdr.sample_count;
+    if (out_crc)
+        *out_crc = crc;
     return true;
 
 fail:
@@ -407,26 +460,26 @@ static bool source_complete_format_a(const char *path)
     if (stat(path, &st) != 0 || st.st_size < OX_SOURCE_HEADER + OX_SOURCE_TRAILER)
         return false;
     uint64_t body = (uint64_t)st.st_size - OX_SOURCE_HEADER - OX_SOURCE_TRAILER;
-    if (body == 0 || body % 3 != 0) return false;
+    if (body == 0 || body % 3 != 0)
+        return false;
     FILE *f = fopen(path, "rb");
-    if (!f) return false;
-    static const uint8_t format_a_header[OX_SOURCE_HEADER] =
-        { 0x01, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00 };
+    if (!f)
+        return false;
+    static const uint8_t format_a_header[OX_SOURCE_HEADER] = {
+        0x01, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00};
     uint8_t header[OX_SOURCE_HEADER];
     if (fread(header, 1, sizeof(header), f) != sizeof(header) ||
         memcmp(header, format_a_header, sizeof(header)) != 0) {
         fclose(f);
         return false;
     }
-    if (fseek(f, st.st_size - OX_SOURCE_TRAILER + OX_TRAILER_MAGIC_OFFSET,
-              SEEK_SET) != 0) {
+    if (fseek(f, st.st_size - OX_SOURCE_TRAILER + OX_TRAILER_MAGIC_OFFSET, SEEK_SET) != 0) {
         fclose(f);
         return false;
     }
     uint8_t magic[4];
-    bool ok = fread(magic, 1, sizeof(magic), f) == sizeof(magic) &&
-              magic[0] == 0x48 && magic[1] == 0x12 && magic[2] == 0x5a &&
-              magic[3] == 0xda;
+    bool ok = fread(magic, 1, sizeof(magic), f) == sizeof(magic) && magic[0] == 0x48 &&
+              magic[1] == 0x12 && magic[2] == 0x5a && magic[3] == 0xda;
     fclose(f);
     return ok;
 }
@@ -471,7 +524,8 @@ static bool read_vld3_header(const char *path, ox_vld3_header_t *out)
     if (!path || !out || stat(path, &st) != 0 || st.st_size <= 0)
         return false;
     FILE *f = fopen(path, "rb");
-    if (!f) return false;
+    if (!f)
+        return false;
     uint8_t bytes[VLD3_HEADER_LEN];
     bool read_ok = fread(bytes, 1, sizeof(bytes), f) == sizeof(bytes);
     fclose(f);
@@ -485,19 +539,23 @@ static bool source_complete_vld3(const char *path)
 }
 
 static bool select_vld3_time(const ox_vld3_header_t *header,
-                             const char *recording_id, vld3_time_t *out)
+                             const char *recording_id,
+                             vld3_time_t *out)
 {
-    if (!header || !out) return false;
+    if (!header || !out)
+        return false;
     memset(out, 0, sizeof(*out));
     if (header->datetime_valid) {
-        out->header_ms = civil_epoch_ms(header->year, header->month, header->day,
-                                        header->hour, header->minute, header->second);
+        out->header_ms = civil_epoch_ms(
+            header->year, header->month, header->day, header->hour, header->minute, header->second);
     }
     out->filename_ms = filename_epoch_ms(recording_id);
     if (time_is_usable()) {
         int64_t latest = (int64_t)time(NULL) * 1000 + 24LL * 60 * 60 * 1000;
-        if (out->header_ms > latest) out->header_ms = 0;
-        if (out->filename_ms > latest) out->filename_ms = 0;
+        if (out->header_ms > latest)
+            out->header_ms = 0;
+        if (out->filename_ms > latest)
+            out->filename_ms = 0;
     }
     if (out->header_ms && out->filename_ms) {
         out->difference_ms = out->filename_ms - out->header_ms;
@@ -532,23 +590,30 @@ static bool select_vld3_time(const ox_vld3_header_t *header,
  *   byte 3: Maximum acceleration over the sample interval
  *   byte 4: Reserved source status
  * Returns true on success. */
-static bool write_snt3_vld3(const char *src, const char *dst,
-                             int64_t start_ms, uint32_t period_us,
-                             uint32_t *out_count, uint32_t *out_crc)
+static bool write_snt3_vld3(const char *src,
+                            const char *dst,
+                            int64_t start_ms,
+                            uint32_t period_us,
+                            uint32_t *out_count,
+                            uint32_t *out_crc)
 {
     struct stat st;
     if (stat(src, &st) != 0 || st.st_size < VLD3_HEADER_LEN + VLD3_RECORD_LEN)
         return false;
     long body_len = st.st_size - VLD3_HEADER_LEN;
-    if (body_len % VLD3_RECORD_LEN != 0) return false;
+    if (body_len % VLD3_RECORD_LEN != 0)
+        return false;
     uint32_t sample_count = body_len / VLD3_RECORD_LEN;
-    if (sample_count == 0 || sample_count > UINT32_MAX) return false;
+    if (sample_count == 0 || sample_count > UINT32_MAX)
+        return false;
 
     FILE *in = fopen(src, "rb");
     FILE *out = fopen(dst, "wb");
     if (!in || !out) {
-        if (in) fclose(in);
-        if (out) fclose(out);
+        if (in)
+            fclose(in);
+        if (out)
+            fclose(out);
         return false;
     }
 
@@ -566,40 +631,45 @@ static bool write_snt3_vld3(const char *src, const char *dst,
     hdr.start_epoch_ms = start_ms;
     hdr.sample_count = sample_count;
     hdr.data_bytes = sample_count * hdr.n_channels * hdr.sample_bytes;
-    if (fwrite(&hdr, 1, sizeof(hdr), out) != sizeof(hdr)) goto fail;
+    if (fwrite(&hdr, 1, sizeof(hdr), out) != sizeof(hdr))
+        goto fail;
 
-    if (fseek(in, VLD3_HEADER_LEN, SEEK_SET) != 0) goto fail;
+    if (fseek(in, VLD3_HEADER_LEN, SEEK_SET) != 0)
+        goto fail;
     uint32_t crc = 0;
     for (uint32_t i = 0; i < sample_count; i++) {
         uint8_t raw[VLD3_RECORD_LEN];
         ox_vld3_record_t sample;
         int16_t rec[OXIMETRY_CANONICAL_VITALS_CHANNELS];
-        if (fread(raw, 1, sizeof(raw), in) != sizeof(raw) ||
-            !ox_vld3_parse_record(raw, &sample)) goto fail;
+        if (fread(raw, 1, sizeof(raw), in) != sizeof(raw) || !ox_vld3_parse_record(raw, &sample))
+            goto fail;
         bool spo2_missing = sample.spo2 == 0 || sample.spo2 > 100;
         bool pulse_missing = sample.pulse == 0 || sample.pulse > 300;
-        rec[OXIMETRY_CANONICAL_VITALS_SPO2] = spo2_missing
-            ? OXIMETRY_CANONICAL_SNT_MISSING : (int16_t)sample.spo2 * 100;
-        rec[OXIMETRY_CANONICAL_VITALS_PULSE] = pulse_missing
-            ? OXIMETRY_CANONICAL_SNT_MISSING : (int16_t)sample.pulse * 100;
+        rec[OXIMETRY_CANONICAL_VITALS_SPO2] =
+            spo2_missing ? OXIMETRY_CANONICAL_SNT_MISSING : (int16_t)sample.spo2 * 100;
+        rec[OXIMETRY_CANONICAL_VITALS_PULSE] =
+            pulse_missing ? OXIMETRY_CANONICAL_SNT_MISSING : (int16_t)sample.pulse * 100;
         rec[OXIMETRY_CANONICAL_VITALS_MOTION_FLAGS] = sample.acceleration;
         uint16_t status = (spo2_missing ? OX_STATUS_SPO2_MISSING : 0) |
                           (pulse_missing ? OX_STATUS_PULSE_MISSING : 0);
         rec[OXIMETRY_CANONICAL_VITALS_STATUS] = (int16_t)status;
         rec[OXIMETRY_CANONICAL_VITALS_SOURCE_STATUS] = sample.reserved;
-        if (fwrite(rec, sizeof(rec), 1, out) != 1) goto fail;
+        if (fwrite(rec, sizeof(rec), 1, out) != 1)
+            goto fail;
         crc = esp_rom_crc32_le(crc, (const uint8_t *)rec, sizeof(rec));
     }
 
     hdr.data_crc32 = crc;
-    if (fseek(out, 0, SEEK_SET) != 0 ||
-        fwrite(&hdr, 1, sizeof(hdr), out) != sizeof(hdr) ||
+    if (fseek(out, 0, SEEK_SET) != 0 || fwrite(&hdr, 1, sizeof(hdr), out) != sizeof(hdr) ||
         fflush(out) != 0 || fsync(fileno(out)) != 0)
         goto fail;
     fclose(in);
-    if (fclose(out) != 0) return false;
-    if (out_count) *out_count = sample_count;
-    if (out_crc) *out_crc = crc;
+    if (fclose(out) != 0)
+        return false;
+    if (out_count)
+        *out_count = sample_count;
+    if (out_crc)
+        *out_crc = crc;
     return true;
 
 fail:
@@ -610,21 +680,22 @@ fail:
 }
 
 static esp_err_t build_generation_manifest_vld3(const char *path,
-                                                  const char *device_id,
-                                                  const char *recording_id,
-                                                  const char *source_name,
-                                                  int64_t start_ms,
-                                                  int64_t end_ms,
-                                                  uint32_t source_size,
-                                                  uint32_t source_crc,
-                                                  uint32_t sample_count,
-                                                  uint32_t data_crc,
-                                                  uint32_t period_us,
-                                                  const vld3_time_t *time_meta,
-                                                  const ox_vld3_header_t *source_header)
+                                                const char *device_id,
+                                                const char *recording_id,
+                                                const char *source_name,
+                                                int64_t start_ms,
+                                                int64_t end_ms,
+                                                uint32_t source_size,
+                                                uint32_t source_crc,
+                                                uint32_t sample_count,
+                                                uint32_t data_crc,
+                                                uint32_t period_us,
+                                                const vld3_time_t *time_meta,
+                                                const ox_vld3_header_t *source_header)
 {
     cJSON *root = cJSON_CreateObject();
-    if (!root) return ESP_ERR_NO_MEM;
+    if (!root)
+        return ESP_ERR_NO_MEM;
     cJSON_AddStringToObject(root, "schema", "somnotrace.oximetry.generation/1");
     cJSON_AddStringToObject(root, "recording_id", recording_id);
     cJSON_AddNumberToObject(root, "generation", 1);
@@ -671,7 +742,8 @@ static esp_err_t build_generation_manifest_vld3(const char *path,
     if (time_meta->filename_ms)
         cJSON_AddNumberToObject(time, "filename_epoch_ms", (double)time_meta->filename_ms);
     if (time_meta->difference_ms)
-        cJSON_AddNumberToObject(time, "header_filename_difference_ms", (double)time_meta->difference_ms);
+        cJSON_AddNumberToObject(
+            time, "header_filename_difference_ms", (double)time_meta->difference_ms);
     if (time_meta->warning)
         cJSON_AddStringToObject(time, "warning", time_meta->warning);
 
@@ -685,8 +757,8 @@ static esp_err_t build_generation_manifest_vld3(const char *path,
     cJSON_AddNumberToObject(track, "sample_count", sample_count);
     cJSON_AddNumberToObject(track, "data_crc32", data_crc);
     cJSON *channels = cJSON_AddArrayToObject(track, "channels");
-    const char *semantics[] = { "spo2", "pulse_rate", "motion", "sample_status", "source_status" };
-    const char *units[] = { "%", "bpm", "source_index", "bitset", "bitset" };
+    const char *semantics[] = {"spo2", "pulse_rate", "motion", "sample_status", "source_status"};
+    const char *units[] = {"%", "bpm", "source_index", "bitset", "bitset"};
     for (size_t i = 0; i < 5; i++) {
         cJSON *ch = cJSON_CreateObject();
         cJSON_AddStringToObject(ch, "semantic", semantics[i]);
@@ -701,7 +773,8 @@ static esp_err_t build_generation_manifest_vld3(const char *path,
     cJSON_AddBoolToObject(integrity, "verified", source_header->declared_size_matches);
     cJSON_AddStringToObject(integrity, "source_validator", "wellue_vld3_vendor_layout");
     cJSON_AddBoolToObject(integrity, "declared_size_matches", source_header->declared_size_matches);
-    cJSON_AddBoolToObject(integrity, "uploadable", time_meta->uploadable && source_header->declared_size_matches);
+    cJSON_AddBoolToObject(
+        integrity, "uploadable", time_meta->uploadable && source_header->declared_size_matches);
 
     esp_err_t e = write_json_atomic(path, root);
     cJSON_Delete(root);
@@ -709,8 +782,8 @@ static esp_err_t build_generation_manifest_vld3(const char *path,
 }
 
 esp_err_t oximetry_canonical_convert_vld3(const char *device_id,
-                                           const char *recording_id,
-                                           const char *source_path)
+                                          const char *recording_id,
+                                          const char *source_path)
 {
     if (!sd_storage_is_ready() || !safe_component(device_id, OXIMETRY_CANONICAL_MAX_COMPONENT) ||
         !valid_recording_id(recording_id) || !source_path)
@@ -720,7 +793,8 @@ esp_err_t oximetry_canonical_convert_vld3(const char *device_id,
         ESP_LOGW(TAG, "vld3 convert: invalid vendor-format header for '%s'", recording_id);
         return ESP_ERR_INVALID_ARG;
     }
-    if (oximetry_canonical_ensure_dirs() != ESP_OK) return ESP_FAIL;
+    if (oximetry_canonical_ensure_dirs() != ESP_OK)
+        return ESP_FAIL;
 
     vld3_time_t time_meta;
     if (!select_vld3_time(&source_header, recording_id, &time_meta)) {
@@ -730,14 +804,18 @@ esp_err_t oximetry_canonical_convert_vld3(const char *device_id,
     int64_t start_ms = time_meta.selected_ms;
     uint32_t period_us = source_header.period_us;
     if (time_meta.warning)
-        ESP_LOGW(TAG, "vld3 convert: %s for '%s' (header=%lld filename=%lld)",
-                 time_meta.warning, recording_id, (long long)time_meta.header_ms,
+        ESP_LOGW(TAG,
+                 "vld3 convert: %s for '%s' (header=%lld filename=%lld)",
+                 time_meta.warning,
+                 recording_id,
+                 (long long)time_meta.header_ms,
                  (long long)time_meta.filename_ms);
     if (!source_header.declared_size_matches)
         ESP_LOGW(TAG, "vld3 convert: declared source size differs for '%s'", recording_id);
 
     char day[9];
-    if (!day_for_epoch(start_ms, day)) return ESP_ERR_INVALID_ARG;
+    if (!day_for_epoch(start_ms, day))
+        return ESP_ERR_INVALID_ARG;
 
     struct stat st;
     if (stat(source_path, &st) != 0 || st.st_size > OXIMETRY_CANONICAL_MAX_SOURCE_BYTES)
@@ -746,8 +824,10 @@ esp_err_t oximetry_canonical_convert_vld3(const char *device_id,
     int64_t end_ms = start_ms + (int64_t)(count - 1) * (int64_t)(period_us / 1000);
 
     convert_ctx_t *p = heap_caps_malloc(sizeof(*p), MALLOC_CAP_SPIRAM);
-    if (!p) p = malloc(sizeof(*p));
-    if (!p) return ESP_ERR_NO_MEM;
+    if (!p)
+        p = malloc(sizeof(*p));
+    if (!p)
+        return ESP_ERR_NO_MEM;
 
     esp_err_t ret = ESP_FAIL;
 
@@ -775,9 +855,13 @@ esp_err_t oximetry_canonical_convert_vld3(const char *device_id,
         !path_join3(p->stage_gen_dir, sizeof(p->stage_gen_dir), p->stage_dir, OX_GEN, "1") ||
         !path_join2(p->stage_data_dir, sizeof(p->stage_data_dir), p->stage_gen_dir, "data") ||
         !path_join2(p->stage_source, sizeof(p->stage_source), p->stage_source_dir, "source.vld") ||
-        !path_join2(p->stage_track_tmp, sizeof(p->stage_track_tmp), p->stage_data_dir, "vitals.snt.tmp") ||
+        !path_join2(
+            p->stage_track_tmp, sizeof(p->stage_track_tmp), p->stage_data_dir, "vitals.snt.tmp") ||
         !path_join2(p->stage_track, sizeof(p->stage_track), p->stage_data_dir, "vitals.snt") ||
-        !path_join2(p->stage_gen_manifest, sizeof(p->stage_gen_manifest), p->stage_gen_dir, "manifest.json")) {
+        !path_join2(p->stage_gen_manifest,
+                    sizeof(p->stage_gen_manifest),
+                    p->stage_gen_dir,
+                    "manifest.json")) {
         free(p);
         return ESP_ERR_INVALID_SIZE;
     }
@@ -798,7 +882,10 @@ esp_err_t oximetry_canonical_convert_vld3(const char *device_id,
         return ESP_ERR_INVALID_SIZE;
     }
     cJSON *pending = cJSON_CreateObject();
-    if (!pending) { free(p); return ESP_ERR_NO_MEM; }
+    if (!pending) {
+        free(p);
+        return ESP_ERR_NO_MEM;
+    }
     cJSON_AddStringToObject(pending, "schema", "somnotrace.oximetry.recording/1");
     cJSON_AddStringToObject(pending, "recording_id", recording_id);
     cJSON_AddNumberToObject(pending, "active_generation", 1);
@@ -808,7 +895,10 @@ esp_err_t oximetry_canonical_convert_vld3(const char *device_id,
     cJSON_AddNumberToObject(pending, "start_epoch_ms", (double)start_ms);
     esp_err_t pending_err = write_json_atomic(p->stage_pointer, pending);
     cJSON_Delete(pending);
-    if (pending_err != ESP_OK) { free(p); return pending_err; }
+    if (pending_err != ESP_OK) {
+        free(p);
+        return pending_err;
+    }
 
     uint32_t source_crc = 0;
     uint32_t track_crc = 0;
@@ -819,12 +909,22 @@ esp_err_t oximetry_canonical_convert_vld3(const char *device_id,
     else
         source_ok = copy_file_crc(source_path, p->stage_source, &source_crc, &source_size);
     if (!source_ok || source_size != (uint64_t)st.st_size ||
-        !write_snt3_vld3(source_path, p->stage_track_tmp, start_ms, period_us, &count, &track_crc) ||
+        !write_snt3_vld3(
+            source_path, p->stage_track_tmp, start_ms, period_us, &count, &track_crc) ||
         (unlink(p->stage_track), rename(p->stage_track_tmp, p->stage_track) != 0) ||
-        build_generation_manifest_vld3(p->stage_gen_manifest, device_id, recording_id,
-                                       basename_safe(source_path), start_ms, end_ms,
-                                       (uint32_t)source_size, source_crc, count, track_crc,
-                                       period_us, &time_meta, &source_header) != ESP_OK) {
+        build_generation_manifest_vld3(p->stage_gen_manifest,
+                                       device_id,
+                                       recording_id,
+                                       basename_safe(source_path),
+                                       start_ms,
+                                       end_ms,
+                                       (uint32_t)source_size,
+                                       source_crc,
+                                       count,
+                                       track_crc,
+                                       period_us,
+                                       &time_meta,
+                                       &source_header) != ESP_OK) {
         ESP_LOGW(TAG, "convert_vld3 %s: conversion step failed", recording_id);
         unlink(p->stage_track_tmp);
         free(p);
@@ -832,7 +932,10 @@ esp_err_t oximetry_canonical_convert_vld3(const char *device_id,
     }
 
     cJSON *pointer = cJSON_CreateObject();
-    if (!pointer) { free(p); return ESP_ERR_NO_MEM; }
+    if (!pointer) {
+        free(p);
+        return ESP_ERR_NO_MEM;
+    }
     cJSON_AddStringToObject(pointer, "schema", "somnotrace.oximetry.recording/1");
     cJSON_AddStringToObject(pointer, "recording_id", recording_id);
     cJSON_AddNumberToObject(pointer, "active_generation", 1);
@@ -844,20 +947,26 @@ esp_err_t oximetry_canonical_convert_vld3(const char *device_id,
     cJSON_AddNumberToObject(pointer, "end_epoch_ms", (double)end_ms);
     cJSON_AddStringToObject(pointer, "time_source", time_meta.source);
     cJSON_AddStringToObject(pointer, "time_confidence", time_meta.confidence);
-    cJSON_AddBoolToObject(pointer, "uploadable",
-                          time_meta.uploadable && source_header.declared_size_matches);
+    cJSON_AddBoolToObject(
+        pointer, "uploadable", time_meta.uploadable && source_header.declared_size_matches);
     if (time_meta.warning)
         cJSON_AddStringToObject(pointer, "warning", time_meta.warning);
     else if (!source_header.declared_size_matches)
         cJSON_AddStringToObject(pointer, "warning", "declared_size_mismatch");
     esp_err_t pe = write_json_atomic(p->stage_pointer, pointer);
     cJSON_Delete(pointer);
-    if (pe != ESP_OK) { free(p); return pe; }
+    if (pe != ESP_OK) {
+        free(p);
+        return pe;
+    }
 
     char replaced_path[OXIMETRY_CANONICAL_MAX_PATH] = {0};
     if (replace_existing) {
-        if (snprintf(replaced_path, sizeof(replaced_path), "%s/%s-decoder-v1",
-                     OX_QUARANTINE, recording_id) >= (int)sizeof(replaced_path) ||
+        if (snprintf(replaced_path,
+                     sizeof(replaced_path),
+                     "%s/%s-decoder-v1",
+                     OX_QUARANTINE,
+                     recording_id) >= (int)sizeof(replaced_path) ||
             rename(p->final_dir, replaced_path) != 0) {
             ESP_LOGW(TAG, "preserve old recording %s failed: %s", p->final_dir, strerror(errno));
             free(p);
@@ -866,7 +975,8 @@ esp_err_t oximetry_canonical_convert_vld3(const char *device_id,
     }
     if (rename(p->stage_dir, p->final_dir) != 0) {
         ESP_LOGW(TAG, "publish %s -> %s failed: %s", p->stage_dir, p->final_dir, strerror(errno));
-        if (replaced_path[0]) rename(replaced_path, p->final_dir);
+        if (replaced_path[0])
+            rename(replaced_path, p->final_dir);
         free(p);
         return ESP_FAIL;
     }
@@ -880,15 +990,20 @@ static bool valid_recording_id(const char *id)
     return safe_component(id, OXIMETRY_CANONICAL_MAX_COMPONENT);
 }
 
-static esp_err_t build_generation_manifest(const char *path, const char *device_id,
+static esp_err_t build_generation_manifest(const char *path,
+                                           const char *device_id,
                                            const char *recording_id,
                                            const char *source_name,
-                                           int64_t start_ms, int64_t end_ms,
-                                           uint32_t source_size, uint32_t source_crc,
-                                           uint32_t sample_count, uint32_t data_crc)
+                                           int64_t start_ms,
+                                           int64_t end_ms,
+                                           uint32_t source_size,
+                                           uint32_t source_crc,
+                                           uint32_t sample_count,
+                                           uint32_t data_crc)
 {
     cJSON *root = cJSON_CreateObject();
-    if (!root) return ESP_ERR_NO_MEM;
+    if (!root)
+        return ESP_ERR_NO_MEM;
     cJSON_AddStringToObject(root, "schema", "somnotrace.oximetry.generation/1");
     cJSON_AddStringToObject(root, "recording_id", recording_id);
     cJSON_AddNumberToObject(root, "generation", 1);
@@ -942,8 +1057,8 @@ static esp_err_t build_generation_manifest(const char *path, const char *device_
     cJSON_AddNumberToObject(track, "sample_count", sample_count);
     cJSON_AddNumberToObject(track, "data_crc32", data_crc);
     cJSON *channels = cJSON_AddArrayToObject(track, "channels");
-    const char *semantics[] = { "spo2", "pulse_rate", "motion", "sample_status", "source_status" };
-    const char *units[] = { "%", "bpm", "source_index", "bitset", "bitset" };
+    const char *semantics[] = {"spo2", "pulse_rate", "motion", "sample_status", "source_status"};
+    const char *units[] = {"%", "bpm", "source_index", "bitset", "bitset"};
     for (size_t i = 0; i < 5; i++) {
         cJSON *ch = cJSON_CreateObject();
         cJSON_AddStringToObject(ch, "semantic", semantics[i]);
@@ -963,20 +1078,20 @@ static esp_err_t build_generation_manifest(const char *path, const char *device_
     return e;
 }
 
-
 esp_err_t oximetry_canonical_convert_format_a(const char *device_id,
-                                               const char *recording_id,
-                                               const char *source_path,
-                                               int64_t start_utc_ms)
+                                              const char *recording_id,
+                                              const char *source_path,
+                                              int64_t start_utc_ms)
 {
     if (!sd_storage_is_ready() || !safe_component(device_id, OXIMETRY_CANONICAL_MAX_COMPONENT) ||
-        !valid_recording_id(recording_id) || !source_path ||
-        !source_complete_format_a(source_path))
+        !valid_recording_id(recording_id) || !source_path || !source_complete_format_a(source_path))
         return ESP_ERR_INVALID_ARG;
-    if (oximetry_canonical_ensure_dirs() != ESP_OK) return ESP_FAIL;
+    if (oximetry_canonical_ensure_dirs() != ESP_OK)
+        return ESP_FAIL;
 
     char day[9];
-    if (!day_for_epoch(start_utc_ms, day)) return ESP_ERR_INVALID_ARG;
+    if (!day_for_epoch(start_utc_ms, day))
+        return ESP_ERR_INVALID_ARG;
 
     struct stat st;
     if (stat(source_path, &st) != 0 || st.st_size > OXIMETRY_CANONICAL_MAX_SOURCE_BYTES)
@@ -986,8 +1101,10 @@ esp_err_t oximetry_canonical_convert_format_a(const char *device_id,
 
     /* Heap-allocate path buffers to avoid ~8 KB of stack usage. */
     convert_ctx_t *p = heap_caps_malloc(sizeof(*p), MALLOC_CAP_SPIRAM);
-    if (!p) p = malloc(sizeof(*p));
-    if (!p) return ESP_ERR_NO_MEM;
+    if (!p)
+        p = malloc(sizeof(*p));
+    if (!p)
+        return ESP_ERR_NO_MEM;
 
     esp_err_t ret = ESP_FAIL;
 
@@ -1010,9 +1127,13 @@ esp_err_t oximetry_canonical_convert_format_a(const char *device_id,
         !path_join3(p->stage_gen_dir, sizeof(p->stage_gen_dir), p->stage_dir, OX_GEN, "1") ||
         !path_join2(p->stage_data_dir, sizeof(p->stage_data_dir), p->stage_gen_dir, "data") ||
         !path_join2(p->stage_source, sizeof(p->stage_source), p->stage_source_dir, "source.bin") ||
-        !path_join2(p->stage_track_tmp, sizeof(p->stage_track_tmp), p->stage_data_dir, "vitals.snt.tmp") ||
+        !path_join2(
+            p->stage_track_tmp, sizeof(p->stage_track_tmp), p->stage_data_dir, "vitals.snt.tmp") ||
         !path_join2(p->stage_track, sizeof(p->stage_track), p->stage_data_dir, "vitals.snt") ||
-        !path_join2(p->stage_gen_manifest, sizeof(p->stage_gen_manifest), p->stage_gen_dir, "manifest.json")) {
+        !path_join2(p->stage_gen_manifest,
+                    sizeof(p->stage_gen_manifest),
+                    p->stage_gen_dir,
+                    "manifest.json")) {
         free(p);
         return ESP_ERR_INVALID_SIZE;
     }
@@ -1033,7 +1154,10 @@ esp_err_t oximetry_canonical_convert_format_a(const char *device_id,
         return ESP_ERR_INVALID_SIZE;
     }
     cJSON *pending = cJSON_CreateObject();
-    if (!pending) { free(p); return ESP_ERR_NO_MEM; }
+    if (!pending) {
+        free(p);
+        return ESP_ERR_NO_MEM;
+    }
     cJSON_AddStringToObject(pending, "schema", "somnotrace.oximetry.recording/1");
     cJSON_AddStringToObject(pending, "recording_id", recording_id);
     cJSON_AddNumberToObject(pending, "active_generation", 1);
@@ -1043,7 +1167,10 @@ esp_err_t oximetry_canonical_convert_format_a(const char *device_id,
     cJSON_AddNumberToObject(pending, "start_epoch_ms", (double)start_utc_ms);
     esp_err_t pending_err = write_json_atomic(p->stage_pointer, pending);
     cJSON_Delete(pending);
-    if (pending_err != ESP_OK) { free(p); return pending_err; }
+    if (pending_err != ESP_OK) {
+        free(p);
+        return pending_err;
+    }
 
     uint32_t source_crc = 0;
     uint32_t track_crc = 0;
@@ -1056,9 +1183,16 @@ esp_err_t oximetry_canonical_convert_format_a(const char *device_id,
     if (!source_ok || source_size != (uint64_t)st.st_size ||
         !write_snt3_format_a(source_path, p->stage_track_tmp, start_utc_ms, &count, &track_crc) ||
         (unlink(p->stage_track), rename(p->stage_track_tmp, p->stage_track) != 0) ||
-        build_generation_manifest(p->stage_gen_manifest, device_id, recording_id,
-                                  basename_safe(source_path), start_utc_ms, end_ms,
-                                  (uint32_t)source_size, source_crc, count, track_crc) != ESP_OK) {
+        build_generation_manifest(p->stage_gen_manifest,
+                                  device_id,
+                                  recording_id,
+                                  basename_safe(source_path),
+                                  start_utc_ms,
+                                  end_ms,
+                                  (uint32_t)source_size,
+                                  source_crc,
+                                  count,
+                                  track_crc) != ESP_OK) {
         ESP_LOGW(TAG, "convert %s: conversion step failed", recording_id);
         unlink(p->stage_track_tmp);
         free(p);
@@ -1066,7 +1200,10 @@ esp_err_t oximetry_canonical_convert_format_a(const char *device_id,
     }
 
     cJSON *pointer = cJSON_CreateObject();
-    if (!pointer) { free(p); return ESP_ERR_NO_MEM; }
+    if (!pointer) {
+        free(p);
+        return ESP_ERR_NO_MEM;
+    }
     cJSON_AddStringToObject(pointer, "schema", "somnotrace.oximetry.recording/1");
     cJSON_AddStringToObject(pointer, "recording_id", recording_id);
     cJSON_AddNumberToObject(pointer, "active_generation", 1);
@@ -1077,7 +1214,10 @@ esp_err_t oximetry_canonical_convert_format_a(const char *device_id,
     cJSON_AddNumberToObject(pointer, "end_epoch_ms", (double)end_ms);
     esp_err_t pe = write_json_atomic(p->stage_pointer, pointer);
     cJSON_Delete(pointer);
-    if (pe != ESP_OK) { free(p); return pe; }
+    if (pe != ESP_OK) {
+        free(p);
+        return pe;
+    }
 
     /* The stage and final directory are on the same FAT volume.  The root
      * pointer is written before publication and is the final readiness gate. */
@@ -1093,28 +1233,33 @@ esp_err_t oximetry_canonical_convert_format_a(const char *device_id,
 
 static bool valid_day_name(const char *s)
 {
-    if (!s || strlen(s) != 8) return false;
-    for (int i = 0; i < 8; i++) if (s[i] < '0' || s[i] > '9') return false;
+    if (!s || strlen(s) != 8)
+        return false;
+    for (int i = 0; i < 8; i++)
+        if (s[i] < '0' || s[i] > '9')
+            return false;
     return true;
 }
 
 static bool recording_ready_at(const char *dir)
 {
     char pointer[OXIMETRY_CANONICAL_MAX_PATH];
-    if (!path_join2(pointer, sizeof(pointer), dir, "recording.json")) return false;
+    if (!path_join2(pointer, sizeof(pointer), dir, "recording.json"))
+        return false;
     cJSON *p = read_json_file(pointer);
-    if (!p) return false;
+    if (!p)
+        return false;
     cJSON *state = cJSON_GetObjectItem(p, "state");
     cJSON *gen = cJSON_GetObjectItem(p, "active_generation");
     bool ok = cJSON_IsString(state) && strcmp(state->valuestring, "ready") == 0 &&
               cJSON_IsNumber(gen) && gen->valueint > 0;
     if (ok) {
         char manifest[OXIMETRY_CANONICAL_MAX_PATH];
-        snprintf(manifest, sizeof(manifest), "%s/%s/%d/manifest.json", dir, OX_GEN,
-                 gen->valueint);
+        snprintf(manifest, sizeof(manifest), "%s/%s/%d/manifest.json", dir, OX_GEN, gen->valueint);
         cJSON *m = read_json_file(manifest);
         ok = m != NULL;
-        if (m) cJSON_Delete(m);
+        if (m)
+            cJSON_Delete(m);
     }
     cJSON_Delete(p);
     return ok;
@@ -1126,22 +1271,31 @@ esp_err_t oximetry_canonical_migrate_legacy(const char *device_id)
         oximetry_canonical_ensure_dirs() != ESP_OK)
         return ESP_ERR_INVALID_STATE;
     char dir[OXIMETRY_CANONICAL_MAX_PATH];
-    if (!path_join2(dir, sizeof(dir), OX_ROOT "/files", device_id)) return ESP_ERR_INVALID_SIZE;
+    if (!path_join2(dir, sizeof(dir), OX_ROOT "/files", device_id))
+        return ESP_ERR_INVALID_SIZE;
     DIR *d = opendir(dir);
-    if (!d) return ESP_OK;
+    if (!d)
+        return ESP_OK;
     struct dirent *e;
     while ((e = readdir(d)) != NULL) {
         size_t len = strlen(e->d_name);
-        if (len < 18 || strcmp(e->d_name + len - 4, ".bin") != 0) continue;
+        if (len < 18 || strcmp(e->d_name + len - 4, ".bin") != 0)
+            continue;
         char name[OXIMETRY_CANONICAL_MAX_COMPONENT];
-        if (len - 4 >= sizeof(name)) continue;
-        memcpy(name, e->d_name, len - 4); name[len - 4] = '\0';
+        if (len - 4 >= sizeof(name))
+            continue;
+        memcpy(name, e->d_name, len - 4);
+        name[len - 4] = '\0';
         int64_t start = filename_epoch_ms(name);
-        if (!start) continue;
+        if (!start)
+            continue;
         char source[OXIMETRY_CANONICAL_MAX_PATH];
-        if (!path_join2(source, sizeof(source), dir, e->d_name)) continue;
+        if (!path_join2(source, sizeof(source), dir, e->d_name))
+            continue;
         if (!source_complete_format_a(source)) {
-            ESP_LOGI(TAG, "legacy migration skipped %s (not a complete OxyII Format A file; retained)", source);
+            ESP_LOGI(TAG,
+                     "legacy migration skipped %s (not a complete OxyII Format A file; retained)",
+                     source);
             continue;
         }
         if (ox_store_index_check(device_id, name) < 0) {
@@ -1150,7 +1304,9 @@ esp_err_t oximetry_canonical_migrate_legacy(const char *device_id)
                 ox_store_index_add(device_id, name, (uint32_t)source_st.st_size, true);
         }
         esp_err_t conversion = oximetry_canonical_convert_format_a(device_id, name, source, start);
-        ox_store_index_mark_converted(device_id, name, conversion == ESP_OK,
+        ox_store_index_mark_converted(device_id,
+                                      name,
+                                      conversion == ESP_OK,
                                       conversion == ESP_OK ? NULL : esp_err_to_name(conversion));
         if (conversion != ESP_OK)
             ESP_LOGW(TAG, "legacy migration failed %s (source retained)", source);
@@ -1162,15 +1318,20 @@ esp_err_t oximetry_canonical_migrate_legacy(const char *device_id)
         size_t len = strlen(e->d_name);
         bool has_vld = len > 4 && strcmp(e->d_name + len - 4, ".vld") == 0;
         size_t id_len = has_vld ? len - 4 : len;
-        if (id_len != 14) continue;
+        if (id_len != 14)
+            continue;
         bool numeric = true;
         for (size_t i = 0; i < id_len; i++)
-            if (e->d_name[i] < '0' || e->d_name[i] > '9') numeric = false;
-        if (!numeric) continue;
+            if (e->d_name[i] < '0' || e->d_name[i] > '9')
+                numeric = false;
+        if (!numeric)
+            continue;
         char name[OXIMETRY_CANONICAL_MAX_COMPONENT];
-        memcpy(name, e->d_name, id_len); name[id_len] = '\0';
+        memcpy(name, e->d_name, id_len);
+        name[id_len] = '\0';
         char source[OXIMETRY_CANONICAL_MAX_PATH];
-        if (!path_join2(source, sizeof(source), dir, e->d_name)) continue;
+        if (!path_join2(source, sizeof(source), dir, e->d_name))
+            continue;
         if (!source_complete_vld3(source)) {
             ESP_LOGI(TAG, "vld3 migration skipped %s (not a complete VLD3 file; retained)", source);
             continue;
@@ -1181,7 +1342,9 @@ esp_err_t oximetry_canonical_migrate_legacy(const char *device_id)
                 ox_store_index_add(device_id, e->d_name, (uint32_t)source_st.st_size, true);
         }
         esp_err_t conversion = oximetry_canonical_convert_vld3(device_id, name, source);
-        ox_store_index_mark_converted(device_id, e->d_name, conversion == ESP_OK,
+        ox_store_index_mark_converted(device_id,
+                                      e->d_name,
+                                      conversion == ESP_OK,
                                       conversion == ESP_OK ? NULL : esp_err_to_name(conversion));
         if (conversion != ESP_OK)
             ESP_LOGW(TAG, "vld3 migration failed %s (source retained)", source);
@@ -1193,15 +1356,18 @@ esp_err_t oximetry_canonical_migrate_legacy(const char *device_id)
 
 esp_err_t oximetry_canonical_migrate_all_legacy(void)
 {
-    if (oximetry_canonical_ensure_dirs() != ESP_OK) return ESP_ERR_INVALID_STATE;
+    if (oximetry_canonical_ensure_dirs() != ESP_OK)
+        return ESP_ERR_INVALID_STATE;
     char files_dir[OXIMETRY_CANONICAL_MAX_PATH];
     if (snprintf(files_dir, sizeof(files_dir), "%s/files", OX_ROOT) >= (int)sizeof(files_dir))
         return ESP_ERR_INVALID_SIZE;
     DIR *d = opendir(files_dir);
-    if (!d) return ESP_OK;
+    if (!d)
+        return ESP_OK;
     struct dirent *e;
     while ((e = readdir(d)) != NULL) {
-        if (!safe_component(e->d_name, OXIMETRY_CANONICAL_MAX_COMPONENT)) continue;
+        if (!safe_component(e->d_name, OXIMETRY_CANONICAL_MAX_COMPONENT))
+            continue;
         oximetry_canonical_migrate_legacy(e->d_name);
     }
     closedir(d);
@@ -1210,7 +1376,8 @@ esp_err_t oximetry_canonical_migrate_all_legacy(void)
 
 esp_err_t oximetry_canonical_reconcile(void)
 {
-    if (oximetry_canonical_ensure_dirs() != ESP_OK) return ESP_ERR_INVALID_STATE;
+    if (oximetry_canonical_ensure_dirs() != ESP_OK)
+        return ESP_ERR_INVALID_STATE;
 
     /* A converting pointer plus a complete source is enough to resume the
      * deterministic conversion after reboot. */
@@ -1218,20 +1385,25 @@ esp_err_t oximetry_canonical_reconcile(void)
     if (staging) {
         struct dirent *se;
         while ((se = readdir(staging)) != NULL) {
-            if (!safe_component(se->d_name, OXIMETRY_CANONICAL_MAX_COMPONENT)) continue;
+            if (!safe_component(se->d_name, OXIMETRY_CANONICAL_MAX_COMPONENT))
+                continue;
             char stage_dir[OXIMETRY_CANONICAL_MAX_PATH], pointer[OXIMETRY_CANONICAL_MAX_PATH];
             if (!path_join2(stage_dir, sizeof(stage_dir), OX_STAGING, se->d_name) ||
-                !path_join2(pointer, sizeof(pointer), stage_dir, "recording.json")) continue;
+                !path_join2(pointer, sizeof(pointer), stage_dir, "recording.json"))
+                continue;
             cJSON *p = read_json_file(pointer);
-            if (!p) continue;
+            if (!p)
+                continue;
             cJSON *state = cJSON_GetObjectItem(p, "state");
             cJSON *device = cJSON_GetObjectItem(p, "device_key");
             cJSON *start = cJSON_GetObjectItem(p, "start_epoch_ms");
             char source[OXIMETRY_CANONICAL_MAX_PATH];
-            bool can_resume = cJSON_IsString(state) && strcmp(state->valuestring, "converting") == 0 &&
+            bool can_resume = cJSON_IsString(state) &&
+                              strcmp(state->valuestring, "converting") == 0 &&
                               cJSON_IsString(device);
             esp_err_t resumed = ESP_ERR_INVALID_STATE;
-            if (can_resume && path_join3(source, sizeof(source), stage_dir, "source", "source.vld") &&
+            if (can_resume &&
+                path_join3(source, sizeof(source), stage_dir, "source", "source.vld") &&
                 access(source, F_OK) == 0)
                 resumed = oximetry_canonical_convert_vld3(device->valuestring, se->d_name, source);
             else if (can_resume && cJSON_IsNumber(start) &&
@@ -1248,19 +1420,25 @@ esp_err_t oximetry_canonical_reconcile(void)
     }
 
     DIR *days = opendir(OX_RECORDINGS);
-    if (!days) return ESP_OK;
+    if (!days)
+        return ESP_OK;
     struct dirent *de;
     while ((de = readdir(days)) != NULL) {
-        if (!valid_day_name(de->d_name)) continue;
+        if (!valid_day_name(de->d_name))
+            continue;
         char day_path[OXIMETRY_CANONICAL_MAX_PATH];
-        if (!path_join2(day_path, sizeof(day_path), OX_RECORDINGS, de->d_name)) continue;
+        if (!path_join2(day_path, sizeof(day_path), OX_RECORDINGS, de->d_name))
+            continue;
         DIR *records = opendir(day_path);
-        if (!records) continue;
+        if (!records)
+            continue;
         struct dirent *re;
         while ((re = readdir(records)) != NULL) {
-            if (!safe_component(re->d_name, OXIMETRY_CANONICAL_MAX_COMPONENT)) continue;
+            if (!safe_component(re->d_name, OXIMETRY_CANONICAL_MAX_COMPONENT))
+                continue;
             char record_path[OXIMETRY_CANONICAL_MAX_PATH];
-            if (!path_join2(record_path, sizeof(record_path), day_path, re->d_name)) continue;
+            if (!path_join2(record_path, sizeof(record_path), day_path, re->d_name))
+                continue;
             if (!recording_ready_at(record_path))
                 ESP_LOGW(TAG, "recording is not ready: %s", record_path);
             vTaskDelay(1);
@@ -1274,16 +1452,21 @@ esp_err_t oximetry_canonical_reconcile(void)
 static int list_day_records(const char *day_path, cJSON *arr, int count_so_far, int max_records)
 {
     DIR *records = opendir(day_path);
-    if (!records) return count_so_far;
+    if (!records)
+        return count_so_far;
     struct dirent *re;
     while ((re = readdir(records)) != NULL && count_so_far < max_records) {
-        if (!safe_component(re->d_name, OXIMETRY_CANONICAL_MAX_COMPONENT)) continue;
+        if (!safe_component(re->d_name, OXIMETRY_CANONICAL_MAX_COMPONENT))
+            continue;
         char record_path[OXIMETRY_CANONICAL_MAX_PATH];
-        if (!path_join2(record_path, sizeof(record_path), day_path, re->d_name)) continue;
+        if (!path_join2(record_path, sizeof(record_path), day_path, re->d_name))
+            continue;
         char pointer[OXIMETRY_CANONICAL_MAX_PATH];
-        if (!path_join2(pointer, sizeof(pointer), record_path, "recording.json")) continue;
+        if (!path_join2(pointer, sizeof(pointer), record_path, "recording.json"))
+            continue;
         cJSON *p = read_json_file(pointer);
-        if (!p) continue;
+        if (!p)
+            continue;
         cJSON *state = cJSON_GetObjectItem(p, "state");
         cJSON *gen = cJSON_GetObjectItem(p, "active_generation");
         if (!cJSON_IsString(state) || strcmp(state->valuestring, "ready") != 0 ||
@@ -1300,12 +1483,16 @@ static int list_day_records(const char *day_path, cJSON *arr, int count_so_far, 
 
 esp_err_t oximetry_canonical_list_ready_for_day(const char *day, cJSON **out)
 {
-    if (!out) return ESP_ERR_INVALID_ARG;
+    if (!out)
+        return ESP_ERR_INVALID_ARG;
     *out = NULL;
-    if (!valid_day_name(day)) return ESP_ERR_INVALID_ARG;
-    if (oximetry_canonical_ensure_dirs() != ESP_OK) return ESP_ERR_INVALID_STATE;
+    if (!valid_day_name(day))
+        return ESP_ERR_INVALID_ARG;
+    if (oximetry_canonical_ensure_dirs() != ESP_OK)
+        return ESP_ERR_INVALID_STATE;
     cJSON *arr = cJSON_CreateArray();
-    if (!arr) return ESP_ERR_NO_MEM;
+    if (!arr)
+        return ESP_ERR_NO_MEM;
 
     char day_path[OXIMETRY_CANONICAL_MAX_PATH];
     if (path_join2(day_path, sizeof(day_path), OX_RECORDINGS, day)) {
@@ -1317,11 +1504,14 @@ esp_err_t oximetry_canonical_list_ready_for_day(const char *day, cJSON **out)
 
 esp_err_t oximetry_canonical_list_days(cJSON **out)
 {
-    if (!out) return ESP_ERR_INVALID_ARG;
+    if (!out)
+        return ESP_ERR_INVALID_ARG;
     *out = NULL;
-    if (oximetry_canonical_ensure_dirs() != ESP_OK) return ESP_ERR_INVALID_STATE;
+    if (oximetry_canonical_ensure_dirs() != ESP_OK)
+        return ESP_ERR_INVALID_STATE;
     cJSON *arr = cJSON_CreateArray();
-    if (!arr) return ESP_ERR_NO_MEM;
+    if (!arr)
+        return ESP_ERR_NO_MEM;
 
     DIR *days = opendir(OX_RECORDINGS);
     if (!days) {
@@ -1330,7 +1520,8 @@ esp_err_t oximetry_canonical_list_days(cJSON **out)
     }
     struct dirent *de;
     while ((de = readdir(days)) != NULL) {
-        if (!valid_day_name(de->d_name)) continue;
+        if (!valid_day_name(de->d_name))
+            continue;
         cJSON_AddItemToArray(arr, cJSON_CreateString(de->d_name));
     }
     closedir(days);
@@ -1340,11 +1531,14 @@ esp_err_t oximetry_canonical_list_days(cJSON **out)
 
 esp_err_t oximetry_canonical_list_ready(cJSON **out)
 {
-    if (!out) return ESP_ERR_INVALID_ARG;
+    if (!out)
+        return ESP_ERR_INVALID_ARG;
     *out = NULL;
-    if (oximetry_canonical_ensure_dirs() != ESP_OK) return ESP_ERR_INVALID_STATE;
+    if (oximetry_canonical_ensure_dirs() != ESP_OK)
+        return ESP_ERR_INVALID_STATE;
     cJSON *arr = cJSON_CreateArray();
-    if (!arr) return ESP_ERR_NO_MEM;
+    if (!arr)
+        return ESP_ERR_NO_MEM;
 
     DIR *days = opendir(OX_RECORDINGS);
     if (!days) {
@@ -1354,9 +1548,11 @@ esp_err_t oximetry_canonical_list_ready(cJSON **out)
     struct dirent *de;
     int count = 0;
     while ((de = readdir(days)) != NULL && count < OXIMETRY_CANONICAL_MAX_RECORDINGS) {
-        if (!valid_day_name(de->d_name)) continue;
+        if (!valid_day_name(de->d_name))
+            continue;
         char day_path[OXIMETRY_CANONICAL_MAX_PATH];
-        if (!path_join2(day_path, sizeof(day_path), OX_RECORDINGS, de->d_name)) continue;
+        if (!path_join2(day_path, sizeof(day_path), OX_RECORDINGS, de->d_name))
+            continue;
         count = list_day_records(day_path, arr, count, OXIMETRY_CANONICAL_MAX_RECORDINGS);
     }
     closedir(days);
@@ -1364,19 +1560,20 @@ esp_err_t oximetry_canonical_list_ready(cJSON **out)
     return ESP_OK;
 }
 
-
-static esp_err_t resolve_recording_internal(const char *recording_id, char *out,
-                                            size_t out_size)
+static esp_err_t resolve_recording_internal(const char *recording_id, char *out, size_t out_size)
 {
-    if (!valid_recording_id(recording_id) || !out || out_size == 0) return ESP_ERR_INVALID_ARG;
+    if (!valid_recording_id(recording_id) || !out || out_size == 0)
+        return ESP_ERR_INVALID_ARG;
     DIR *days = opendir(OX_RECORDINGS);
-    if (!days) return ESP_ERR_NOT_FOUND;
+    if (!days)
+        return ESP_ERR_NOT_FOUND;
     struct dirent *de;
     while ((de = readdir(days)) != NULL) {
-        if (!valid_day_name(de->d_name)) continue;
+        if (!valid_day_name(de->d_name))
+            continue;
         char candidate[OXIMETRY_CANONICAL_MAX_PATH];
-        if (!path_join3(candidate, sizeof(candidate), OX_RECORDINGS,
-                        de->d_name, recording_id)) continue;
+        if (!path_join3(candidate, sizeof(candidate), OX_RECORDINGS, de->d_name, recording_id))
+            continue;
         struct stat st;
         if (stat(candidate, &st) != 0 || !S_ISDIR(st.st_mode) || !recording_ready_at(candidate))
             continue;
@@ -1396,7 +1593,8 @@ esp_err_t oximetry_canonical_resolve_recording(const char *recording_id,
                                                char *out_path,
                                                size_t out_path_size)
 {
-    if (oximetry_canonical_ensure_dirs() != ESP_OK) return ESP_ERR_INVALID_STATE;
+    if (oximetry_canonical_ensure_dirs() != ESP_OK)
+        return ESP_ERR_INVALID_STATE;
     return resolve_recording_internal(recording_id, out_path, out_path_size);
 }
 
@@ -1411,18 +1609,28 @@ esp_err_t oximetry_canonical_resolve_track(const char *recording_id,
         return ESP_ERR_INVALID_ARG;
     char dir[OXIMETRY_CANONICAL_MAX_PATH];
     esp_err_t e = oximetry_canonical_resolve_recording(recording_id, dir, sizeof(dir));
-    if (e != ESP_OK) return e;
+    if (e != ESP_OK)
+        return e;
     char pointer[OXIMETRY_CANONICAL_MAX_PATH];
-    if (!path_join2(pointer, sizeof(pointer), dir, "recording.json")) return ESP_ERR_INVALID_SIZE;
+    if (!path_join2(pointer, sizeof(pointer), dir, "recording.json"))
+        return ESP_ERR_INVALID_SIZE;
     cJSON *p = read_json_file(pointer);
-    if (!p) return ESP_ERR_NOT_FOUND;
+    if (!p)
+        return ESP_ERR_NOT_FOUND;
     cJSON *gen = cJSON_GetObjectItem(p, "active_generation");
     int generation = cJSON_IsNumber(gen) ? gen->valueint : 0;
     cJSON_Delete(p);
-    if (generation <= 0 || generation > 100000) return ESP_ERR_NOT_FOUND;
+    if (generation <= 0 || generation > 100000)
+        return ESP_ERR_NOT_FOUND;
     const char *ext = strcmp(track_id, "events") == 0 ? "jsonl" : "snt";
-    if (snprintf(out_path, out_path_size, "%s/%s/%d/data/%s.%s", dir, OX_GEN,
-                 generation, track_id, ext) >= (int)out_path_size)
+    if (snprintf(out_path,
+                 out_path_size,
+                 "%s/%s/%d/data/%s.%s",
+                 dir,
+                 OX_GEN,
+                 generation,
+                 track_id,
+                 ext) >= (int)out_path_size)
         return ESP_ERR_INVALID_SIZE;
     struct stat st;
     return stat(out_path, &st) == 0 ? ESP_OK : ESP_ERR_NOT_FOUND;
@@ -1430,19 +1638,24 @@ esp_err_t oximetry_canonical_resolve_track(const char *recording_id,
 
 esp_err_t oximetry_canonical_get_manifest(const char *recording_id, cJSON **out)
 {
-    if (!out) return ESP_ERR_INVALID_ARG;
+    if (!out)
+        return ESP_ERR_INVALID_ARG;
     *out = NULL;
     char dir[OXIMETRY_CANONICAL_MAX_PATH];
     esp_err_t e = oximetry_canonical_resolve_recording(recording_id, dir, sizeof(dir));
-    if (e != ESP_OK) return e;
+    if (e != ESP_OK)
+        return e;
     char pointer[OXIMETRY_CANONICAL_MAX_PATH];
-    if (!path_join2(pointer, sizeof(pointer), dir, "recording.json")) return ESP_ERR_INVALID_SIZE;
+    if (!path_join2(pointer, sizeof(pointer), dir, "recording.json"))
+        return ESP_ERR_INVALID_SIZE;
     cJSON *p = read_json_file(pointer);
-    if (!p) return ESP_ERR_NOT_FOUND;
+    if (!p)
+        return ESP_ERR_NOT_FOUND;
     cJSON *gen = cJSON_GetObjectItem(p, "active_generation");
     int generation = cJSON_IsNumber(gen) ? gen->valueint : 0;
     cJSON_Delete(p);
-    if (generation <= 0) return ESP_ERR_NOT_FOUND;
+    if (generation <= 0)
+        return ESP_ERR_NOT_FOUND;
     char manifest[OXIMETRY_CANONICAL_MAX_PATH];
     char gen_name[16];
     snprintf(gen_name, sizeof(gen_name), "%d", generation);
@@ -1455,7 +1668,8 @@ esp_err_t oximetry_canonical_get_manifest(const char *recording_id, cJSON **out)
 char *oximetry_canonical_list_json(void)
 {
     cJSON *arr = NULL;
-    if (oximetry_canonical_list_ready(&arr) != ESP_OK || !arr) return NULL;
+    if (oximetry_canonical_list_ready(&arr) != ESP_OK || !arr)
+        return NULL;
     char *s = cJSON_PrintUnformatted(arr);
     cJSON_Delete(arr);
     return s;
@@ -1464,7 +1678,8 @@ char *oximetry_canonical_list_json(void)
 char *oximetry_canonical_manifest_json(const char *recording_id)
 {
     cJSON *obj = NULL;
-    if (oximetry_canonical_get_manifest(recording_id, &obj) != ESP_OK || !obj) return NULL;
+    if (oximetry_canonical_get_manifest(recording_id, &obj) != ESP_OK || !obj)
+        return NULL;
     char *s = cJSON_PrintUnformatted(obj);
     cJSON_Delete(obj);
     return s;

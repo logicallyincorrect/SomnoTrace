@@ -31,8 +31,7 @@ extern "C" {
 
 int64_t edf_find_mask_on_time(const char *events_snt_path);
 int64_t edf_find_mask_off_time(const char *events_snt_path);
-int64_t edf_find_zle_edge_time(const char *events_snt_path, int want_value,
-                               int64_t clock_drift_ms);
+int64_t edf_find_zle_edge_time(const char *events_snt_path, int want_value, int64_t clock_drift_ms);
 
 static inline uint32_t edf_ms_to_samples_25hz(int64_t ms)
 {

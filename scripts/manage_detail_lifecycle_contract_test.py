@@ -26,7 +26,7 @@ def function(name: str) -> str:
 
 
 build_page = function("build_manage_page")
-assert "s_manage_detail_host = make_card" in build_page
+assert re.search(r"s_manage_detail_host\s*=\s*make_card\s*\(", build_page)
 for eager in (
     "build_devices_section(",
     "build_connectivity_section(",
@@ -79,7 +79,9 @@ for pointer in (
 ):
     assert pointer in clear, f"destination pointer not invalidated: {pointer}"
 
-assert "roots=%u objects=%u internal=%u psram=%u" in SOURCE
+assert re.search(
+    r'roots=%u objects=%u\s*"\s*"internal=%u psram=%u', SOURCE
+)
 
 
 class DetailOwnership:

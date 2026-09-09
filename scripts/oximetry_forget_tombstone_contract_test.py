@@ -34,15 +34,35 @@ def function_body(name: str, source: str) -> str:
     return source[match.end(): cursor - 1]
 
 
+def require(source: str, pattern: str, description: str) -> re.Match[str]:
+    match = re.search(pattern, source, re.MULTILINE)
+    if not match:
+        raise AssertionError(f"missing contract: {description}")
+    return match
+
+
+def position(source: str, pattern: str, description: str) -> int:
+    return require(source, pattern, description).start()
+
+
 for source, driver in (
     (OXYII, "OX_DRIVER_OXYII"),
     (LEGACY, "OX_DRIVER_LEGACY"),
 ):
     save = function_body("do_save_nvs", source)
-    driver_write = f'nvs_set_u8(h, "driver", (uint8_t){driver})'
-    assert save.index(driver_write) < save.index('nvs_set_u8(h, "forgotten", 0)') \
-           < save.index("nvs_commit(h)")
-    assert 'if (e == ESP_OK) e = nvs_set_u8(h, "forgotten", 0);' in save
+    driver_write = rf'nvs_set_u8\s*\(\s*h\s*,\s*"driver"\s*,\s*\(uint8_t\)\s*{driver}\s*\)'
+    forgotten_clear = r'nvs_set_u8\s*\(\s*h\s*,\s*"forgotten"\s*,\s*0\s*\)'
+    commit = r'nvs_commit\s*\(\s*h\s*\)'
+    assert position(save, driver_write, "save driver") \
+           < position(save, forgotten_clear, "clear forgotten tombstone") \
+           < position(save, commit, "commit pairing record")
+    require(
+        save,
+        r'if\s*\(\s*e\s*==\s*ESP_OK\s*\)\s*e\s*=\s*'
+        + forgotten_clear
+        + r'\s*;',
+        "clear forgotten tombstone only after successful pairing writes",
+    )
 
     pair = function_body("pair_task", source)
     persist = pair.index("nvs_writer_run(do_save_nvs, &nvs_arg)")
@@ -58,11 +78,23 @@ for source, driver in (
 
     erase = function_body("do_erase_nvs", source)
     assert 'nvs_erase_key(h, "forgotten")' not in erase
-    assert erase.index('erase_nvs_key_if_present(h, "driver")') \
-           < erase.index('nvs_set_u8(h, "forgotten", 1)') \
-           < erase.index("nvs_commit(h)")
-    assert 'if (e == ESP_OK) e = nvs_set_u8(h, "forgotten", 1);' in erase
-    assert 'if (e == ESP_OK) e = nvs_commit(h);' in erase
+    erase_driver = r'erase_nvs_key_if_present\s*\(\s*h\s*,\s*"driver"\s*\)'
+    forgotten_set = r'nvs_set_u8\s*\(\s*h\s*,\s*"forgotten"\s*,\s*1\s*\)'
+    assert position(erase, erase_driver, "erase driver") \
+           < position(erase, forgotten_set, "set forgotten tombstone") \
+           < position(erase, commit, "commit forgotten tombstone")
+    require(
+        erase,
+        r'if\s*\(\s*e\s*==\s*ESP_OK\s*\)\s*e\s*=\s*'
+        + forgotten_set
+        + r'\s*;',
+        "set forgotten tombstone only after successful erases",
+    )
+    require(
+        erase,
+        r'if\s*\(\s*e\s*==\s*ESP_OK\s*\)\s*e\s*=\s*nvs_commit\s*\(\s*h\s*\)\s*;',
+        "commit forgotten tombstone only after successful writes",
+    )
 
     erase_helper = function_body("erase_nvs_key_if_present", source)
     assert "nvs_erase_key(h, key)" in erase_helper
@@ -75,7 +107,12 @@ for source, driver in (
         "driver",
         "probe_mode",
     ):
-        assert f'if (e == ESP_OK) e = erase_nvs_key_if_present(h, "{key}");' in erase
+        require(
+            erase,
+            rf'if\s*\(\s*e\s*==\s*ESP_OK\s*\)\s*e\s*=\s*'
+            rf'erase_nvs_key_if_present\s*\(\s*h\s*,\s*"{key}"\s*\)\s*;',
+            f"erase {key} only after prior erases succeed",
+        )
 
     load = function_body("load_paired_from_nvs", source)
     tombstone_read = load.index('nvs_get_u8(h, "forgotten", &forgotten_value)')

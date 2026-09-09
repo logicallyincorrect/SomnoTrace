@@ -57,24 +57,24 @@
  * true. Returning UPLOAD_OK for a deliberate skip is correct and expected. */
 
 typedef enum {
-    UPLOAD_OK = 0,          /* transferred, or deliberately skipped         */
-    UPLOAD_CANCELLED,       /* recording admission requested; leave pending */
-    UPLOAD_NOT_CONFIGURED,  /* backend has no valid config — skipped        */
-    UPLOAD_ERR_TRANSIENT,   /* timeout / unreachable / 5xx — retry later    */
-    UPLOAD_ERR_PERMANENT,   /* auth rejected / 4xx — retry, but surface it  */
+    UPLOAD_OK = 0,         /* transferred, or deliberately skipped         */
+    UPLOAD_CANCELLED,      /* recording admission requested; leave pending */
+    UPLOAD_NOT_CONFIGURED, /* backend has no valid config — skipped        */
+    UPLOAD_ERR_TRANSIENT,  /* timeout / unreachable / 5xx — retry later    */
+    UPLOAD_ERR_PERMANENT,  /* auth rejected / 4xx — retry, but surface it  */
 } upload_result_t;
 
 /* Kept as an alias so existing backend code reads naturally; any error maps
  * onto the transient ladder unless the backend is more specific. */
-#define UPLOAD_FAILED  UPLOAD_ERR_TRANSIENT
+#define UPLOAD_FAILED UPLOAD_ERR_TRANSIENT
 
 /* Forward name: the backend vtable below takes a config by pointer, and the struct itself is
  * defined further down with the rest of the configuration surface. */
 typedef struct uploader_config_s uploader_config_t;
 
 typedef struct {
-    const char *id;         /* "smb" | "sleephq" — stable tracking key      */
-    const char *label;      /* "NAS (SMB)" — shown in the UI                */
+    const char *id;    /* "smb" | "sleephq" — stable tracking key      */
+    const char *label; /* "NAS (SMB)" — shown in the UI                */
 
     /* May this backend be contacted when the ONLY thing that changed is the
      * root bundle, with no new session groups to send?
@@ -111,8 +111,7 @@ typedef struct {
     upload_result_t (*ox_day_end)(const char *day, bool any_uploaded);
 
     /* Offer the root bundle for this day (see note above). */
-    upload_result_t (*put_bundle)(const char *day,
-                                  const upload_bundle_ref_t *b, bool changed);
+    upload_result_t (*put_bundle)(const char *day, const upload_bundle_ref_t *b, bool changed);
 
     /* Leave a day: finalise the import (SHQ) or nothing (SMB).
      * any_uploaded is false when the day had no pending groups left. */
@@ -138,29 +137,29 @@ typedef struct {
 
 struct uploader_config_s {
     /* SMB server */
-    bool smb_enabled;        /* toggle: include SMB in upload cycle         */
-    char smb_host[64];       /* server IP or hostname                      */
-    char smb_share[64];      /* share name (e.g. "cpap")                   */
-    char smb_user[64];       /* username (empty = guest)                   */
-    char smb_pass[64];       /* password (empty = guest)                   */
-    char smb_path[128];      /* remote path within share (e.g. "/SomnoTrace") */
+    bool smb_enabled;   /* toggle: include SMB in upload cycle         */
+    char smb_host[64];  /* server IP or hostname                      */
+    char smb_share[64]; /* share name (e.g. "cpap")                   */
+    char smb_user[64];  /* username (empty = guest)                   */
+    char smb_pass[64];  /* password (empty = guest)                   */
+    char smb_path[128]; /* remote path within share (e.g. "/SomnoTrace") */
 
     /* SleepHQ */
-    bool shq_enabled;        /* toggle: include SleepHQ in upload cycle     */
-    char shq_client_id[128];      /* API key (Client UID)                */
-    char shq_client_secret[128];  /* Client Secret                       */
+    bool shq_enabled;            /* toggle: include SleepHQ in upload cycle     */
+    char shq_client_id[128];     /* API key (Client UID)                */
+    char shq_client_secret[128]; /* Client Secret                       */
 
     /* Built-in FTP server */
-    bool ftp_enabled;        /* toggle: start FTP server at boot            */
-    bool ftp_anonymous;      /* true = anonymous, false = user/pass auth    */
-    char ftp_user[32];       /* FTP username (when not anonymous)           */
-    char ftp_pass[32];       /* FTP password (when not anonymous)           */
+    bool ftp_enabled;   /* toggle: start FTP server at boot            */
+    bool ftp_anonymous; /* true = anonymous, false = user/pass auth    */
+    char ftp_user[32];  /* FTP username (when not anonymous)           */
+    char ftp_pass[32];  /* FTP password (when not anonymous)           */
 
     /* Upload window in days (newest first).  Bounds the periodic scan, the
      * progress denominators, and above all a manual "reset upload state" so
      * one click cannot start re-uploading a year of history.
      * Default UPLOAD_DEFAULT_MAX_DAYS (30), hard cap UPLOAD_MAX_DAYS_CAP. */
-    int  max_days;
+    int max_days;
 };
 
 /* ── Public API ─────────────────────────────────────────────────────── */
@@ -182,11 +181,10 @@ esp_err_t uploader_init(void);
  * separate zero-wait lease to delete old index state, releases it, then ack's.
  * A reset at any boundary repeats invalidation safely before acknowledgement. */
 #define UPLOADER_INVALIDATION_TOKEN_CAP 128
-typedef bool (*uploader_invalidation_next_fn_t)(uint32_t *day, char *token,
-                                               size_t token_cap);
+typedef bool (*uploader_invalidation_next_fn_t)(uint32_t *day, char *token, size_t token_cap);
 typedef esp_err_t (*uploader_invalidation_ack_fn_t)(uint32_t day, const char *token);
 void uploader_set_invalidation_hooks(uploader_invalidation_next_fn_t next,
-                                      uploader_invalidation_ack_fn_t ack);
+                                     uploader_invalidation_ack_fn_t ack);
 
 /* ── Event triggers ───────────────────────────────────────────────────
  * All are safe to call from any task; they only nudge the scheduler.
@@ -269,12 +267,12 @@ bool uploader_is_ftp_enabled(void);
  * bedside display.  The snapshot owns all of its strings and the getter does
  * not allocate.  Entries include every registered backend, including ones
  * that are disabled or do not yet have complete configuration. */
-#define UPLOADER_PROGRESS_MAX_BACKENDS  4
-#define UPLOADER_PROGRESS_ID_LEN        12
-#define UPLOADER_PROGRESS_LABEL_LEN     32
-#define UPLOADER_PROGRESS_DAY_LEN       12
-#define UPLOADER_PROGRESS_ERROR_LEN     72
-#define UPLOADER_PROGRESS_STATUS_LEN    64
+#define UPLOADER_PROGRESS_MAX_BACKENDS 4
+#define UPLOADER_PROGRESS_ID_LEN 12
+#define UPLOADER_PROGRESS_LABEL_LEN 32
+#define UPLOADER_PROGRESS_DAY_LEN 12
+#define UPLOADER_PROGRESS_ERROR_LEN 72
+#define UPLOADER_PROGRESS_STATUS_LEN 64
 
 typedef enum {
     UPLOADER_BACKEND_DISABLED = 0,
@@ -364,14 +362,26 @@ esp_err_t uploader_reset_state(void);
  * `cfg` is the configuration to probe with, or NULL to use what is saved in NVS. A caller that
  * passes settings from an unsaved form (#214.2) merges them over the stored ones itself, so this
  * function never has to know where they came from and nothing is written to NVS by a test. */
-esp_err_t uploader_test_connection(const char *backend_id, const uploader_config_t *cfg,
-                                   bool *out_ok, char *msg, size_t msg_len);
+esp_err_t uploader_test_connection(
+    const char *backend_id, const uploader_config_t *cfg, bool *out_ok, char *msg, size_t msg_len);
 /* Scheduler-owned connection probes; bounded snapshots contain no credentials. */
-typedef enum { UPLOAD_TEST_IDLE, UPLOAD_TEST_QUEUED, UPLOAD_TEST_RUNNING,
-               UPLOAD_TEST_PASSED, UPLOAD_TEST_FAILED, UPLOAD_TEST_BLOCKED } uploader_test_state_t;
-typedef enum { UPLOAD_STAGE_RESOLVE, UPLOAD_STAGE_CONNECT, UPLOAD_STAGE_AUTH_MOUNT,
-               UPLOAD_STAGE_WRITE, UPLOAD_STAGE_VERIFY, UPLOAD_STAGE_CLEANUP,
-               UPLOAD_TEST_STAGE_COUNT } uploader_test_stage_t;
+typedef enum {
+    UPLOAD_TEST_IDLE,
+    UPLOAD_TEST_QUEUED,
+    UPLOAD_TEST_RUNNING,
+    UPLOAD_TEST_PASSED,
+    UPLOAD_TEST_FAILED,
+    UPLOAD_TEST_BLOCKED
+} uploader_test_state_t;
+typedef enum {
+    UPLOAD_STAGE_RESOLVE,
+    UPLOAD_STAGE_CONNECT,
+    UPLOAD_STAGE_AUTH_MOUNT,
+    UPLOAD_STAGE_WRITE,
+    UPLOAD_STAGE_VERIFY,
+    UPLOAD_STAGE_CLEANUP,
+    UPLOAD_TEST_STAGE_COUNT
+} uploader_test_stage_t;
 typedef struct {
     char backend[12];
     uploader_test_state_t state;

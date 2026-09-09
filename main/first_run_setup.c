@@ -23,9 +23,9 @@
 
 static const char *TAG = "first_run";
 
-#define NVS_NAMESPACE   "first_run"
-#define NVS_KEY_SCHEMA  "schema"
-#define NVS_KEY_STATE   "state"
+#define NVS_NAMESPACE "first_run"
+#define NVS_KEY_SCHEMA "schema"
+#define NVS_KEY_STATE "state"
 
 #define RECORD_FLAG_CONTINUE_WITHOUT_RECORDING (1U << 0)
 
@@ -38,8 +38,7 @@ typedef struct {
     uint8_t flags;
 } first_run_record_v1_t;
 
-_Static_assert(sizeof(first_run_record_v1_t) == 4,
-               "first-run v1 record layout changed");
+_Static_assert(sizeof(first_run_record_v1_t) == 4, "first-run v1 record layout changed");
 
 static first_run_setup_state_t s_state;
 /* Writer arguments live in static internal DRAM. A callback still copies this
@@ -59,15 +58,15 @@ static bool s_runtime_initialized;
 
 static void ensure_runtime(void)
 {
-    if (s_state_mutex && s_operation_mutex && s_runtime_initialized) return;
+    if (s_state_mutex && s_operation_mutex && s_runtime_initialized)
+        return;
 
     portENTER_CRITICAL(&s_mutex_init_lock);
     if (!s_state_mutex) {
         s_state_mutex = xSemaphoreCreateMutexStatic(&s_state_mutex_storage);
     }
     if (!s_operation_mutex) {
-        s_operation_mutex = xSemaphoreCreateMutexStatic(
-            &s_operation_mutex_storage);
+        s_operation_mutex = xSemaphoreCreateMutexStatic(&s_operation_mutex_storage);
     }
     if (!s_runtime_initialized) {
         first_run_setup_model_defaults(&s_state);
@@ -119,7 +118,8 @@ static esp_err_t do_load_nvs(void *arg)
 
     nvs_handle_t h;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &h);
-    if (err != ESP_OK) return err;
+    if (err != ESP_OK)
+        return err;
 
     uint16_t schema = 0;
     err = nvs_get_u16(h, NVS_KEY_SCHEMA, &schema);
@@ -129,34 +129,33 @@ static esp_err_t do_load_nvs(void *arg)
     }
 
     switch (schema) {
-        case 1: {
-            first_run_record_v1_t record = {0};
-            size_t record_size = sizeof(record);
-            err = nvs_get_blob(h, NVS_KEY_STATE, &record, &record_size);
-            if (err == ESP_OK && record_size != sizeof(record)) {
-                err = ESP_ERR_INVALID_SIZE;
-            }
-            if (err == ESP_OK) {
-                decoded.schema_version = FIRST_RUN_SETUP_SCHEMA_VERSION;
-                decoded.current_step =
-                    (first_run_setup_step_t)record.current_step;
-                decoded.completed_mask = record.completed_mask;
-                decoded.skipped_mask = record.skipped_mask;
-                decoded.continue_without_recording =
-                    (record.flags &
-                     RECORD_FLAG_CONTINUE_WITHOUT_RECORDING) != 0;
-            }
-            break;
+    case 1: {
+        first_run_record_v1_t record = {0};
+        size_t record_size = sizeof(record);
+        err = nvs_get_blob(h, NVS_KEY_STATE, &record, &record_size);
+        if (err == ESP_OK && record_size != sizeof(record)) {
+            err = ESP_ERR_INVALID_SIZE;
         }
+        if (err == ESP_OK) {
+            decoded.schema_version = FIRST_RUN_SETUP_SCHEMA_VERSION;
+            decoded.current_step = (first_run_setup_step_t)record.current_step;
+            decoded.completed_mask = record.completed_mask;
+            decoded.skipped_mask = record.skipped_mask;
+            decoded.continue_without_recording =
+                (record.flags & RECORD_FLAG_CONTINUE_WITHOUT_RECORDING) != 0;
+        }
+        break;
+    }
 
-        /* Add explicit migrations here when schema v2 is introduced. */
-        default:
-            err = ESP_ERR_INVALID_VERSION;
-            break;
+    /* Add explicit migrations here when schema v2 is introduced. */
+    default:
+        err = ESP_ERR_INVALID_VERSION;
+        break;
     }
 
     nvs_close(h);
-    if (err != ESP_OK) return err;
+    if (err != ESP_OK)
+        return err;
     if (!first_run_setup_model_is_valid(&decoded)) {
         return ESP_ERR_INVALID_STATE;
     }
@@ -170,8 +169,7 @@ static esp_err_t do_save_nvs(void *arg)
 {
     /* Copy before nvs_open: arg can never be dereferenced while flash has the
      * cache disabled, even if this callback's caller used a PSRAM stack. */
-    const first_run_setup_state_t state =
-        *(const first_run_setup_state_t *)arg;
+    const first_run_setup_state_t state = *(const first_run_setup_state_t *)arg;
     if (!first_run_setup_model_is_valid(&state)) {
         return ESP_ERR_INVALID_ARG;
     }
@@ -180,21 +178,20 @@ static esp_err_t do_save_nvs(void *arg)
         .current_step = (uint8_t)state.current_step,
         .completed_mask = state.completed_mask,
         .skipped_mask = state.skipped_mask,
-        .flags = state.continue_without_recording
-                     ? RECORD_FLAG_CONTINUE_WITHOUT_RECORDING
-                     : 0,
+        .flags = state.continue_without_recording ? RECORD_FLAG_CONTINUE_WITHOUT_RECORDING : 0,
     };
 
     nvs_handle_t h;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
-    if (err != ESP_OK) return err;
+    if (err != ESP_OK)
+        return err;
 
-    err = nvs_set_u16(h, NVS_KEY_SCHEMA,
-                      FIRST_RUN_SETUP_SCHEMA_VERSION);
+    err = nvs_set_u16(h, NVS_KEY_SCHEMA, FIRST_RUN_SETUP_SCHEMA_VERSION);
     if (err == ESP_OK) {
         err = nvs_set_blob(h, NVS_KEY_STATE, &record, sizeof(record));
     }
-    if (err == ESP_OK) err = nvs_commit(h);
+    if (err == ESP_OK)
+        err = nvs_commit(h);
     nvs_close(h);
     return err;
 }
@@ -204,9 +201,11 @@ static esp_err_t do_reset_nvs(void *arg)
     (void)arg;
     nvs_handle_t h;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
-    if (err != ESP_OK) return err;
+    if (err != ESP_OK)
+        return err;
     err = nvs_erase_all(h);
-    if (err == ESP_OK) err = nvs_commit(h);
+    if (err == ESP_OK)
+        err = nvs_commit(h);
     nvs_close(h);
     return err;
 }
@@ -231,17 +230,18 @@ esp_err_t first_run_setup_load(void)
     esp_err_t err = nvs_writer_run(do_load_nvs, &s_nvs_work);
     if (err == ESP_OK) {
         publish_state(&s_nvs_work, true, true, ESP_OK);
-        ESP_LOGI(TAG, "loaded schema=%u current=%u complete=0x%02x skip=0x%02x no-record=%u",
+        ESP_LOGI(TAG,
+                 "loaded schema=%u current=%u complete=0x%02x skip=0x%02x no-record=%u",
                  (unsigned)s_nvs_work.schema_version,
                  (unsigned)s_nvs_work.current_step,
-                 s_nvs_work.completed_mask, s_nvs_work.skipped_mask,
+                 s_nvs_work.completed_mask,
+                 s_nvs_work.skipped_mask,
                  s_nvs_work.continue_without_recording);
     } else {
         first_run_setup_state_t defaults;
         first_run_setup_model_defaults(&defaults);
         bool missing = err == ESP_ERR_NVS_NOT_FOUND;
-        bool record_present = err == ESP_ERR_INVALID_VERSION ||
-                              err == ESP_ERR_INVALID_SIZE ||
+        bool record_present = err == ESP_ERR_INVALID_VERSION || err == ESP_ERR_INVALID_SIZE ||
                               err == ESP_ERR_INVALID_STATE;
         publish_state(&defaults, record_present, missing, err);
         if (missing) {
@@ -257,7 +257,8 @@ esp_err_t first_run_setup_load(void)
 
 void first_run_setup_snapshot(first_run_setup_snapshot_t *out)
 {
-    if (!out) return;
+    if (!out)
+        return;
     state_lock();
     out->state = s_state;
     out->persisted = s_persisted;
@@ -266,8 +267,7 @@ void first_run_setup_snapshot(first_run_setup_snapshot_t *out)
     state_unlock();
 }
 
-static esp_err_t copy_mutable_state(first_run_setup_state_t *out,
-                                    bool *persisted)
+static esp_err_t copy_mutable_state(first_run_setup_state_t *out, bool *persisted)
 {
     state_lock();
     if (!s_loaded) {
@@ -280,13 +280,13 @@ static esp_err_t copy_mutable_state(first_run_setup_state_t *out,
         return err == ESP_OK ? ESP_ERR_INVALID_VERSION : err;
     }
     *out = s_state;
-    if (persisted) *persisted = s_persisted;
+    if (persisted)
+        *persisted = s_persisted;
     state_unlock();
     return ESP_OK;
 }
 
-esp_err_t first_run_setup_update(first_run_setup_step_t step,
-                                 first_run_setup_update_t update)
+esp_err_t first_run_setup_update(first_run_setup_step_t step, first_run_setup_update_t update)
 {
     ensure_runtime();
     nvs_writer_init();
@@ -294,11 +294,11 @@ esp_err_t first_run_setup_update(first_run_setup_step_t step,
 
     first_run_setup_state_t candidate;
     esp_err_t err = copy_mutable_state(&candidate, NULL);
-    if (err == ESP_OK &&
-        !first_run_setup_model_apply(&candidate, step, update)) {
+    if (err == ESP_OK && !first_run_setup_model_apply(&candidate, step, update)) {
         err = ESP_ERR_INVALID_ARG;
     }
-    if (err == ESP_OK) err = persist_candidate(&candidate);
+    if (err == ESP_OK)
+        err = persist_candidate(&candidate);
     if (err == ESP_OK) {
         publish_state(&candidate, true, true, ESP_OK);
     } else {
@@ -309,10 +309,10 @@ esp_err_t first_run_setup_update(first_run_setup_step_t step,
     return err;
 }
 
-esp_err_t first_run_setup_reconcile(
-    const first_run_setup_observed_t *observed)
+esp_err_t first_run_setup_reconcile(const first_run_setup_observed_t *observed)
 {
-    if (!observed) return ESP_ERR_INVALID_ARG;
+    if (!observed)
+        return ESP_ERR_INVALID_ARG;
     ensure_runtime();
     nvs_writer_init();
     xSemaphoreTake(s_operation_mutex, portMAX_DELAY);
@@ -321,11 +321,11 @@ esp_err_t first_run_setup_reconcile(
     bool had_persisted_state = false;
     esp_err_t err = copy_mutable_state(&candidate, &had_persisted_state);
     if (err == ESP_OK &&
-        !first_run_setup_model_reconcile(&candidate, observed,
-                                         had_persisted_state)) {
+        !first_run_setup_model_reconcile(&candidate, observed, had_persisted_state)) {
         err = ESP_ERR_INVALID_ARG;
     }
-    if (err == ESP_OK) err = persist_candidate(&candidate);
+    if (err == ESP_OK)
+        err = persist_candidate(&candidate);
     if (err == ESP_OK) {
         publish_state(&candidate, true, true, ESP_OK);
     } else {

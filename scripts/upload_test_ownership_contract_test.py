@@ -27,7 +27,7 @@ if not re.search(
 if not re.search(
     r"uploader_test_request\(const char \*backend, uint32_t \*generation_out\).*?"
     r"s_test\.state = UPLOAD_TEST_QUEUED.*?"
-    r"if \(generation_out\) \*generation_out = generation",
+    r"if\s*\(generation_out\)\s*\*generation_out\s*=\s*generation",
     SCHEDULER,
     re.DOTALL,
 ):

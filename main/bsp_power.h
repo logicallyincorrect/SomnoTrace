@@ -52,11 +52,11 @@ void bsp_power_start_boot_monitor(volatile bool *softap_flag, int hold_ms);
 
 /* Immutable snapshot of the battery state, published by the monitor task. */
 typedef struct {
-    int      percent;      /* 0-100 (slew-limited for display), -1 if unknown */
-    int      millivolts;   /* filtered VBAT in mV, -1 if unknown */
-    bool     charging;     /* true while CHG_STAT is low */
-    bool     valid;        /* false until the first successful sample burst */
-    uint32_t age_s;        /* seconds since the last successful sample burst */
+    int percent;    /* 0-100 (slew-limited for display), -1 if unknown */
+    int millivolts; /* filtered VBAT in mV, -1 if unknown */
+    bool charging;  /* true while CHG_STAT is low */
+    bool valid;     /* false until the first successful sample burst */
+    uint32_t age_s; /* seconds since the last successful sample burst */
 } bsp_battery_t;
 
 /* Start the background battery monitor.  Call once at boot, after

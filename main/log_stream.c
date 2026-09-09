@@ -53,49 +53,49 @@ static const char *TAG = "log_stream";
 
 /* ── Ring Buffer ──────────────────────────────────────────────────── */
 
-#define RINGBUF_SIZE_INTERNAL   (8  * 1024)
-#define RINGBUF_SIZE_PSRAM      (16 * 1024)
-#define LOG_LINE_MAX            256
+#define RINGBUF_SIZE_INTERNAL (8 * 1024)
+#define RINGBUF_SIZE_PSRAM (16 * 1024)
+#define LOG_LINE_MAX 256
 #define LOGS_RECENT_RESPONSE_CAP (8 * 1024)
 /* Includes the longest non-negative signed cursor and leaves room for NUL. */
 #define LOGS_RECENT_SUFFIX_RESERVE (sizeof("],\"cursor\":2147483647}"))
 
 /* ── SD Persistent Logging ───────────────────────────────────────── */
 
-#define LOG_DIR             SD_LOG_DIR
-#define LOG_FILE_PREFIX     "somnotrace.log."
-#define LOG_MAX_FILES       4
-#define LOG_FILE_MAX_SIZE   (128 * 1024)  /* 128 KB per file */
-#define LOG_TOTAL_MAX       (LOG_FILE_MAX_SIZE * LOG_MAX_FILES)  /* 512 KB */
-#define WRITEBUF_SIZE       (8 * 1024)    /* PSRAM write buffer */
-#define FLUSH_INTERVAL_MS   2000          /* flush at least every 2 s */
-#define FLUSH_THRESHOLD     4096          /* flush when buffer reaches 4 KB */
+#define LOG_DIR SD_LOG_DIR
+#define LOG_FILE_PREFIX "somnotrace.log."
+#define LOG_MAX_FILES 4
+#define LOG_FILE_MAX_SIZE (128 * 1024)                    /* 128 KB per file */
+#define LOG_TOTAL_MAX (LOG_FILE_MAX_SIZE * LOG_MAX_FILES) /* 512 KB */
+#define WRITEBUF_SIZE (8 * 1024)                          /* PSRAM write buffer */
+#define FLUSH_INTERVAL_MS 2000                            /* flush at least every 2 s */
+#define FLUSH_THRESHOLD 4096                              /* flush when buffer reaches 4 KB */
 
 /* The native UI retains complete logical lines independently of the byte ring
  * drained by WebSocket/polling clients.  2,048 lines matches the Rev B screen
  * contract and costs about 430 KiB with the bounded text prefix below.  A tiny
  * internal-RAM fallback keeps diagnostics available on boards without usable
  * PSRAM without jeopardising the display's internal-RAM budget. */
-#define RETAINED_CAPACITY_PSRAM          2048u
-#define RETAINED_CAPACITY_PSRAM_FALLBACK  512u
-#define RETAINED_CAPACITY_INTERNAL         32u
-#define RETAINED_SAVE_FILE         "touchscreen-visible.log"
-#define RETAINED_SAVE_TMP_FILE     RETAINED_SAVE_FILE ".tmp"
-#define RETAINED_SAVE_BACKUP_FILE  RETAINED_SAVE_FILE ".bak"
-#define RETAINED_SLOT_TRUNCATED    (1u << 0)
+#define RETAINED_CAPACITY_PSRAM 2048u
+#define RETAINED_CAPACITY_PSRAM_FALLBACK 512u
+#define RETAINED_CAPACITY_INTERNAL 32u
+#define RETAINED_SAVE_FILE "touchscreen-visible.log"
+#define RETAINED_SAVE_TMP_FILE RETAINED_SAVE_FILE ".tmp"
+#define RETAINED_SAVE_BACKUP_FILE RETAINED_SAVE_FILE ".bak"
+#define RETAINED_SLOT_TRUNCATED (1u << 0)
 
 static RingbufHandle_t s_ringbuf;
-static vprintf_like_t  s_orig_vprintf;
+static vprintf_like_t s_orig_vprintf;
 static bool s_init_attempted;
 static esp_err_t s_init_result = ESP_ERR_INVALID_STATE;
 
 /* Write buffer for SD persistence (separate from SSE ring buffer). */
-static uint8_t *s_writebuf;          /* PSRAM buffer */
-static size_t   s_writebuf_head;     /* write position (from vprintf hook) */
-static size_t   s_writebuf_tail;     /* read position (from flush task) */
+static uint8_t *s_writebuf;    /* PSRAM buffer */
+static size_t s_writebuf_head; /* write position (from vprintf hook) */
+static size_t s_writebuf_tail; /* read position (from flush task) */
 static SemaphoreHandle_t s_writebuf_mutex;
 static TaskHandle_t s_flush_task;
-static bool s_sd_ready;              /* SD card is mounted and log dir created */
+static bool s_sd_ready; /* SD card is mounted and log dir created */
 
 typedef struct {
     uint64_t sequence;
@@ -132,31 +132,39 @@ static portMUX_TYPE s_retained_lock = portMUX_INITIALIZER_UNLOCKED;
 typedef struct {
     httpd_handle_t hd;
     int fd;
-    bool paused;  /* per-client: when true, non-log pushes are skipped for this client */
+    bool paused; /* per-client: when true, non-log pushes are skipped for this client */
 } ws_client_t;
 
-static ws_client_t       s_ws_clients[MAX_WS_CLIENTS];
-static int               s_ws_client_count = 0;
+static ws_client_t s_ws_clients[MAX_WS_CLIENTS];
+static int s_ws_client_count = 0;
 static SemaphoreHandle_t s_ws_mutex;
-static TaskHandle_t     s_ws_fwd_task;
-static bool             s_ws_fwd_starting;
-static portMUX_TYPE     s_ws_task_lock = portMUX_INITIALIZER_UNLOCKED;
+static TaskHandle_t s_ws_fwd_task;
+static bool s_ws_fwd_starting;
+static portMUX_TYPE s_ws_task_lock = portMUX_INITIALIZER_UNLOCKED;
 
 /* ── Native touchscreen retained feed ─────────────────────────────── */
 
 static uint8_t retained_level_for_line(const char *text, size_t length)
 {
     size_t i = 0;
-    while (i < length && (text[i] == ' ' || text[i] == '\t')) i++;
-    if (i >= length) return LOG_STREAM_RETAINED_LEVEL_UNKNOWN;
+    while (i < length && (text[i] == ' ' || text[i] == '\t'))
+        i++;
+    if (i >= length)
+        return LOG_STREAM_RETAINED_LEVEL_UNKNOWN;
 
     switch (text[i]) {
-    case 'E': return LOG_STREAM_RETAINED_LEVEL_ERROR;
-    case 'W': return LOG_STREAM_RETAINED_LEVEL_WARN;
-    case 'I': return LOG_STREAM_RETAINED_LEVEL_INFO;
-    case 'D': return LOG_STREAM_RETAINED_LEVEL_DEBUG;
-    case 'V': return LOG_STREAM_RETAINED_LEVEL_VERBOSE;
-    default:  return LOG_STREAM_RETAINED_LEVEL_UNKNOWN;
+    case 'E':
+        return LOG_STREAM_RETAINED_LEVEL_ERROR;
+    case 'W':
+        return LOG_STREAM_RETAINED_LEVEL_WARN;
+    case 'I':
+        return LOG_STREAM_RETAINED_LEVEL_INFO;
+    case 'D':
+        return LOG_STREAM_RETAINED_LEVEL_DEBUG;
+    case 'V':
+        return LOG_STREAM_RETAINED_LEVEL_VERBOSE;
+    default:
+        return LOG_STREAM_RETAINED_LEVEL_UNKNOWN;
     }
 }
 
@@ -169,7 +177,8 @@ static void retained_set_last_error(esp_err_t error)
 
 static void retained_fill_info_locked(log_stream_retained_info_t *info)
 {
-    if (!info) return;
+    if (!info)
+        return;
     info->available = s_retained_slots != NULL;
     info->in_psram = s_retained_in_psram;
     info->capacity = s_retained_capacity;
@@ -177,30 +186,24 @@ static void retained_fill_info_locked(log_stream_retained_info_t *info)
     info->generation = s_retained_generation;
     info->total_count = s_retained_total_count;
     info->retained_span_ms = 0;
-    if (s_retained_slots && s_retained_capacity > 0 &&
-        s_retained_count > 1) {
-        size_t oldest = (s_retained_head + s_retained_capacity -
-                         s_retained_count) % s_retained_capacity;
-        size_t newest = (s_retained_head + s_retained_capacity - 1) %
-                        s_retained_capacity;
+    if (s_retained_slots && s_retained_capacity > 0 && s_retained_count > 1) {
+        size_t oldest =
+            (s_retained_head + s_retained_capacity - s_retained_count) % s_retained_capacity;
+        size_t newest = (s_retained_head + s_retained_capacity - 1) % s_retained_capacity;
         info->retained_span_ms =
-            s_retained_slots[newest].captured_ms -
-            s_retained_slots[oldest].captured_ms;
+            s_retained_slots[newest].captured_ms - s_retained_slots[oldest].captured_ms;
     }
-    info->dropped_count = __atomic_load_n(&s_retained_dropped_count,
-                                          __ATOMIC_RELAXED);
+    info->dropped_count = __atomic_load_n(&s_retained_dropped_count, __ATOMIC_RELAXED);
     info->last_error = s_retained_last_error;
 }
 
-static esp_err_t retained_read_bounds(retained_bounds_t *bounds,
-                                      log_stream_retained_info_t *info)
+static esp_err_t retained_read_bounds(retained_bounds_t *bounds, log_stream_retained_info_t *info)
 {
     esp_err_t result;
     portENTER_CRITICAL(&s_retained_lock);
     retained_fill_info_locked(info);
     if (!s_retained_slots || s_retained_capacity == 0) {
-        result = s_retained_last_error == ESP_OK
-            ? ESP_ERR_INVALID_STATE : s_retained_last_error;
+        result = s_retained_last_error == ESP_OK ? ESP_ERR_INVALID_STATE : s_retained_last_error;
     } else {
         if (bounds) {
             bounds->head = s_retained_head;
@@ -215,8 +218,7 @@ static esp_err_t retained_read_bounds(retained_bounds_t *bounds,
     return result;
 }
 
-static bool retained_copy_slot(size_t index,
-                               log_stream_retained_line_t *line)
+static bool retained_copy_slot(size_t index, log_stream_retained_line_t *line)
 {
     bool copied = false;
     portENTER_CRITICAL(&s_retained_lock);
@@ -242,22 +244,29 @@ static bool retained_contains_case_insensitive(const char *haystack,
                                                size_t haystack_len,
                                                const char *needle)
 {
-    if (!needle || needle[0] == '\0') return true;
+    if (!needle || needle[0] == '\0')
+        return true;
     size_t needle_len = strlen(needle);
-    if (needle_len == 0) return true;
-    if (needle_len > haystack_len) return false;
+    if (needle_len == 0)
+        return true;
+    if (needle_len > haystack_len)
+        return false;
 
     for (size_t i = 0; i + needle_len <= haystack_len; i++) {
         size_t j = 0;
         while (j < needle_len) {
             unsigned char a = (unsigned char)haystack[i + j];
             unsigned char b = (unsigned char)needle[j];
-            if (a >= 'A' && a <= 'Z') a = (unsigned char)(a - 'A' + 'a');
-            if (b >= 'A' && b <= 'Z') b = (unsigned char)(b - 'A' + 'a');
-            if (a != b) break;
+            if (a >= 'A' && a <= 'Z')
+                a = (unsigned char)(a - 'A' + 'a');
+            if (b >= 'A' && b <= 'Z')
+                b = (unsigned char)(b - 'A' + 'a');
+            if (a != b)
+                break;
             j++;
         }
-        if (j == needle_len) return true;
+        if (j == needle_len)
+            return true;
     }
     return false;
 }
@@ -282,72 +291,71 @@ static const char *retained_search_start(const log_stream_retained_line_t *line,
 static bool retained_filter_matches(const log_stream_retained_line_t *line,
                                     const log_stream_retained_filter_t *filter)
 {
-    if (!filter) return true;
-    uint32_t mask = filter->level_mask == 0
-        ? LOG_STREAM_RETAINED_LEVEL_ALL : filter->level_mask;
-    if ((mask & line->level) == 0) return false;
-    if (line->sequence <= filter->after_sequence) return false;
-    if (filter->before_sequence != 0 &&
-        line->sequence >= filter->before_sequence) return false;
+    if (!filter)
+        return true;
+    uint32_t mask = filter->level_mask == 0 ? LOG_STREAM_RETAINED_LEVEL_ALL : filter->level_mask;
+    if ((mask & line->level) == 0)
+        return false;
+    if (line->sequence <= filter->after_sequence)
+        return false;
+    if (filter->before_sequence != 0 && line->sequence >= filter->before_sequence)
+        return false;
 
     size_t search_length;
     const char *search = retained_search_start(line, &search_length);
-    return retained_contains_case_insensitive(search, search_length,
-                                              filter->query);
+    return retained_contains_case_insensitive(search, search_length, filter->query);
 }
 
 static bool retained_line_is_in_bounds(const log_stream_retained_line_t *line,
                                        const retained_bounds_t *bounds)
 {
-    if (bounds->count == 0 || bounds->total_count == 0) return false;
+    if (bounds->count == 0 || bounds->total_count == 0)
+        return false;
     uint64_t first = bounds->total_count - bounds->count + 1;
     return line->sequence >= first && line->sequence <= bounds->total_count;
 }
 
-static size_t retained_snapshot_from_bounds(
-    const retained_bounds_t *bounds,
-    log_stream_retained_line_t *lines,
-    size_t line_capacity,
-    const log_stream_retained_filter_t *filter,
-    bool *unstable)
+static size_t retained_snapshot_from_bounds(const retained_bounds_t *bounds,
+                                            log_stream_retained_line_t *lines,
+                                            size_t line_capacity,
+                                            const log_stream_retained_filter_t *filter,
+                                            bool *unstable)
 {
     size_t copied = 0;
-    bool oldest_first = filter &&
-        filter->order == LOG_STREAM_RETAINED_OLDEST_FIRST;
+    bool oldest_first = filter && filter->order == LOG_STREAM_RETAINED_OLDEST_FIRST;
 
-    if (unstable) *unstable = false;
-    for (size_t offset = 0;
-         offset < bounds->count && copied < line_capacity;
-         offset++) {
+    if (unstable)
+        *unstable = false;
+    for (size_t offset = 0; offset < bounds->count && copied < line_capacity; offset++) {
         size_t index;
         if (oldest_first) {
-            index = (bounds->head + bounds->capacity - bounds->count + offset)
-                % bounds->capacity;
+            index = (bounds->head + bounds->capacity - bounds->count + offset) % bounds->capacity;
         } else {
-            index = (bounds->head + bounds->capacity - 1 - offset)
-                % bounds->capacity;
+            index = (bounds->head + bounds->capacity - 1 - offset) % bounds->capacity;
         }
 
         log_stream_retained_line_t candidate;
         if (!retained_copy_slot(index, &candidate) ||
             !retained_line_is_in_bounds(&candidate, bounds)) {
-            if (unstable) *unstable = true;
+            if (unstable)
+                *unstable = true;
             continue;
         }
-        if (!retained_filter_matches(&candidate, filter)) continue;
+        if (!retained_filter_matches(&candidate, filter))
+            continue;
         lines[copied++] = candidate;
     }
     return copied;
 }
 
-static void retained_append_line(const char *text, size_t length,
-                                 bool source_truncated)
+static void retained_append_line(const char *text, size_t length, bool source_truncated)
 {
     if (!s_retained_slots || s_retained_capacity == 0) {
         __atomic_fetch_add(&s_retained_dropped_count, 1, __ATOMIC_RELAXED);
         return;
     }
-    if (length == 0) return;
+    if (length == 0)
+        return;
 
     /* Never wait in the global vprintf path.  A simultaneous snapshot read or
      * Clear costs this line, which is counted and visible to the UI. */
@@ -372,24 +380,25 @@ static void retained_append_line(const char *text, size_t length,
     slot->captured_ms = (uint32_t)(esp_timer_get_time() / 1000);
 
     s_retained_head = (s_retained_head + 1) % s_retained_capacity;
-    if (s_retained_count < s_retained_capacity) s_retained_count++;
+    if (s_retained_count < s_retained_capacity)
+        s_retained_count++;
     s_retained_generation++;
     portEXIT_CRITICAL(&s_retained_lock);
 }
 
-static void retained_capture_text(const char *text, size_t length,
-                                  bool source_truncated)
+static void retained_capture_text(const char *text, size_t length, bool source_truncated)
 {
     size_t start = 0;
     while (start < length) {
         size_t end = start;
-        while (end < length && text[end] != '\n') end++;
+        while (end < length && text[end] != '\n')
+            end++;
         size_t line_end = end;
-        if (line_end > start && text[line_end - 1] == '\r') line_end--;
+        if (line_end > start && text[line_end - 1] == '\r')
+            line_end--;
         if (line_end > start) {
             bool last_was_truncated = source_truncated && end == length;
-            retained_append_line(text + start, line_end - start,
-                                 last_was_truncated);
+            retained_append_line(text + start, line_end - start, last_was_truncated);
         }
         start = end < length ? end + 1 : length;
     }
@@ -398,8 +407,7 @@ static void retained_capture_text(const char *text, size_t length,
 static void retained_init(void)
 {
     size_t bytes = RETAINED_CAPACITY_PSRAM * sizeof(retained_slot_t);
-    s_retained_slots = heap_caps_calloc(1, bytes,
-                                        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    s_retained_slots = heap_caps_calloc(1, bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (s_retained_slots) {
         s_retained_capacity = RETAINED_CAPACITY_PSRAM;
         s_retained_in_psram = true;
@@ -410,8 +418,7 @@ static void retained_init(void)
     /* A fragmented PSRAM heap may no longer have the roughly 430 KiB required
      * for the full ring even though it can still retain a useful history. */
     bytes = RETAINED_CAPACITY_PSRAM_FALLBACK * sizeof(retained_slot_t);
-    s_retained_slots = heap_caps_calloc(1, bytes,
-                                        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    s_retained_slots = heap_caps_calloc(1, bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (s_retained_slots) {
         s_retained_capacity = RETAINED_CAPACITY_PSRAM_FALLBACK;
         s_retained_in_psram = true;
@@ -420,8 +427,7 @@ static void retained_init(void)
     }
 
     bytes = RETAINED_CAPACITY_INTERNAL * sizeof(retained_slot_t);
-    s_retained_slots = heap_caps_calloc(1, bytes,
-                                        MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    s_retained_slots = heap_caps_calloc(1, bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     if (s_retained_slots) {
         s_retained_capacity = RETAINED_CAPACITY_INTERNAL;
         s_retained_in_psram = false;
@@ -435,7 +441,8 @@ static void retained_init(void)
 
 esp_err_t log_stream_retained_get_info(log_stream_retained_info_t *info)
 {
-    if (!info) return ESP_ERR_INVALID_ARG;
+    if (!info)
+        return ESP_ERR_INVALID_ARG;
     return retained_read_bounds(NULL, info);
 }
 
@@ -456,12 +463,10 @@ esp_err_t log_stream_retained_retry(void)
     retained_slot_t *slots = NULL;
     size_t capacity = RETAINED_CAPACITY_PSRAM;
     bool in_psram = true;
-    slots = heap_caps_calloc(1, capacity * sizeof(*slots),
-                             MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    slots = heap_caps_calloc(1, capacity * sizeof(*slots), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!slots) {
         capacity = RETAINED_CAPACITY_PSRAM_FALLBACK;
-        slots = heap_caps_calloc(1, capacity * sizeof(*slots),
-                                 MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        slots = heap_caps_calloc(1, capacity * sizeof(*slots), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     }
     /* Do not consume the display's already-tight internal heap from a late UI
      * retry.  The tiny internal fallback is safe only during early boot,
@@ -488,12 +493,11 @@ esp_err_t log_stream_retained_retry(void)
     return result;
 }
 
-esp_err_t log_stream_retained_snapshot(
-    log_stream_retained_line_t *lines,
-    size_t line_capacity,
-    const log_stream_retained_filter_t *filter,
-    size_t *line_count,
-    log_stream_retained_info_t *info)
+esp_err_t log_stream_retained_snapshot(log_stream_retained_line_t *lines,
+                                       size_t line_capacity,
+                                       const log_stream_retained_filter_t *filter,
+                                       size_t *line_count,
+                                       log_stream_retained_info_t *info)
 {
     if (!line_count || (line_capacity > 0 && !lines) ||
         (filter && filter->order != LOG_STREAM_RETAINED_NEWEST_FIRST &&
@@ -512,43 +516,39 @@ esp_err_t log_stream_retained_snapshot(
      * A slot can still age out between the metadata snapshot and its copy;
      * skip it rather than returning a newer line.  Generation lets the UI
      * request again. */
-    *line_count = retained_snapshot_from_bounds(&bounds, lines, line_capacity,
-                                                filter, NULL);
+    *line_count = retained_snapshot_from_bounds(&bounds, lines, line_capacity, filter, NULL);
     return ESP_OK;
 }
 
-esp_err_t log_stream_retained_snapshot_page(
-    log_stream_retained_line_t *lines,
-    size_t line_capacity,
-    const log_stream_retained_filter_t *filter,
-    size_t match_offset,
-    log_stream_retained_page_t *page,
-    log_stream_retained_info_t *info)
+esp_err_t log_stream_retained_snapshot_page(log_stream_retained_line_t *lines,
+                                            size_t line_capacity,
+                                            const log_stream_retained_filter_t *filter,
+                                            size_t match_offset,
+                                            log_stream_retained_page_t *page,
+                                            log_stream_retained_info_t *info)
 {
     if (!page || (line_capacity > 0 && !lines) ||
         (filter && filter->order != LOG_STREAM_RETAINED_NEWEST_FIRST &&
          filter->order != LOG_STREAM_RETAINED_OLDEST_FIRST)) {
         return ESP_ERR_INVALID_ARG;
     }
-    *page = (log_stream_retained_page_t) {
+    *page = (log_stream_retained_page_t){
         .match_offset = match_offset,
     };
 
     retained_bounds_t bounds;
     esp_err_t error = retained_read_bounds(&bounds, info);
-    if (error != ESP_OK || bounds.count == 0) return error;
+    if (error != ESP_OK || bounds.count == 0)
+        return error;
 
-    bool oldest_first = filter &&
-        filter->order == LOG_STREAM_RETAINED_OLDEST_FIRST;
+    bool oldest_first = filter && filter->order == LOG_STREAM_RETAINED_OLDEST_FIRST;
     size_t matched = 0;
     for (size_t offset = 0; offset < bounds.count; offset++) {
         size_t index;
         if (oldest_first) {
-            index = (bounds.head + bounds.capacity - bounds.count + offset)
-                % bounds.capacity;
+            index = (bounds.head + bounds.capacity - bounds.count + offset) % bounds.capacity;
         } else {
-            index = (bounds.head + bounds.capacity - 1 - offset)
-                % bounds.capacity;
+            index = (bounds.head + bounds.capacity - 1 - offset) % bounds.capacity;
         }
 
         log_stream_retained_line_t candidate;
@@ -560,7 +560,8 @@ esp_err_t log_stream_retained_snapshot_page(
 
         if (matched >= match_offset && page->returned < line_capacity) {
             lines[page->returned++] = candidate;
-            if (page->returned == 1) page->first_sequence = candidate.sequence;
+            if (page->returned == 1)
+                page->first_sequence = candidate.sequence;
             page->last_sequence = candidate.sequence;
         }
         matched++;
@@ -568,8 +569,7 @@ esp_err_t log_stream_retained_snapshot_page(
 
     page->matching_count = matched;
     page->has_previous_page = match_offset > 0 && matched > 0;
-    page->has_next_page = match_offset < matched &&
-        page->returned < matched - match_offset;
+    page->has_next_page = match_offset < matched && page->returned < matched - match_offset;
     return ESP_OK;
 }
 
@@ -577,8 +577,8 @@ esp_err_t log_stream_retained_clear(void)
 {
     portENTER_CRITICAL(&s_retained_lock);
     if (!s_retained_slots || s_retained_capacity == 0) {
-        esp_err_t error = s_retained_last_error == ESP_OK
-            ? ESP_ERR_INVALID_STATE : s_retained_last_error;
+        esp_err_t error =
+            s_retained_last_error == ESP_OK ? ESP_ERR_INVALID_STATE : s_retained_last_error;
         portEXIT_CRITICAL(&s_retained_lock);
         return error;
     }
@@ -664,9 +664,10 @@ static int log_vprintf_hook(const char *fmt, va_list args)
 /* Ensure the log directory exists on the SD card. */
 static void ensure_log_dir(void)
 {
-    if (!sd_storage_is_ready()) return;
-    mkdir(SD_APP_DIR, 0777);  /* parent .somnotrace/ (non-recursive mkdir) */
-    mkdir(LOG_DIR, 0777);     /* ignore EEXIST */
+    if (!sd_storage_is_ready())
+        return;
+    mkdir(SD_APP_DIR, 0777); /* parent .somnotrace/ (non-recursive mkdir) */
+    mkdir(LOG_DIR, 0777);    /* ignore EEXIST */
     s_sd_ready = true;
 }
 
@@ -694,7 +695,8 @@ static long log_file_size(void)
     char path[64];
     snprintf(path, sizeof(path), "%s/%s0", LOG_DIR, LOG_FILE_PREFIX);
     struct stat st;
-    if (stat(path, &st) == 0) return st.st_size;
+    if (stat(path, &st) == 0)
+        return st.st_size;
     return 0;
 }
 
@@ -703,35 +705,42 @@ static long log_file_size(void)
  * silently dropping it.  The flush task is the sole tail writer. */
 static void writebuf_acknowledge(size_t written)
 {
-    if (!written || !s_writebuf_mutex) return;
+    if (!written || !s_writebuf_mutex)
+        return;
     xSemaphoreTake(s_writebuf_mutex, portMAX_DELAY);
     size_t pending = s_writebuf_head - s_writebuf_tail;
-    if (written > pending) written = pending;
+    if (written > pending)
+        written = pending;
     s_writebuf_tail += written;
     xSemaphoreGive(s_writebuf_mutex);
 }
 
 static void log_flush_once(void)
 {
-    if (!s_writebuf || !s_writebuf_mutex || !sd_storage_is_ready()) return;
+    if (!s_writebuf || !s_writebuf_mutex || !sd_storage_is_ready())
+        return;
 
     /* Persistent logs are independent of raw session files, so use EXPORT:
      * this serialises rotation/open/write against card readers and destructive
      * maintenance while remaining explicitly allowed during therapy. */
-    if (!sd_storage_lease_acquire(SD_LEASE_EXPORT, 250)) return;
+    if (!sd_storage_lease_acquire(SD_LEASE_EXPORT, 250))
+        return;
 
     FILE *file = NULL;
-    if (!sd_storage_is_ready()) goto done;
+    if (!sd_storage_is_ready())
+        goto done;
     if (!s_sd_ready) {
         ensure_log_dir();
-        if (!s_sd_ready) goto done;
+        if (!s_sd_ready)
+            goto done;
     }
 
     size_t available;
     xSemaphoreTake(s_writebuf_mutex, portMAX_DELAY);
     available = s_writebuf_head - s_writebuf_tail;
     xSemaphoreGive(s_writebuf_mutex);
-    if (available == 0) goto done;
+    if (available == 0)
+        goto done;
 
     long current_size = log_file_size();
     if (current_size >= LOG_FILE_MAX_SIZE) {
@@ -758,8 +767,10 @@ static void log_flush_once(void)
         }
         size_t position = s_writebuf_tail % WRITEBUF_SIZE;
         size_t chunk = WRITEBUF_SIZE - position;
-        if (chunk > pending) chunk = pending;
-        if (chunk > sizeof(temporary)) chunk = sizeof(temporary);
+        if (chunk > pending)
+            chunk = pending;
+        if (chunk > sizeof(temporary))
+            chunk = sizeof(temporary);
         memcpy(temporary, s_writebuf + position, chunk);
         xSemaphoreGive(s_writebuf_mutex);
 
@@ -767,15 +778,17 @@ static void log_flush_once(void)
         writebuf_acknowledge(written);
         total_written += written;
         if (written != chunk) {
-            ESP_LOGW(TAG, "flush: short write (%u/%u, errno %d); retaining suffix",
-                     (unsigned)written, (unsigned)chunk, errno);
+            ESP_LOGW(TAG,
+                     "flush: short write (%u/%u, errno %d); retaining suffix",
+                     (unsigned)written,
+                     (unsigned)chunk,
+                     errno);
             break;
         }
 
         if (current_size + (long)total_written >= LOG_FILE_MAX_SIZE) {
             if (fclose(file) != 0) {
-                ESP_LOGW(TAG, "flush: close before rotation failed (errno %d)",
-                         errno);
+                ESP_LOGW(TAG, "flush: close before rotation failed (errno %d)", errno);
                 file = NULL;
                 break;
             }
@@ -785,8 +798,7 @@ static void log_flush_once(void)
             total_written = 0;
             file = fopen(path, "ab");
             if (!file) {
-                ESP_LOGE(TAG, "flush: cannot reopen %s (errno %d)", path,
-                         errno);
+                ESP_LOGE(TAG, "flush: cannot reopen %s (errno %d)", path, errno);
                 break;
             }
         }
@@ -812,7 +824,8 @@ static void log_flush_task(void *arg)
         if (!hwm_logged) {
             hwm_logged = true;
             UBaseType_t hwm = uxTaskGetStackHighWaterMark(NULL);
-            ESP_LOGI(TAG, "log_flush: stack high-water = %u bytes",
+            ESP_LOGI(TAG,
+                     "log_flush: stack high-water = %u bytes",
                      (unsigned)(hwm * sizeof(StackType_t)));
         }
     }
@@ -830,27 +843,32 @@ static esp_err_t retained_publish_snapshot(const char *temporary_path,
     struct stat status;
     errno = 0;
     bool final_exists = stat(final_path, &status) == 0;
-    if (!final_exists && errno != ENOENT) return ESP_FAIL;
+    if (!final_exists && errno != ENOENT)
+        return ESP_FAIL;
 
     errno = 0;
     bool backup_exists = stat(backup_path, &status) == 0;
-    if (!backup_exists && errno != ENOENT) return ESP_FAIL;
+    if (!backup_exists && errno != ENOENT)
+        return ESP_FAIL;
 
     /* Recover an interrupted earlier publication before starting a new one.
      * If both names exist, final is already the committed copy and the stale
      * backup can be discarded. */
     if (backup_exists) {
         if (final_exists) {
-            if (remove(backup_path) != 0) return ESP_FAIL;
+            if (remove(backup_path) != 0)
+                return ESP_FAIL;
         } else {
-            if (rename(backup_path, final_path) != 0) return ESP_FAIL;
+            if (rename(backup_path, final_path) != 0)
+                return ESP_FAIL;
             final_exists = true;
         }
     }
 
     bool moved_previous = false;
     if (final_exists) {
-        if (rename(final_path, backup_path) != 0) return ESP_FAIL;
+        if (rename(final_path, backup_path) != 0)
+            return ESP_FAIL;
         moved_previous = true;
     }
 
@@ -873,32 +891,32 @@ static esp_err_t retained_publish_snapshot(const char *temporary_path,
     return ESP_OK;
 }
 
-esp_err_t log_stream_retained_save_to_sd(
-    const log_stream_retained_filter_t *filter,
-    char *saved_path,
-    size_t saved_path_size,
-    size_t *saved_line_count,
-    log_stream_retained_progress_fn progress_fn,
-    void *progress_ctx)
+esp_err_t log_stream_retained_save_to_sd(const log_stream_retained_filter_t *filter,
+                                         char *saved_path,
+                                         size_t saved_path_size,
+                                         size_t *saved_line_count,
+                                         log_stream_retained_progress_fn progress_fn,
+                                         void *progress_ctx)
 {
-    if ((saved_path && saved_path_size == 0) ||
-        (!saved_path && saved_path_size != 0) ||
+    if ((saved_path && saved_path_size == 0) || (!saved_path && saved_path_size != 0) ||
         (filter && filter->order != LOG_STREAM_RETAINED_NEWEST_FIRST &&
          filter->order != LOG_STREAM_RETAINED_OLDEST_FIRST)) {
         return ESP_ERR_INVALID_ARG;
     }
-    if (saved_path) saved_path[0] = '\0';
-    if (saved_line_count) *saved_line_count = 0;
+    if (saved_path)
+        saved_path[0] = '\0';
+    if (saved_line_count)
+        *saved_line_count = 0;
 
-    const size_t final_path_len = strlen(LOG_DIR) + 1 +
-        strlen(RETAINED_SAVE_FILE);
+    const size_t final_path_len = strlen(LOG_DIR) + 1 + strlen(RETAINED_SAVE_FILE);
     if (saved_path && saved_path_size <= final_path_len) {
         return ESP_ERR_INVALID_SIZE;
     }
 
     log_stream_retained_info_t info;
     esp_err_t error = log_stream_retained_get_info(&info);
-    if (error != ESP_OK) return error;
+    if (error != ESP_OK)
+        return error;
     if (!sd_storage_is_ready()) {
         retained_set_last_error(ESP_ERR_INVALID_STATE);
         return ESP_ERR_INVALID_STATE;
@@ -911,12 +929,9 @@ esp_err_t log_stream_retained_save_to_sd(
     char final_path[96];
     char tmp_path[100];
     char backup_path[100];
-    snprintf(final_path, sizeof(final_path), "%s/%s", LOG_DIR,
-             RETAINED_SAVE_FILE);
-    snprintf(tmp_path, sizeof(tmp_path), "%s/%s", LOG_DIR,
-             RETAINED_SAVE_TMP_FILE);
-    snprintf(backup_path, sizeof(backup_path), "%s/%s", LOG_DIR,
-             RETAINED_SAVE_BACKUP_FILE);
+    snprintf(final_path, sizeof(final_path), "%s/%s", LOG_DIR, RETAINED_SAVE_FILE);
+    snprintf(tmp_path, sizeof(tmp_path), "%s/%s", LOG_DIR, RETAINED_SAVE_TMP_FILE);
+    snprintf(backup_path, sizeof(backup_path), "%s/%s", LOG_DIR, RETAINED_SAVE_BACKUP_FILE);
 
     FILE *file = NULL;
     bool tmp_exists = false;
@@ -934,8 +949,10 @@ esp_err_t log_stream_retained_save_to_sd(
 
     retained_bounds_t bounds;
     error = retained_read_bounds(&bounds, NULL);
-    if (error != ESP_OK) goto done;
-    if (progress_fn) progress_fn(0, bounds.count, progress_ctx);
+    if (error != ESP_OK)
+        goto done;
+    if (progress_fn)
+        progress_fn(0, bounds.count, progress_ctx);
 
     /* A temporary sibling prevents a failed/partial write from replacing the
      * last successful touchscreen export.  Capture remains available while
@@ -951,28 +968,27 @@ esp_err_t log_stream_retained_save_to_sd(
     tmp_exists = true;
 
     log_stream_retained_filter_t chronological = {0};
-    if (filter) chronological = *filter;
+    if (filter)
+        chronological = *filter;
     chronological.order = LOG_STREAM_RETAINED_OLDEST_FIRST;
 
     for (size_t offset = 0; offset < bounds.count; offset++) {
-        size_t index = (bounds.head + bounds.capacity - bounds.count + offset)
-            % bounds.capacity;
+        size_t index = (bounds.head + bounds.capacity - bounds.count + offset) % bounds.capacity;
         log_stream_retained_line_t line;
-        if (!retained_copy_slot(index, &line) ||
-            !retained_line_is_in_bounds(&line, &bounds)) {
+        if (!retained_copy_slot(index, &line) || !retained_line_is_in_bounds(&line, &bounds)) {
             error = ESP_ERR_INVALID_STATE;
             goto done;
         }
         if (retained_filter_matches(&line, &chronological)) {
-            if ((line.length > 0 &&
-                 fwrite(line.text, 1, line.length, file) != line.length) ||
+            if ((line.length > 0 && fwrite(line.text, 1, line.length, file) != line.length) ||
                 fwrite("\n", 1, 1, file) != 1) {
                 error = ESP_FAIL;
                 goto done;
             }
             written_lines++;
         }
-        if (progress_fn) progress_fn(offset + 1, bounds.count, progress_ctx);
+        if (progress_fn)
+            progress_fn(offset + 1, bounds.count, progress_ctx);
     }
 
     /* Filtering can skip the final slot's write; progress still describes the
@@ -981,7 +997,8 @@ esp_err_t log_stream_retained_save_to_sd(
         progress_fn(0, 0, progress_ctx);
 
     bool close_failed = fflush(file) != 0;
-    if (fclose(file) != 0) close_failed = true;
+    if (fclose(file) != 0)
+        close_failed = true;
     file = NULL;
     if (close_failed) {
         error = ESP_FAIL;
@@ -989,41 +1006,46 @@ esp_err_t log_stream_retained_save_to_sd(
     }
 
     error = retained_publish_snapshot(tmp_path, final_path, backup_path);
-    if (error != ESP_OK) goto done;
+    if (error != ESP_OK)
+        goto done;
     tmp_exists = false;
     error = ESP_OK;
-    if (progress_fn) progress_fn(bounds.count, bounds.count, progress_ctx);
+    if (progress_fn)
+        progress_fn(bounds.count, bounds.count, progress_ctx);
 
 done:
-    if (file && fclose(file) != 0 && error == ESP_OK) error = ESP_FAIL;
-    if (tmp_exists) remove(tmp_path);
+    if (file && fclose(file) != 0 && error == ESP_OK)
+        error = ESP_FAIL;
+    if (tmp_exists)
+        remove(tmp_path);
     sd_storage_lease_release_unchanged(SD_LEASE_EXPORT);
     retained_set_last_error(error);
 
     if (error == ESP_OK) {
-        if (saved_path) snprintf(saved_path, saved_path_size, "%s", final_path);
-        if (saved_line_count) *saved_line_count = written_lines;
+        if (saved_path)
+            snprintf(saved_path, saved_path_size, "%s", final_path);
+        if (saved_line_count)
+            *saved_line_count = written_lines;
     }
     return error;
 }
 
 esp_err_t log_stream_init(void)
 {
-    if (s_init_attempted) return s_init_result;
+    if (s_init_attempted)
+        return s_init_result;
     s_init_attempted = true;
     s_init_result = ESP_ERR_NO_MEM;
 
     /* Prefer PSRAM (larger buffer) if available, else internal RAM. */
     size_t buf_sz = 0;
     if (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) > RINGBUF_SIZE_PSRAM * 2) {
-        s_ringbuf = xRingbufferCreateWithCaps(RINGBUF_SIZE_PSRAM,
-                                              RINGBUF_TYPE_BYTEBUF,
-                                              MALLOC_CAP_SPIRAM);
+        s_ringbuf =
+            xRingbufferCreateWithCaps(RINGBUF_SIZE_PSRAM, RINGBUF_TYPE_BYTEBUF, MALLOC_CAP_SPIRAM);
         buf_sz = RINGBUF_SIZE_PSRAM;
     } else {
-        s_ringbuf = xRingbufferCreateWithCaps(RINGBUF_SIZE_INTERNAL,
-                                              RINGBUF_TYPE_BYTEBUF,
-                                              MALLOC_CAP_INTERNAL);
+        s_ringbuf = xRingbufferCreateWithCaps(
+            RINGBUF_SIZE_INTERNAL, RINGBUF_TYPE_BYTEBUF, MALLOC_CAP_INTERNAL);
         buf_sz = RINGBUF_SIZE_INTERNAL;
     }
     if (!s_ringbuf) {
@@ -1073,21 +1095,22 @@ esp_err_t log_stream_init(void)
         }
     }
 
-    ESP_LOGI(TAG, "log stream init: %u-byte ring buffer (%s), %s SD logging, "
+    ESP_LOGI(TAG,
+             "log stream init: %u-byte ring buffer (%s), %s SD logging, "
              "%u-line retained feed (%s)",
              (unsigned)buf_sz,
              buf_sz == RINGBUF_SIZE_PSRAM ? "PSRAM" : "internal",
              s_flush_task ? "with" : "without",
              (unsigned)s_retained_capacity,
-             s_retained_in_psram ? "PSRAM" :
-                 s_retained_slots ? "internal" : "unavailable");
+             s_retained_in_psram ? "PSRAM"
+             : s_retained_slots  ? "internal"
+                                 : "unavailable");
 
-    bool complete = s_ringbuf && s_retained_slots && s_writebuf &&
-                    s_writebuf_mutex && s_flush_task && s_ws_mutex;
+    bool complete = s_ringbuf && s_retained_slots && s_writebuf && s_writebuf_mutex &&
+                    s_flush_task && s_ws_mutex;
     s_init_result = complete ? ESP_OK : ESP_ERR_NO_MEM;
     if (!complete)
-        ESP_LOGW(TAG, "log stream started in degraded mode (%s)",
-                 esp_err_to_name(s_init_result));
+        ESP_LOGW(TAG, "log stream started in degraded mode (%s)", esp_err_to_name(s_init_result));
     return s_init_result;
 }
 
@@ -1097,7 +1120,8 @@ esp_err_t log_stream_init(void)
 static bool ws_has_active_client(void)
 {
     bool active = false;
-    if (!s_ws_mutex) return false;
+    if (!s_ws_mutex)
+        return false;
     if (xSemaphoreTake(s_ws_mutex, 0) == pdTRUE) {
         for (int i = 0; i < s_ws_client_count; i++) {
             if (!s_ws_clients[i].paused) {
@@ -1114,8 +1138,8 @@ static bool ws_has_active_client(void)
  * task.  Volatile because they are written from other tasks/contexts. */
 static volatile bool s_push_status_now = false;
 static volatile bool s_push_upload_now = false;
-static volatile bool s_push_ble_now    = false;
-static volatile bool s_push_ox_now     = false;
+static volatile bool s_push_ble_now = false;
+static volatile bool s_push_ox_now = false;
 
 /* Request an immediate upload-progress push on the next forwarder cycle
  * (e.g. on a backend state transition).  Safe to call from any task. */
@@ -1138,8 +1162,8 @@ void log_stream_request_ox_push(void)
     s_push_ox_now = true;
 }
 
-static esp_err_t ws_queue_send(httpd_handle_t hd, int fd, uint8_t type,
-                               const char *payload, size_t len);
+static esp_err_t ws_queue_send(
+    httpd_handle_t hd, int fd, uint8_t type, const char *payload, size_t len);
 
 static void ws_remove_client_locked(int fd)
 {
@@ -1157,7 +1181,8 @@ static void ws_remove_client_locked(int fd)
 static void ws_add_client_locked(httpd_handle_t hd, int fd)
 {
     for (int i = 0; i < s_ws_client_count; i++) {
-        if (s_ws_clients[i].fd == fd) return;
+        if (s_ws_clients[i].fd == fd)
+            return;
     }
     if (s_ws_client_count >= MAX_WS_CLIENTS) {
         httpd_handle_t old_hd = s_ws_clients[0].hd;
@@ -1165,8 +1190,7 @@ static void ws_add_client_locked(httpd_handle_t hd, int fd)
         ESP_LOGI(TAG, "ws: evicting oldest client (fd=%d) for new client (fd=%d)", old_fd, fd);
 
         const char *evict_msg = "{\"type\":\"evicted\",\"reason\":\"max_clients_exceeded\"}";
-        ws_queue_send(old_hd, old_fd, HTTPD_WS_TYPE_TEXT, evict_msg,
-                      strlen(evict_msg));
+        ws_queue_send(old_hd, old_fd, HTTPD_WS_TYPE_TEXT, evict_msg, strlen(evict_msg));
         ws_queue_send(old_hd, old_fd, HTTPD_WS_TYPE_CLOSE, NULL, 0);
 
         for (int i = 0; i < s_ws_client_count - 1; i++) {
@@ -1192,7 +1216,8 @@ typedef struct {
 static void ws_send_work(void *arg)
 {
     ws_send_work_t *work = arg;
-    if (!work) return;
+    if (!work)
+        return;
     httpd_ws_frame_t pkt = {
         .final = true,
         .type = work->type,
@@ -1200,8 +1225,7 @@ static void ws_send_work(void *arg)
         .len = work->len,
     };
     esp_err_t err = httpd_ws_send_frame_async(work->hd, work->fd, &pkt);
-    if (s_ws_mutex && err != ESP_OK && err != ESP_ERR_TIMEOUT &&
-        err != ESP_ERR_NO_MEM) {
+    if (s_ws_mutex && err != ESP_OK && err != ESP_ERR_TIMEOUT && err != ESP_ERR_NO_MEM) {
         if (xSemaphoreTake(s_ws_mutex, 0) == pdTRUE) {
             ws_remove_client_locked(work->fd);
             xSemaphoreGive(s_ws_mutex);
@@ -1211,19 +1235,28 @@ static void ws_send_work(void *arg)
     free(work);
 }
 
-static esp_err_t ws_queue_send(httpd_handle_t hd, int fd, uint8_t type,
-                               const char *payload, size_t len)
+static esp_err_t ws_queue_send(
+    httpd_handle_t hd, int fd, uint8_t type, const char *payload, size_t len)
 {
     ws_send_work_t *work = heap_caps_calloc(1, sizeof(*work), MALLOC_CAP_SPIRAM);
-    if (!work) work = calloc(1, sizeof(*work));
-    if (!work) return ESP_ERR_NO_MEM;
+    if (!work)
+        work = calloc(1, sizeof(*work));
+    if (!work)
+        return ESP_ERR_NO_MEM;
     if (len > 0) {
         work->payload = heap_caps_malloc(len, MALLOC_CAP_SPIRAM);
-        if (!work->payload) work->payload = malloc(len);
-        if (!work->payload) { free(work); return ESP_ERR_NO_MEM; }
+        if (!work->payload)
+            work->payload = malloc(len);
+        if (!work->payload) {
+            free(work);
+            return ESP_ERR_NO_MEM;
+        }
         memcpy(work->payload, payload, len);
     }
-    work->hd = hd; work->fd = fd; work->type = type; work->len = len;
+    work->hd = hd;
+    work->fd = fd;
+    work->type = type;
+    work->len = len;
     esp_err_t err = httpd_queue_work(hd, ws_send_work, work);
     if (err != ESP_OK) {
         free(work->payload);
@@ -1232,11 +1265,12 @@ static esp_err_t ws_queue_send(httpd_handle_t hd, int fd, uint8_t type,
     return err;
 }
 
-static esp_err_t ws_send_frame_internal(const char *payload_str, size_t len,
-                                        bool skip_paused)
+static esp_err_t ws_send_frame_internal(const char *payload_str, size_t len, bool skip_paused)
 {
-    if (!s_ws_mutex) return ESP_ERR_INVALID_STATE;
-    if (!payload_str && len > 0) return ESP_ERR_INVALID_ARG;
+    if (!s_ws_mutex)
+        return ESP_ERR_INVALID_STATE;
+    if (!payload_str && len > 0)
+        return ESP_ERR_INVALID_ARG;
 
     ws_client_t clients[MAX_WS_CLIENTS];
     int count = 0;
@@ -1248,14 +1282,15 @@ static esp_err_t ws_send_frame_internal(const char *payload_str, size_t len,
         }
         xSemaphoreGive(s_ws_mutex);
     }
-    if (count <= 0) return ESP_OK;
+    if (count <= 0)
+        return ESP_OK;
 
     for (int i = 0; i < count; i++) {
         /* Skip paused clients for non-log messages (per-client pause). */
         if (skip_paused && clients[i].paused)
             continue;
-        esp_err_t err = ws_queue_send(clients[i].hd, clients[i].fd,
-                                      HTTPD_WS_TYPE_TEXT, payload_str, len);
+        esp_err_t err =
+            ws_queue_send(clients[i].hd, clients[i].fd, HTTPD_WS_TYPE_TEXT, payload_str, len);
         if (err != ESP_OK) {
             bool transient = (err == ESP_ERR_TIMEOUT || err == ESP_ERR_NO_MEM);
             if (!transient) {
@@ -1273,18 +1308,21 @@ static esp_err_t ws_send_frame_internal(const char *payload_str, size_t len,
 esp_err_t log_stream_ws_send_json(const char *type, cJSON *data_obj)
 {
     if (!type) {
-        if (data_obj) cJSON_Delete(data_obj);
+        if (data_obj)
+            cJSON_Delete(data_obj);
         return ESP_ERR_INVALID_ARG;
     }
     if (!s_ringbuf || !s_ws_mutex) {
-        if (data_obj) cJSON_Delete(data_obj);
+        if (data_obj)
+            cJSON_Delete(data_obj);
         return ESP_ERR_INVALID_STATE;
     }
 
     bool is_log = (strcmp(type, "log") == 0);
     cJSON *root = cJSON_CreateObject();
     if (!root) {
-        if (data_obj) cJSON_Delete(data_obj);
+        if (data_obj)
+            cJSON_Delete(data_obj);
         return ESP_ERR_NO_MEM;
     }
     cJSON_AddStringToObject(root, "type", type);
@@ -1293,7 +1331,8 @@ esp_err_t log_stream_ws_send_json(const char *type, cJSON *data_obj)
     }
     char *str = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
-    if (!str) return ESP_ERR_NO_MEM;
+    if (!str)
+        return ESP_ERR_NO_MEM;
 
     esp_err_t err = ws_send_frame_internal(str, strlen(str), !is_log);
     free(str);
@@ -1302,18 +1341,23 @@ esp_err_t log_stream_ws_send_json(const char *type, cJSON *data_obj)
 
 esp_err_t log_stream_ws_send_json_raw(const char *type, const char *data_json_str)
 {
-    if (!type) return ESP_ERR_INVALID_ARG;
-    if (!s_ringbuf || !s_ws_mutex) return ESP_ERR_INVALID_STATE;
+    if (!type)
+        return ESP_ERR_INVALID_ARG;
+    if (!s_ringbuf || !s_ws_mutex)
+        return ESP_ERR_INVALID_STATE;
 
     bool is_log = (strcmp(type, "log") == 0);
     size_t type_len = strlen(type);
     size_t data_len = data_json_str ? strlen(data_json_str) : 4;
     size_t total = type_len + data_len + 32;
     char *buf = heap_caps_malloc(total, MALLOC_CAP_SPIRAM);
-    if (!buf) buf = malloc(total);
-    if (!buf) return ESP_ERR_NO_MEM;
+    if (!buf)
+        buf = malloc(total);
+    if (!buf)
+        return ESP_ERR_NO_MEM;
 
-    int len = snprintf(buf, total, "{\"type\":\"%s\",\"data\":%s}", type, data_json_str ? data_json_str : "null");
+    int len = snprintf(
+        buf, total, "{\"type\":\"%s\",\"data\":%s}", type, data_json_str ? data_json_str : "null");
     esp_err_t err = ws_send_frame_internal(buf, len, !is_log);
     free(buf);
     return err;
@@ -1332,8 +1376,10 @@ static bool ws_forwarder_wait_for_publication(void)
         published = s_ws_fwd_task == self;
         abandoned = !s_ws_fwd_starting && !published;
         portEXIT_CRITICAL(&s_ws_task_lock);
-        if (published) return true;
-        if (abandoned) return false;
+        if (published)
+            return true;
+        if (abandoned)
+            return false;
         vTaskDelay(1);
     }
 }
@@ -1342,7 +1388,8 @@ static void ws_forwarder_clear_current(void)
 {
     TaskHandle_t self = xTaskGetCurrentTaskHandle();
     portENTER_CRITICAL(&s_ws_task_lock);
-    if (s_ws_fwd_task == self) s_ws_fwd_task = NULL;
+    if (s_ws_fwd_task == self)
+        s_ws_fwd_task = NULL;
     portEXIT_CRITICAL(&s_ws_task_lock);
 }
 
@@ -1363,12 +1410,14 @@ static esp_err_t ws_forwarder_start(void)
         create = true;
     }
     portEXIT_CRITICAL(&s_ws_task_lock);
-    if (!create) return ESP_OK;
+    if (!create)
+        return ESP_OK;
 
-    TaskHandle_t task = psram_task_create(ws_forwarder_task, "ws_fwd", 12288,
-                                          NULL, 3, 0, NULL, NULL);
+    TaskHandle_t task =
+        psram_task_create(ws_forwarder_task, "ws_fwd", 12288, NULL, 3, 0, NULL, NULL);
     portENTER_CRITICAL(&s_ws_task_lock);
-    if (task) s_ws_fwd_task = task;
+    if (task)
+        s_ws_fwd_task = task;
     s_ws_fwd_starting = false;
     portEXIT_CRITICAL(&s_ws_task_lock);
     return task ? ESP_OK : ESP_ERR_NO_MEM;
@@ -1408,8 +1457,8 @@ static void ws_forwarder_task(void *arg)
         if (!hwm_logged && client_count > 0) {
             hwm_logged = true;
             UBaseType_t hwm = uxTaskGetStackHighWaterMark(NULL);
-            ESP_LOGI(TAG, "ws_fwd: stack high-water = %u bytes",
-                     (unsigned)(hwm * sizeof(StackType_t)));
+            ESP_LOGI(
+                TAG, "ws_fwd: stack high-water = %u bytes", (unsigned)(hwm * sizeof(StackType_t)));
         }
 
         if (client_count <= 0) {
@@ -1419,8 +1468,8 @@ static void ws_forwarder_task(void *arg)
             last_upload_tick = xTaskGetTickCount();
             s_push_status_now = false;
             s_push_upload_now = false;
-            s_push_ble_now    = false;
-            s_push_ox_now     = false;
+            s_push_ble_now = false;
+            s_push_ox_now = false;
             continue;
         }
 
@@ -1521,7 +1570,8 @@ static void ws_forwarder_task(void *arg)
 static esp_err_t logs_ws_handler(httpd_req_t *req)
 {
     if (!s_ringbuf || !s_ws_mutex) {
-        if (req->method == HTTP_GET) httpd_resp_send_500(req);
+        if (req->method == HTTP_GET)
+            httpd_resp_send_500(req);
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -1548,8 +1598,7 @@ static esp_err_t logs_ws_handler(httpd_req_t *req)
     ws_pkt.payload = buf;
     ws_pkt.type = HTTPD_WS_TYPE_TEXT;
 
-    if (httpd_ws_recv_frame(req, &ws_pkt, sizeof(buf) - 1) != ESP_OK ||
-        ws_pkt.len >= sizeof(buf)) {
+    if (httpd_ws_recv_frame(req, &ws_pkt, sizeof(buf) - 1) != ESP_OK || ws_pkt.len >= sizeof(buf)) {
         return ESP_FAIL;
     }
 
@@ -1614,7 +1663,8 @@ static esp_err_t logs_recent_handler(httpd_req_t *req)
         char val[16] = {0};
         if (httpd_query_key_value(query, "since", val, sizeof(val)) == ESP_OK) {
             since = atoi(val);
-            if (since < 0) since = 0;
+            if (since < 0)
+                since = 0;
         }
     }
 
@@ -1650,12 +1700,14 @@ static esp_err_t logs_recent_handler(httpd_req_t *req)
     while (s_ringbuf && !response_full) {
         size_t item_sz = 0;
         void *item = xRingbufferReceiveUpTo(s_ringbuf, &item_sz, 0, LOG_LINE_MAX);
-        if (!item) break;
+        if (!item)
+            break;
 
-        if (local_cursor < INT_MAX) local_cursor++;
+        if (local_cursor < INT_MAX)
+            local_cursor++;
 
         /* Split chunk into individual lines on '\n' and emit as JSON strings. */
-        const char *p   = (const char *)item;
+        const char *p = (const char *)item;
         const char *end = p + item_sz;
 
         while (p < end) {
@@ -1675,8 +1727,7 @@ static esp_err_t logs_recent_handler(httpd_req_t *req)
                 size_t escaped_len = 0;
                 for (size_t i = 0; i < line_len; i++) {
                     unsigned char c = (unsigned char)p[i];
-                    escaped_len += (c == '\\' || c == '"') ? 2u :
-                                   (c < 0x20) ? 6u : 1u;
+                    escaped_len += (c == '\\' || c == '"') ? 2u : (c < 0x20) ? 6u : 1u;
                 }
                 size_t needed = escaped_len + 2u + (chunks_sent > 0 ? 1u : 0u);
                 if (needed + LOGS_RECENT_SUFFIX_RESERVE > cap - pos) {
@@ -1684,7 +1735,8 @@ static esp_err_t logs_recent_handler(httpd_req_t *req)
                     break;
                 }
 
-                if (chunks_sent > 0) buf[pos++] = ',';
+                if (chunks_sent > 0)
+                    buf[pos++] = ',';
                 buf[pos++] = '"';
 
                 /* Escape JSON-special characters. */
@@ -1718,8 +1770,7 @@ static esp_err_t logs_recent_handler(httpd_req_t *req)
         vRingbufferReturnItem(s_ringbuf, item);
     }
 
-    int suffix_len = snprintf(buf + pos, cap - pos,
-                              "],\"cursor\":%d}", local_cursor);
+    int suffix_len = snprintf(buf + pos, cap - pos, "],\"cursor\":%d}", local_cursor);
     if (suffix_len < 0 || (size_t)suffix_len >= cap - pos) {
         free(buf);
         httpd_resp_send_500(req);
@@ -1740,22 +1791,28 @@ static esp_err_t logs_recent_handler(httpd_req_t *req)
  * one consistent archive view. */
 static esp_err_t snapshot_pending_log_bytes(uint8_t **bytes, size_t *length)
 {
-    if (!bytes || !length) return ESP_ERR_INVALID_ARG;
+    if (!bytes || !length)
+        return ESP_ERR_INVALID_ARG;
     *bytes = NULL;
     *length = 0;
-    if (!s_writebuf || !s_writebuf_mutex) return ESP_OK;
+    if (!s_writebuf || !s_writebuf_mutex)
+        return ESP_OK;
 
     uint8_t *copy = heap_caps_malloc(WRITEBUF_SIZE, MALLOC_CAP_SPIRAM);
-    if (!copy) copy = malloc(WRITEBUF_SIZE);
-    if (!copy) return ESP_ERR_NO_MEM;
+    if (!copy)
+        copy = malloc(WRITEBUF_SIZE);
+    if (!copy)
+        return ESP_ERR_NO_MEM;
 
     xSemaphoreTake(s_writebuf_mutex, portMAX_DELAY);
     size_t pending = s_writebuf_head - s_writebuf_tail;
-    if (pending > WRITEBUF_SIZE) pending = WRITEBUF_SIZE;
+    if (pending > WRITEBUF_SIZE)
+        pending = WRITEBUF_SIZE;
     if (pending > 0) {
         size_t position = s_writebuf_tail % WRITEBUF_SIZE;
         size_t first = WRITEBUF_SIZE - position;
-        if (first > pending) first = pending;
+        if (first > pending)
+            first = pending;
         memcpy(copy, s_writebuf + position, first);
         if (pending > first)
             memcpy(copy + first, s_writebuf, pending - first);
@@ -1793,7 +1850,8 @@ static esp_err_t stream_persistent_log_files(httpd_req_t *req,
 
     if (card_ready) {
         leased = sd_storage_lease_acquire(SD_LEASE_EXPORT, 1000);
-        if (!leased) result = ESP_ERR_TIMEOUT;
+        if (!leased)
+            result = ESP_ERR_TIMEOUT;
     }
 
     if (leased) {
@@ -1804,25 +1862,27 @@ static esp_err_t stream_persistent_log_files(httpd_req_t *req,
 
         for (int i = LOG_MAX_FILES - 1; i >= 0; i--) {
             char path[64];
-            snprintf(path, sizeof(path), "%s/%s%d", LOG_DIR,
-                     LOG_FILE_PREFIX, i);
+            snprintf(path, sizeof(path), "%s/%s%d", LOG_DIR, LOG_FILE_PREFIX, i);
             file = fopen(path, "rb");
-            if (!file) continue;
+            if (!file)
+                continue;
 
             char chunk[1024];
             size_t count;
             while ((count = fread(chunk, 1, sizeof(chunk), file)) > 0) {
-                if (httpd_resp_send_chunk(req, chunk, (ssize_t)count) !=
-                    ESP_OK) {
+                if (httpd_resp_send_chunk(req, chunk, (ssize_t)count) != ESP_OK) {
                     result = ESP_FAIL;
                     goto done;
                 }
                 *got_any = true;
             }
-            if (ferror(file)) result = ESP_FAIL;
-            if (fclose(file) != 0 && result == ESP_OK) result = ESP_FAIL;
+            if (ferror(file))
+                result = ESP_FAIL;
+            if (fclose(file) != 0 && result == ESP_OK)
+                result = ESP_FAIL;
             file = NULL;
-            if (result != ESP_OK) goto done;
+            if (result != ESP_OK)
+                goto done;
         }
     }
 
@@ -1830,30 +1890,28 @@ snapshot:
     /* Also snapshot when no card/lease is available. In that case the mutex
      * still makes this a safe best-effort view of the live pending suffix. */
     {
-        esp_err_t snapshot_error =
-            snapshot_pending_log_bytes(pending_bytes, pending_length);
+        esp_err_t snapshot_error = snapshot_pending_log_bytes(pending_bytes, pending_length);
         if (result == ESP_OK && snapshot_error != ESP_OK)
             result = snapshot_error;
     }
 
 done:
-    if (file) fclose(file);
-    if (leased) sd_storage_lease_release_unchanged(SD_LEASE_EXPORT);
+    if (file)
+        fclose(file);
+    if (leased)
+        sd_storage_lease_release_unchanged(SD_LEASE_EXPORT);
     return result;
 }
 
-static esp_err_t stream_complete_log_archive(httpd_req_t *req,
-                                             const char *empty_message)
+static esp_err_t stream_complete_log_archive(httpd_req_t *req, const char *empty_message)
 {
     bool got_any = false;
     uint8_t *pending = NULL;
     size_t pending_length = 0;
-    esp_err_t result = stream_persistent_log_files(
-        req, &got_any, &pending, &pending_length);
+    esp_err_t result = stream_persistent_log_files(req, &got_any, &pending, &pending_length);
 
     if (result != ESP_FAIL && pending_length > 0) {
-        if (httpd_resp_send_chunk(req, (const char *)pending,
-                                  (ssize_t)pending_length) == ESP_OK) {
+        if (httpd_resp_send_chunk(req, (const char *)pending, (ssize_t)pending_length) == ESP_OK) {
             got_any = true;
         } else {
             result = ESP_FAIL;
@@ -1862,8 +1920,7 @@ static esp_err_t stream_complete_log_archive(httpd_req_t *req,
     free(pending);
 
     if (result == ESP_ERR_TIMEOUT && !got_any) {
-        static const char busy[] =
-            "(persistent log files busy; retry this request)\n";
+        static const char busy[] = "(persistent log files busy; retry this request)\n";
         if (httpd_resp_send_chunk(req, busy, sizeof(busy) - 1) == ESP_OK)
             got_any = true;
         else
@@ -1877,8 +1934,7 @@ static esp_err_t stream_complete_log_archive(httpd_req_t *req,
         if (httpd_resp_send_chunk(req, empty_message, -1) != ESP_OK)
             result = ESP_FAIL;
     }
-    if (result != ESP_FAIL &&
-        httpd_resp_send_chunk(req, NULL, 0) != ESP_OK)
+    if (result != ESP_FAIL && httpd_resp_send_chunk(req, NULL, 0) != ESP_OK)
         result = ESP_FAIL;
     return result == ESP_FAIL ? ESP_FAIL : ESP_OK;
 }
@@ -1887,8 +1943,7 @@ static esp_err_t logs_history_handler(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
-    return stream_complete_log_archive(
-        req, "(no log history available)\n");
+    return stream_complete_log_archive(req, "(no log history available)\n");
 }
 
 /* ── Download Endpoint: GET /api/logs/download ────────────────────── */
@@ -1896,8 +1951,7 @@ static esp_err_t logs_history_handler(httpd_req_t *req)
 static esp_err_t logs_download_handler(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/plain");
-    httpd_resp_set_hdr(req, "Content-Disposition",
-                       "attachment; filename=\"somnotrace-logs.txt\"");
+    httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"somnotrace-logs.txt\"");
 
     return stream_complete_log_archive(req, "(no log data available)\n");
 }
@@ -1907,24 +1961,37 @@ static esp_err_t logs_download_handler(httpd_req_t *req)
 static const char *level_to_str(esp_log_level_t level)
 {
     switch (level) {
-        case ESP_LOG_NONE:    return "none";
-        case ESP_LOG_ERROR:   return "error";
-        case ESP_LOG_WARN:    return "warn";
-        case ESP_LOG_INFO:    return "info";
-        case ESP_LOG_DEBUG:   return "debug";
-        case ESP_LOG_VERBOSE: return "verbose";
-        default:              return "unknown";
+    case ESP_LOG_NONE:
+        return "none";
+    case ESP_LOG_ERROR:
+        return "error";
+    case ESP_LOG_WARN:
+        return "warn";
+    case ESP_LOG_INFO:
+        return "info";
+    case ESP_LOG_DEBUG:
+        return "debug";
+    case ESP_LOG_VERBOSE:
+        return "verbose";
+    default:
+        return "unknown";
     }
 }
 
 static esp_log_level_t str_to_level(const char *s)
 {
-    if (strcmp(s, "error")   == 0) return ESP_LOG_ERROR;
-    if (strcmp(s, "warn")    == 0) return ESP_LOG_WARN;
-    if (strcmp(s, "info")    == 0) return ESP_LOG_INFO;
-    if (strcmp(s, "debug")   == 0) return ESP_LOG_DEBUG;
-    if (strcmp(s, "verbose") == 0) return ESP_LOG_VERBOSE;
-    if (strcmp(s, "none")    == 0) return ESP_LOG_NONE;
+    if (strcmp(s, "error") == 0)
+        return ESP_LOG_ERROR;
+    if (strcmp(s, "warn") == 0)
+        return ESP_LOG_WARN;
+    if (strcmp(s, "info") == 0)
+        return ESP_LOG_INFO;
+    if (strcmp(s, "debug") == 0)
+        return ESP_LOG_DEBUG;
+    if (strcmp(s, "verbose") == 0)
+        return ESP_LOG_VERBOSE;
+    if (strcmp(s, "none") == 0)
+        return ESP_LOG_NONE;
     return (esp_log_level_t)-1;
 }
 
@@ -1969,7 +2036,8 @@ static esp_err_t logs_level_handler(httpd_req_t *req)
     cJSON_Delete(json);
 
     if ((int)new_level < 0) {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+        httpd_resp_send_err(req,
+                            HTTPD_400_BAD_REQUEST,
                             "invalid level — use: none, error, warn, info, debug, verbose");
         return ESP_FAIL;
     }
@@ -1992,44 +2060,44 @@ static esp_err_t logs_level_handler(httpd_req_t *req)
 void log_stream_register_handlers(httpd_handle_t server)
 {
     httpd_uri_t recent = {
-        .uri     = "/api/logs/recent",
-        .method  = HTTP_GET,
+        .uri = "/api/logs/recent",
+        .method = HTTP_GET,
         .handler = logs_recent_handler,
     };
     httpd_register_uri_handler(server, &recent);
 
     httpd_uri_t download = {
-        .uri     = "/api/logs/download",
-        .method  = HTTP_GET,
+        .uri = "/api/logs/download",
+        .method = HTTP_GET,
         .handler = logs_download_handler,
     };
     httpd_register_uri_handler(server, &download);
 
     httpd_uri_t level_get = {
-        .uri     = "/api/logs/level",
-        .method  = HTTP_GET,
+        .uri = "/api/logs/level",
+        .method = HTTP_GET,
         .handler = logs_level_handler,
     };
     httpd_register_uri_handler(server, &level_get);
 
     httpd_uri_t level_post = {
-        .uri     = "/api/logs/level",
-        .method  = HTTP_POST,
+        .uri = "/api/logs/level",
+        .method = HTTP_POST,
         .handler = logs_level_handler,
     };
     httpd_register_uri_handler(server, &level_post);
 
     httpd_uri_t history = {
-        .uri     = "/api/logs/history",
-        .method  = HTTP_GET,
+        .uri = "/api/logs/history",
+        .method = HTTP_GET,
         .handler = logs_history_handler,
     };
     httpd_register_uri_handler(server, &history);
 
     httpd_uri_t ws = {
-        .uri        = "/api/ws",
-        .method     = HTTP_GET,
-        .handler    = logs_ws_handler,
+        .uri = "/api/ws",
+        .method = HTTP_GET,
+        .handler = logs_ws_handler,
         .is_websocket = true,
     };
     httpd_register_uri_handler(server, &ws);

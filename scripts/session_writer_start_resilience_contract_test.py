@@ -30,6 +30,13 @@ def function_body(name: str) -> str:
     return SOURCE[match.end():cursor - 1]
 
 
+def position(source: str, pattern: str, description: str) -> int:
+    match = re.search(pattern, source, re.MULTILINE)
+    if not match:
+        raise AssertionError(f"missing contract: {description}")
+    return match.start()
+
+
 # Workers self-park before touching shared queues. Init observes that state, so
 # deleting a partially-created worker cannot race queue/semaphore destruction.
 storage_worker = function_body("sw_storage_task")
@@ -58,14 +65,38 @@ for global_name in (
 assert "vTaskDelete(" not in unwind
 
 init = function_body("session_writer_init")
-storage_create = init.index("s_storage_task = psram_task_create(")
-storage_park = init.index("sw_wait_startup_parked(s_storage_task)")
-post_create = init.index("s_post_task = psram_task_create(")
-post_park = init.index("sw_wait_startup_parked(s_post_task)")
-ready = init.index("s_ready = true")
+storage_create = position(
+    init,
+    r"s_storage_task\s*=\s*psram_task_create\s*\(",
+    "create storage worker",
+)
+storage_park = position(
+    init,
+    r"sw_wait_startup_parked\s*\(\s*s_storage_task\s*\)",
+    "wait for storage worker to park",
+)
+post_create = position(
+    init,
+    r"s_post_task\s*=\s*psram_task_create\s*\(",
+    "create post-processing worker",
+)
+post_park = position(
+    init,
+    r"sw_wait_startup_parked\s*\(\s*s_post_task\s*\)",
+    "wait for post-processing worker to park",
+)
+ready = position(init, r"s_ready\s*=\s*true", "publish ready state")
 assert storage_create < storage_park < post_create < post_park < ready
-assert ready < init.index("vTaskResume(s_storage_task)")
-assert ready < init.index("vTaskResume(s_post_task)")
+assert ready < position(
+    init,
+    r"vTaskResume\s*\(\s*s_storage_task\s*\)",
+    "resume storage worker",
+)
+assert ready < position(
+    init,
+    r"vTaskResume\s*\(\s*s_post_task\s*\)",
+    "resume post-processing worker",
+)
 assert init.count("goto no_mem") == 3
 failure_tail = init[init.index("no_mem:"):]
 assert failure_tail.index("session_writer_init_unwind()") \

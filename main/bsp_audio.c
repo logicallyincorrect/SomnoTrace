@@ -38,70 +38,70 @@
 static const char *TAG = "bsp_audio";
 
 /* ── Hardware pins (Waveshare ESP32-S3-Touch-LCD-1.54) ────────────── */
-#define I2C_FREQ_HZ     BSP_I2C_FREQ_HZ
+#define I2C_FREQ_HZ BSP_I2C_FREQ_HZ
 
-#define I2S_NUM         0
-#define I2S_MCLK_PIN    8
-#define I2S_BCLK_PIN    9
-#define I2S_WS_PIN      10
-#define I2S_DOUT_PIN    12   /* DSDIN — ESP data out to codec DAC */
-#define I2S_DIN_PIN     11   /* ASDOUT — codec ADC data in to ESP (unused) */
+#define I2S_NUM 0
+#define I2S_MCLK_PIN 8
+#define I2S_BCLK_PIN 9
+#define I2S_WS_PIN 10
+#define I2S_DOUT_PIN 12 /* DSDIN — ESP data out to codec DAC */
+#define I2S_DIN_PIN 11  /* ASDOUT — codec ADC data in to ESP (unused) */
 
-#define PA_PIN          7    /* NS4150B amplifier enable */
+#define PA_PIN 7 /* NS4150B amplifier enable */
 
 /* ES8311 I2C 7-bit address (CE=0).
  * Espressif headers use 0x30 (8-bit), but the new I2C master API
  * expects 7-bit addresses: 0x30 >> 1 = 0x18. */
-#define ES8311_ADDR     0x18
+#define ES8311_ADDR 0x18
 
 /* ── ES8311 register addresses ────────────────────────────────────── */
-#define ES8311_RESET_REG00          0x00
-#define ES8311_CLK_MANAGER_REG01    0x01
-#define ES8311_CLK_MANAGER_REG02    0x02
-#define ES8311_CLK_MANAGER_REG03    0x03
-#define ES8311_CLK_MANAGER_REG04    0x04
-#define ES8311_CLK_MANAGER_REG05    0x05
-#define ES8311_CLK_MANAGER_REG06    0x06
-#define ES8311_CLK_MANAGER_REG07    0x07
-#define ES8311_CLK_MANAGER_REG08    0x08
-#define ES8311_SDPIN_REG09          0x09
-#define ES8311_SDPOUT_REG0A         0x0A
-#define ES8311_SYSTEM_REG0B         0x0B
-#define ES8311_SYSTEM_REG0C         0x0C
-#define ES8311_SYSTEM_REG0D         0x0D
-#define ES8311_SYSTEM_REG0E         0x0E
-#define ES8311_SYSTEM_REG10         0x10
-#define ES8311_SYSTEM_REG11         0x11
-#define ES8311_SYSTEM_REG12         0x12
-#define ES8311_SYSTEM_REG13         0x13
-#define ES8311_SYSTEM_REG14         0x14
-#define ES8311_ADC_REG15            0x15
-#define ES8311_ADC_REG16            0x16
-#define ES8311_ADC_REG17            0x17
-#define ES8311_ADC_REG1B            0x1B
-#define ES8311_ADC_REG1C            0x1C
-#define ES8311_DAC_REG31            0x31
-#define ES8311_DAC_REG32            0x32
-#define ES8311_DAC_REG37            0x37
-#define ES8311_GPIO_REG44           0x44
-#define ES8311_GP_REG45             0x45
+#define ES8311_RESET_REG00 0x00
+#define ES8311_CLK_MANAGER_REG01 0x01
+#define ES8311_CLK_MANAGER_REG02 0x02
+#define ES8311_CLK_MANAGER_REG03 0x03
+#define ES8311_CLK_MANAGER_REG04 0x04
+#define ES8311_CLK_MANAGER_REG05 0x05
+#define ES8311_CLK_MANAGER_REG06 0x06
+#define ES8311_CLK_MANAGER_REG07 0x07
+#define ES8311_CLK_MANAGER_REG08 0x08
+#define ES8311_SDPIN_REG09 0x09
+#define ES8311_SDPOUT_REG0A 0x0A
+#define ES8311_SYSTEM_REG0B 0x0B
+#define ES8311_SYSTEM_REG0C 0x0C
+#define ES8311_SYSTEM_REG0D 0x0D
+#define ES8311_SYSTEM_REG0E 0x0E
+#define ES8311_SYSTEM_REG10 0x10
+#define ES8311_SYSTEM_REG11 0x11
+#define ES8311_SYSTEM_REG12 0x12
+#define ES8311_SYSTEM_REG13 0x13
+#define ES8311_SYSTEM_REG14 0x14
+#define ES8311_ADC_REG15 0x15
+#define ES8311_ADC_REG16 0x16
+#define ES8311_ADC_REG17 0x17
+#define ES8311_ADC_REG1B 0x1B
+#define ES8311_ADC_REG1C 0x1C
+#define ES8311_DAC_REG31 0x31
+#define ES8311_DAC_REG32 0x32
+#define ES8311_DAC_REG37 0x37
+#define ES8311_GPIO_REG44 0x44
+#define ES8311_GP_REG45 0x45
 
 /* ── Audio parameters ─────────────────────────────────────────────── */
-#define SAMPLE_RATE     16000
-#define MCLK_MULT       I2S_MCLK_MULTIPLE_256
+#define SAMPLE_RATE 16000
+#define MCLK_MULT I2S_MCLK_MULTIPLE_256
 
 /* ── State ────────────────────────────────────────────────────────── */
 static i2c_master_bus_handle_t s_i2c_bus = NULL;
 static i2c_master_dev_handle_t s_i2c_dev = NULL;
 static i2s_chan_handle_t s_i2s_tx = NULL;
-static bool s_bus_ready = false;   /* I2C bus + device set up */
-static bool s_initialized = false; /* full init (codec + I2S + PA) done */
-static uint8_t s_global_volume = 100;  /* scales all beep calls */
+static bool s_bus_ready = false;      /* I2C bus + device set up */
+static bool s_initialized = false;    /* full init (codec + I2S + PA) done */
+static uint8_t s_global_volume = 100; /* scales all beep calls */
 
 /* ── I2C helpers ──────────────────────────────────────────────────── */
 static esp_err_t es_write_reg(uint8_t reg, uint8_t val)
 {
-    uint8_t buf[2] = { reg, val };
+    uint8_t buf[2] = {reg, val};
     return i2c_master_transmit(s_i2c_dev, buf, sizeof(buf), 100);
 }
 
@@ -116,7 +116,10 @@ static esp_err_t es8311_init(void)
     bool reset_ok = false;
     for (int i = 0; i < 5; i++) {
         esp_err_t r = es_write_reg(ES8311_RESET_REG00, 0x80);
-        if (r == ESP_OK) { reset_ok = true; break; }
+        if (r == ESP_OK) {
+            reset_ok = true;
+            break;
+        }
         ESP_LOGW(TAG, "ES8311 reset retry %d/5: %s", i + 1, esp_err_to_name(r));
         vTaskDelay(pdMS_TO_TICKS(20));
     }
@@ -149,7 +152,7 @@ static esp_err_t es8311_init(void)
     ret |= es_write_reg(ES8311_SYSTEM_REG13, 0x10);
     ret |= es_write_reg(ES8311_ADC_REG1B, 0x0A);
     ret |= es_write_reg(ES8311_ADC_REG1C, 0x6A);
-    ret |= es_write_reg(ES8311_GPIO_REG44, 0x58);  /* internal ref (ADCL + DACR) */
+    ret |= es_write_reg(ES8311_GPIO_REG44, 0x58); /* internal ref (ADCL + DACR) */
 
     /* ── Configure sample rate: 16 kHz, MCLK = 4096000 ─── */
     /* REG02: pre_div=1 (0<<5), pre_multi=1 (0<<3) → 0x00 */
@@ -177,11 +180,11 @@ static esp_err_t es8311_init(void)
     /* ── Power up and start DAC ─── */
     ret |= es_write_reg(ES8311_ADC_REG17, 0xBF);
     ret |= es_write_reg(ES8311_SYSTEM_REG0E, 0x02);
-    ret |= es_write_reg(ES8311_SYSTEM_REG12, 0x00);   /* enable DAC */
+    ret |= es_write_reg(ES8311_SYSTEM_REG12, 0x00); /* enable DAC */
     ret |= es_write_reg(ES8311_SYSTEM_REG14, 0x1A);
-    ret |= es_write_reg(ES8311_SYSTEM_REG0D, 0x01);   /* power up analog */
+    ret |= es_write_reg(ES8311_SYSTEM_REG0D, 0x01); /* power up analog */
     ret |= es_write_reg(ES8311_ADC_REG15, 0x40);
-    ret |= es_write_reg(ES8311_DAC_REG37, 0x08);      /* DAC ramp rate */
+    ret |= es_write_reg(ES8311_DAC_REG37, 0x08); /* DAC ramp rate */
     ret |= es_write_reg(ES8311_GP_REG45, 0x00);
 
     /* Unmute DAC (REG31 bits[6:5] = 00) */
@@ -202,7 +205,8 @@ static esp_err_t es8311_init(void)
 
 static esp_err_t i2c_bus_setup(void)
 {
-    if (s_bus_ready) return ESP_OK;
+    if (s_bus_ready)
+        return ESP_OK;
 
     s_i2c_bus = bsp_i2c_get_bus_handle();
     if (!s_i2c_bus) {
@@ -212,7 +216,8 @@ static esp_err_t i2c_bus_setup(void)
 
     /* Probe for ES8311; also scan bus for diagnostics if not found */
     esp_err_t probe = i2c_master_probe(s_i2c_bus, ES8311_ADDR, 100);
-    ESP_LOGI(TAG, "I2C probe 0x%02X: %s", ES8311_ADDR, probe == ESP_OK ? "OK" : esp_err_to_name(probe));
+    ESP_LOGI(
+        TAG, "I2C probe 0x%02X: %s", ES8311_ADDR, probe == ESP_OK ? "OK" : esp_err_to_name(probe));
     if (probe != ESP_OK) {
         ESP_LOGW(TAG, "ES8311 not found, scanning bus...");
         for (uint8_t addr = 1; addr < 0x80; addr++) {
@@ -241,11 +246,13 @@ static esp_err_t i2c_bus_setup(void)
 
 esp_err_t bsp_audio_init(void)
 {
-    if (s_initialized) return ESP_OK;
+    if (s_initialized)
+        return ESP_OK;
 
     /* I2C bus setup (skipped on retry if already done) */
     esp_err_t ret = i2c_bus_setup();
-    if (ret != ESP_OK) return ret;
+    if (ret != ESP_OK)
+        return ret;
 
     /* ── ES8311 codec ───
      * The ES8311 may NACK register writes immediately after power-up
@@ -254,7 +261,8 @@ esp_err_t bsp_audio_init(void)
      * sequence with a delay between attempts. */
     for (int attempt = 1; attempt <= 3; attempt++) {
         ret = es8311_init();
-        if (ret == ESP_OK) break;
+        if (ret == ESP_OK)
+            break;
         if (attempt < 3) {
             ESP_LOGW(TAG, "ES8311 init attempt %d/3 failed, retrying in 300ms", attempt);
             vTaskDelay(pdMS_TO_TICKS(300));
@@ -274,7 +282,7 @@ esp_err_t bsp_audio_init(void)
         .intr_type = GPIO_INTR_DISABLE,
     };
     gpio_config(&pa_cfg);
-    gpio_set_level(PA_PIN, 0);  /* PA off until beep */
+    gpio_set_level(PA_PIN, 0); /* PA off until beep */
 
     /* ── I2S TX channel ─── */
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM, I2S_ROLE_MASTER);
@@ -296,16 +304,17 @@ esp_err_t bsp_audio_init(void)
         .dout = I2S_DOUT_PIN,
         .din = I2S_DIN_PIN,
         .mclk = I2S_MCLK_PIN,
-        .invert_flags = {
-            .mclk_inv = false,
-            .bclk_inv = false,
-            .ws_inv = false,
-        },
+        .invert_flags =
+            {
+                .mclk_inv = false,
+                .bclk_inv = false,
+                .ws_inv = false,
+            },
     };
     i2s_std_config_t std_cfg = {
         .clk_cfg = clk_cfg,
-        .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(
-            I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO),
+        .slot_cfg =
+            I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO),
         .gpio_cfg = gpio_cfg,
     };
     ret = i2s_channel_init_std_mode(s_i2s_tx, &std_cfg);
@@ -321,8 +330,10 @@ esp_err_t bsp_audio_init(void)
 
 esp_err_t bsp_audio_beep(int freq_hz, int duration_ms, uint8_t volume)
 {
-    if (!s_initialized || !s_i2s_tx) return ESP_ERR_INVALID_STATE;
-    if (freq_hz <= 0 || duration_ms <= 0) return ESP_ERR_INVALID_ARG;
+    if (!s_initialized || !s_i2s_tx)
+        return ESP_ERR_INVALID_STATE;
+    if (freq_hz <= 0 || duration_ms <= 0)
+        return ESP_ERR_INVALID_ARG;
 
     /* Map volume 0-100 to codec DAC register 0x00-0xFF.
      * Scale by s_global_volume so the user-configured alert volume
@@ -333,11 +344,12 @@ esp_err_t bsp_audio_beep(int freq_hz, int duration_ms, uint8_t volume)
 
     /* Generate one period of square wave */
     int period_samples = SAMPLE_RATE / freq_hz;
-    if (period_samples < 2) period_samples = 2;
+    if (period_samples < 2)
+        period_samples = 2;
 
     /* Use stereo frames: I2S STD mono mode sends on left channel.
      * Each sample is 2 bytes (16-bit). */
-    int buf_samples = period_samples * 2;  /* *2 for stereo frame (L+R) */
+    int buf_samples = period_samples * 2; /* *2 for stereo frame (L+R) */
     int buf_bytes = buf_samples * sizeof(int16_t);
     int16_t *buf = heap_caps_malloc(buf_bytes, MALLOC_CAP_8BIT | MALLOC_CAP_DMA);
     if (!buf) {
@@ -348,8 +360,8 @@ esp_err_t bsp_audio_beep(int freq_hz, int duration_ms, uint8_t volume)
     int half = period_samples;
     for (int i = 0; i < period_samples; i++) {
         int16_t val = (i < half / 2) ? 16000 : -16000;
-        buf[i * 2]     = val;   /* left */
-        buf[i * 2 + 1] = val;   /* right */
+        buf[i * 2] = val;     /* left */
+        buf[i * 2 + 1] = val; /* right */
     }
 
     /* Enable PA and I2S */
@@ -383,7 +395,8 @@ esp_err_t bsp_audio_beep(int freq_hz, int duration_ms, uint8_t volume)
 
 void bsp_audio_set_volume(uint8_t percent)
 {
-    if (percent > 100) percent = 100;
+    if (percent > 100)
+        percent = 100;
     s_global_volume = percent;
     ESP_LOGI(TAG, "global alert volume set to %u%%", percent);
 }
@@ -392,7 +405,8 @@ esp_err_t bsp_audio_test_beep(void)
 {
     if (!s_initialized) {
         esp_err_t ret = bsp_audio_init();
-        if (ret != ESP_OK) return ret;
+        if (ret != ESP_OK)
+            return ret;
     }
     return bsp_audio_beep(880, 300, 100);
 }

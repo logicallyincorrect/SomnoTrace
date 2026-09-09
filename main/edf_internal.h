@@ -76,44 +76,63 @@ uint8_t *edf_read_bin_file(const char *path, size_t *out_len);
 /* ── Subsystem Module Interfaces ───────────────────────────────────── */
 
 /* Header Generator (edf_header.c) */
-int edf_write_header(FILE *f, const char *patient_id, const char *recording_id,
-                     const char *start_date, const char *start_time,
-                     int num_records, const char *record_duration,
+int edf_write_header(FILE *f,
+                     const char *patient_id,
+                     const char *recording_id,
+                     const char *start_date,
+                     const char *start_time,
+                     int num_records,
+                     const char *record_duration,
                      const char *reserved_field,
-                     const edf_signal_def_t *signals, int n_signals);
+                     const edf_signal_def_t *signals,
+                     int n_signals);
 
-esp_err_t edf_generate_identification_files(const char *edf_dir,
-                                            const char *ident_json_path);
+esp_err_t edf_generate_identification_files(const char *edf_dir, const char *ident_json_path);
 
 /* Waveform Exporter (edf_waveform.c) */
-esp_err_t edf_convert_snt_to_edf(const char *snt_path, const char *edf_path,
-                                 const char *patient_id, const char *recording_id,
-                                 const char *start_date, const char *start_time,
-                                 const edf_signal_def_t *signals, int n_signals,
+esp_err_t edf_convert_snt_to_edf(const char *snt_path,
+                                 const char *edf_path,
+                                 const char *patient_id,
+                                 const char *recording_id,
+                                 const char *start_date,
+                                 const char *start_time,
+                                 const edf_signal_def_t *signals,
+                                 int n_signals,
                                  const char *record_duration,
                                  const int *channel_map,
-                                 int skip_records, int max_records,
+                                 int skip_records,
+                                 int max_records,
                                  const char *second_snt_path);
 
 /* Annotation Exporter (edf_annotations.c) */
-esp_err_t edf_generate_eve_edf(const char *out_path, const char *events_snt_path,
-                               int64_t session_start_ms, int64_t clock_drift_ms,
-                               const char *patient_id, const char *recording_id,
-                               const char *start_date, const char *start_time);
+esp_err_t edf_generate_eve_edf(const char *out_path,
+                               const char *events_snt_path,
+                               int64_t session_start_ms,
+                               int64_t clock_drift_ms,
+                               const char *patient_id,
+                               const char *recording_id,
+                               const char *start_date,
+                               const char *start_time);
 
-esp_err_t edf_generate_csl_edf(const char *out_path, const char *events_snt_path,
-                               int64_t session_start_ms, int64_t clock_drift_ms,
-                               const char *patient_id, const char *recording_id,
-                               const char *start_date, const char *start_time);
+esp_err_t edf_generate_csl_edf(const char *out_path,
+                               const char *events_snt_path,
+                               int64_t session_start_ms,
+                               int64_t clock_drift_ms,
+                               const char *patient_id,
+                               const char *recording_id,
+                               const char *start_date,
+                               const char *start_time);
 
 /* Summary Exporter (edf_summary.c) */
 esp_err_t edf_generate_str_edf(const char *sdcard_dir,
-                               const char *patient_id, const char *recording_id,
+                               const char *patient_id,
+                               const char *recording_id,
                                const char *start_date,
                                const cJSON *settings_json,
                                const char *session_dir,
                                const char *session_id,
-                               int64_t start_epoch_ms, int64_t end_epoch_ms,
+                               int64_t start_epoch_ms,
+                               int64_t end_epoch_ms,
                                int64_t clock_drift_ms);
 
 #ifdef __cplusplus

@@ -54,8 +54,8 @@
  * The scheduler needs configuration and the backend registry, both of which
  * uploader.c owns.  Declared here so there is one declaration rather than
  * extern statements scattered across translation units. */
-int  uploader_max_days(void);
-int  uploader_enabled_backends(const upload_backend_t **out, int max_out);
+int uploader_max_days(void);
+int uploader_enabled_backends(const upload_backend_t **out, int max_out);
 bool uploader_lease_take(uint32_t timeout_ms);
 void uploader_lease_give(void);
 

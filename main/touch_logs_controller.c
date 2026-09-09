@@ -79,14 +79,16 @@ static bool start_snapshot_worker(logs_controller_t *controller);
 
 static void copy_text(char *dst, size_t dst_size, const char *src)
 {
-    if (!dst || dst_size == 0) return;
+    if (!dst || dst_size == 0)
+        return;
     snprintf(dst, dst_size, "%s", src ? src : "");
 }
 
 static void mark_view_dirty_locked(logs_controller_t *controller)
 {
     controller->desired_revision++;
-    if (controller->desired_revision == 0) controller->desired_revision = 1;
+    if (controller->desired_revision == 0)
+        controller->desired_revision = 1;
 }
 
 /* Capturing one unfiltered newest slot is bounded and supplies the exact
@@ -100,12 +102,13 @@ static esp_err_t capture_pause_anchor(logs_controller_t *controller)
         .level_mask = LOG_STREAM_RETAINED_LEVEL_ALL,
         .order = LOG_STREAM_RETAINED_NEWEST_FIRST,
     };
-    esp_err_t result = log_stream_retained_snapshot(
-        &newest, 1, &filter, &count, &info);
-    if (result != ESP_OK) return result;
+    esp_err_t result = log_stream_retained_snapshot(&newest, 1, &filter, &count, &info);
+    if (result != ESP_OK)
+        return result;
 
-    uint64_t before = count > 0 && newest.sequence < UINT64_MAX
-                    ? newest.sequence + 1 : count > 0 ? UINT64_MAX : 1;
+    uint64_t before = count > 0 && newest.sequence < UINT64_MAX ? newest.sequence + 1
+                      : count > 0                               ? UINT64_MAX
+                                                                : 1;
     portENTER_CRITICAL(&s_logs_lock);
     controller->paused = true;
     controller->before_sequence = before; /* Always non-zero while paused. */
@@ -124,22 +127,23 @@ static void snapshot_task(void *arg)
     logs_controller_t *controller = job->controller;
     log_stream_retained_page_t page = {0};
     log_stream_retained_info_t info = {0};
-    esp_err_t result = log_stream_retained_snapshot_page(
-        controller->page_lines[job->buffer_index],
-        TOUCH_LOGS_UI_VISIBLE_ROWS, &job->filter, job->match_offset,
-        &page, &info);
+    esp_err_t result = log_stream_retained_snapshot_page(controller->page_lines[job->buffer_index],
+                                                         TOUCH_LOGS_UI_VISIBLE_ROWS,
+                                                         &job->filter,
+                                                         job->match_offset,
+                                                         &page,
+                                                         &info);
 
     portENTER_CRITICAL(&s_logs_lock);
     if (job->revision == controller->desired_revision) {
         /* A rolled-over ring can invalidate a previously valid last page.
          * Clamp once and let the next visible refresh request the corrected
          * offset rather than publishing a blank page. */
-        if (result == ESP_OK && page.returned == 0 &&
-            job->match_offset > 0) {
-            controller->match_offset = page.matching_count > 0
-                ? ((page.matching_count - 1) /
-                   TOUCH_LOGS_UI_VISIBLE_ROWS) * TOUCH_LOGS_UI_VISIBLE_ROWS
-                : 0;
+        if (result == ESP_OK && page.returned == 0 && job->match_offset > 0) {
+            controller->match_offset =
+                page.matching_count > 0 ? ((page.matching_count - 1) / TOUCH_LOGS_UI_VISIBLE_ROWS) *
+                                              TOUCH_LOGS_UI_VISIBLE_ROWS
+                                        : 0;
             mark_view_dirty_locked(controller);
         } else {
             controller->active_buffer = job->buffer_index;
@@ -163,9 +167,9 @@ static void snapshot_task(void *arg)
 
 static bool start_snapshot_worker(logs_controller_t *controller)
 {
-    snapshot_job_t *job = heap_caps_calloc(
-        1, sizeof(*job), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!job) return false;
+    snapshot_job_t *job = heap_caps_calloc(1, sizeof(*job), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!job)
+        return false;
     /* Only the LVGL task mutates the desired query. Format it before taking
      * the cross-core spinlock; the fixed memcpy below makes publication of
      * the worker job atomic without holding the lock around snprintf. */
@@ -173,8 +177,7 @@ static bool start_snapshot_worker(logs_controller_t *controller)
     copy_text(query, sizeof(query), controller->query);
 
     portENTER_CRITICAL(&s_logs_lock);
-    if (controller->snapshot_busy || !controller->visible ||
-        !controller->info.available ||
+    if (controller->snapshot_busy || !controller->visible || !controller->info.available ||
         (controller->page_valid &&
          controller->completed_revision == controller->desired_revision)) {
         portEXIT_CRITICAL(&s_logs_lock);
@@ -188,16 +191,16 @@ static bool start_snapshot_worker(logs_controller_t *controller)
     job->match_offset = controller->match_offset;
     job->buffer_index = controller->active_buffer ^ 1U;
     job->filter.level_mask = controller->level_mask;
-    job->filter.before_sequence = controller->paused
-                                ? controller->before_sequence : 0;
+    job->filter.before_sequence = controller->paused ? controller->before_sequence : 0;
     job->filter.order = LOG_STREAM_RETAINED_NEWEST_FIRST;
     memcpy(job->query, query, sizeof(job->query));
     job->filter.query = job->query;
     portEXIT_CRITICAL(&s_logs_lock);
 
-    TaskHandle_t task = psram_task_create(snapshot_task, "ui_log_page", 4096,
-                                           job, 3, 0, NULL, NULL);
-    if (task) return true;
+    TaskHandle_t task =
+        psram_task_create(snapshot_task, "ui_log_page", 4096, job, 3, 0, NULL, NULL);
+    if (task)
+        return true;
 
     portENTER_CRITICAL(&s_logs_lock);
     controller->snapshot_busy = false;
@@ -229,8 +232,7 @@ static void save_task(void *arg)
     char path[96] = {0};
     size_t saved = 0;
 #if CONFIG_SOMNOTRACE_BOARD_QEMU
-    esp_err_t result = touch_logs_qemu_save(&job->filter, &saved,
-                                           save_progress, controller);
+    esp_err_t result = touch_logs_qemu_save(&job->filter, &saved, save_progress, controller);
 #else
     esp_err_t result = log_stream_retained_save_to_sd(
         &job->filter, path, sizeof(path), &saved, save_progress, controller);
@@ -240,13 +242,11 @@ static void save_task(void *arg)
 
     portENTER_CRITICAL(&s_logs_lock);
     controller->save_busy = false;
-    controller->save_state = result == ESP_OK
-                           ? TOUCH_LOGS_UI_SAVE_SUCCEEDED
-                           : TOUCH_LOGS_UI_SAVE_FAILED;
+    controller->save_state =
+        result == ESP_OK ? TOUCH_LOGS_UI_SAVE_SUCCEEDED : TOUCH_LOGS_UI_SAVE_FAILED;
     controller->save_result = result;
     controller->saved_count = saved;
-    memcpy(controller->saved_path, published_path,
-           sizeof(controller->saved_path));
+    memcpy(controller->saved_path, published_path, sizeof(controller->saved_path));
     controller->save_error[0] = '\0';
     if (result == ESP_OK) {
         controller->save_processed = controller->save_total;
@@ -279,7 +279,8 @@ static esp_err_t cb_set_paused(void *ctx, bool paused)
     logs_controller_t *controller = ctx;
     if (paused) {
         esp_err_t result = capture_pause_anchor(controller);
-        if (result == ESP_OK) (void)start_snapshot_worker(controller);
+        if (result == ESP_OK)
+            (void)start_snapshot_worker(controller);
         return result;
     }
     portENTER_CRITICAL(&s_logs_lock);
@@ -299,7 +300,8 @@ static esp_err_t cb_begin_search(void *ctx)
      * exact moment the touch keyboard opens. */
     logs_controller_t *controller = ctx;
     esp_err_t result = capture_pause_anchor(controller);
-    if (result == ESP_OK) (void)start_snapshot_worker(controller);
+    if (result == ESP_OK)
+        (void)start_snapshot_worker(controller);
     return result;
 }
 
@@ -320,17 +322,18 @@ static esp_err_t cb_search_query(void *ctx, const char *query)
 
 static esp_err_t cb_toggle_level(void *ctx, uint32_t bit, bool enabled)
 {
-    const uint32_t supported = LOG_STREAM_RETAINED_LEVEL_ERROR |
-                               LOG_STREAM_RETAINED_LEVEL_WARN |
-                               LOG_STREAM_RETAINED_LEVEL_INFO |
-                               LOG_STREAM_RETAINED_LEVEL_DEBUG;
+    const uint32_t supported = LOG_STREAM_RETAINED_LEVEL_ERROR | LOG_STREAM_RETAINED_LEVEL_WARN |
+                               LOG_STREAM_RETAINED_LEVEL_INFO | LOG_STREAM_RETAINED_LEVEL_DEBUG;
     if ((bit & supported) == 0 || (bit & ~supported) != 0)
         return ESP_ERR_INVALID_ARG;
-    if ((bit & (bit - 1U)) != 0) return ESP_ERR_INVALID_ARG;
+    if ((bit & (bit - 1U)) != 0)
+        return ESP_ERR_INVALID_ARG;
     logs_controller_t *controller = ctx;
     portENTER_CRITICAL(&s_logs_lock);
-    if (enabled) controller->level_mask |= bit;
-    else controller->level_mask &= ~bit;
+    if (enabled)
+        controller->level_mask |= bit;
+    else
+        controller->level_mask &= ~bit;
     controller->level_mask &= supported;
     if (controller->level_mask == 0)
         controller->level_mask = LOG_STREAM_RETAINED_LEVEL_NONE;
@@ -346,14 +349,14 @@ static esp_err_t cb_page_older(void *ctx)
     logs_controller_t *controller = ctx;
     if (!controller->paused) {
         esp_err_t result = capture_pause_anchor(controller);
-        if (result != ESP_OK) return result;
+        if (result != ESP_OK)
+            return result;
     }
     portENTER_CRITICAL(&s_logs_lock);
     size_t matching = controller->page.matching_count;
-    size_t last_offset = matching > 0
-        ? ((matching - 1) / TOUCH_LOGS_UI_VISIBLE_ROWS) *
-          TOUCH_LOGS_UI_VISIBLE_ROWS
-        : 0;
+    size_t last_offset =
+        matching > 0 ? ((matching - 1) / TOUCH_LOGS_UI_VISIBLE_ROWS) * TOUCH_LOGS_UI_VISIBLE_ROWS
+                     : 0;
     if (controller->match_offset < last_offset) {
         size_t next = controller->match_offset + TOUCH_LOGS_UI_VISIBLE_ROWS;
         controller->match_offset = next < last_offset ? next : last_offset;
@@ -369,8 +372,8 @@ static esp_err_t cb_page_newer(void *ctx)
     logs_controller_t *controller = ctx;
     portENTER_CRITICAL(&s_logs_lock);
     size_t previous = controller->match_offset;
-    controller->match_offset = previous > TOUCH_LOGS_UI_VISIBLE_ROWS
-        ? previous - TOUCH_LOGS_UI_VISIBLE_ROWS : 0;
+    controller->match_offset =
+        previous > TOUCH_LOGS_UI_VISIBLE_ROWS ? previous - TOUCH_LOGS_UI_VISIBLE_ROWS : 0;
     if (controller->match_offset != previous)
         mark_view_dirty_locked(controller);
     portEXIT_CRITICAL(&s_logs_lock);
@@ -384,7 +387,8 @@ static esp_err_t cb_jump_newest(void *ctx)
     /* Remain paused, but re-anchor at the newest line so the exact new count
      * restarts from zero without allowing the viewport to move again. */
     esp_err_t result = capture_pause_anchor(controller);
-    if (result == ESP_OK) (void)start_snapshot_worker(controller);
+    if (result == ESP_OK)
+        (void)start_snapshot_worker(controller);
     return result;
 }
 
@@ -394,13 +398,16 @@ static esp_err_t cb_clear_ram(void *ctx)
     portENTER_CRITICAL(&s_logs_lock);
     bool busy = controller->save_busy;
     portEXIT_CRITICAL(&s_logs_lock);
-    if (busy) return ESP_ERR_INVALID_STATE;
+    if (busy)
+        return ESP_ERR_INVALID_STATE;
     esp_err_t result = log_stream_retained_clear();
-    if (result != ESP_OK) return result;
+    if (result != ESP_OK)
+        return result;
 
     if (controller->paused) {
         result = capture_pause_anchor(controller);
-        if (result == ESP_OK) (void)start_snapshot_worker(controller);
+        if (result == ESP_OK)
+            (void)start_snapshot_worker(controller);
         return result;
     }
     portENTER_CRITICAL(&s_logs_lock);
@@ -415,9 +422,9 @@ static esp_err_t cb_clear_ram(void *ctx)
 static esp_err_t cb_save_card(void *ctx)
 {
     logs_controller_t *controller = ctx;
-    save_job_t *job = heap_caps_calloc(
-        1, sizeof(*job), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!job) return ESP_ERR_NO_MEM;
+    save_job_t *job = heap_caps_calloc(1, sizeof(*job), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!job)
+        return ESP_ERR_NO_MEM;
     char query[sizeof(job->query)] = {0};
     copy_text(query, sizeof(query), controller->query);
 
@@ -441,16 +448,15 @@ static esp_err_t cb_save_card(void *ctx)
     job->filter.level_mask = controller->level_mask;
     /* Saving a paused view preserves the same strict sequence ceiling as the
      * rows on screen, excluding lines captured after Pause/search focus. */
-    job->filter.before_sequence = controller->paused
-                                ? controller->before_sequence : 0;
+    job->filter.before_sequence = controller->paused ? controller->before_sequence : 0;
     job->filter.order = LOG_STREAM_RETAINED_OLDEST_FIRST;
     memcpy(job->query, query, sizeof(job->query));
     job->filter.query = job->query;
     portEXIT_CRITICAL(&s_logs_lock);
 
-    TaskHandle_t task = psram_task_create(save_task, "ui_log_save", 6144,
-                                           job, 3, 0, NULL, NULL);
-    if (task) return ESP_OK;
+    TaskHandle_t task = psram_task_create(save_task, "ui_log_save", 6144, job, 3, 0, NULL, NULL);
+    if (task)
+        return ESP_OK;
 
     portENTER_CRITICAL(&s_logs_lock);
     controller->save_busy = false;
@@ -487,9 +493,10 @@ static esp_err_t cb_retry(void *ctx)
     controller->workers++;
     controller->model_revision++;
     portEXIT_CRITICAL(&s_logs_lock);
-    TaskHandle_t task = psram_task_create(retry_task, "ui_log_retry", 4096,
-                                           controller, 3, 0, NULL, NULL);
-    if (task) return ESP_OK;
+    TaskHandle_t task =
+        psram_task_create(retry_task, "ui_log_retry", 4096, controller, 3, 0, NULL, NULL);
+    if (task)
+        return ESP_OK;
 
     portENTER_CRITICAL(&s_logs_lock);
     controller->retry_busy = false;
@@ -529,24 +536,20 @@ static void publish_model(logs_controller_t *controller)
     touch_logs_ui_update_t model = {0};
     uint32_t revision;
     portENTER_CRITICAL(&s_logs_lock);
-    if (!controller->visible ||
-        controller->rendered_revision == controller->model_revision) {
+    if (!controller->visible || controller->rendered_revision == controller->model_revision) {
         portEXIT_CRITICAL(&s_logs_lock);
         return;
     }
     revision = controller->model_revision;
-    model.snapshot_result = controller->page_valid
-                          ? controller->page_result
-                          : controller->info_result;
+    model.snapshot_result =
+        controller->page_valid ? controller->page_result : controller->info_result;
     model.lines = controller->page_lines[controller->active_buffer];
     model.line_count = controller->page_valid ? controller->line_count : 0;
     model.filter.level_mask = controller->level_mask;
     model.filter.query = controller->query;
-    model.filter.before_sequence = controller->paused
-                                 ? controller->before_sequence : 0;
+    model.filter.before_sequence = controller->paused ? controller->before_sequence : 0;
     model.filter.order = LOG_STREAM_RETAINED_NEWEST_FIRST;
-    model.page = controller->page_valid
-               ? controller->page : (log_stream_retained_page_t){0};
+    model.page = controller->page_valid ? controller->page : (log_stream_retained_page_t){0};
     model.info = controller->info;
     model.paused = controller->paused;
     model.pause_anchor_total_count = controller->pause_total_count;
@@ -573,13 +576,14 @@ static void publish_model(logs_controller_t *controller)
 
 esp_err_t touch_logs_controller_show(lv_obj_t *parent)
 {
-    if (!parent) return ESP_ERR_INVALID_ARG;
+    if (!parent)
+        return ESP_ERR_INVALID_ARG;
     if (!s_logs) {
-        logs_controller_t *controller = heap_caps_calloc(
-            1, sizeof(*controller), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-        if (!controller) return ESP_ERR_NO_MEM;
-        controller->level_mask = LOG_STREAM_RETAINED_LEVEL_ERROR |
-                                 LOG_STREAM_RETAINED_LEVEL_WARN |
+        logs_controller_t *controller =
+            heap_caps_calloc(1, sizeof(*controller), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!controller)
+            return ESP_ERR_NO_MEM;
+        controller->level_mask = LOG_STREAM_RETAINED_LEVEL_ERROR | LOG_STREAM_RETAINED_LEVEL_WARN |
                                  LOG_STREAM_RETAINED_LEVEL_INFO;
         controller->desired_revision = 1;
         controller->model_revision = 1;
@@ -607,7 +611,8 @@ esp_err_t touch_logs_controller_show(lv_obj_t *parent)
 
 void touch_logs_controller_hide(void)
 {
-    if (!s_logs) return;
+    if (!s_logs)
+        return;
     portENTER_CRITICAL(&s_logs_lock);
     s_logs->visible = false;
     portEXIT_CRITICAL(&s_logs_lock);
@@ -616,7 +621,8 @@ void touch_logs_controller_hide(void)
 
 bool touch_logs_controller_is_visible(void)
 {
-    if (!s_logs) return false;
+    if (!s_logs)
+        return false;
     portENTER_CRITICAL(&s_logs_lock);
     bool visible = s_logs->visible;
     portEXIT_CRITICAL(&s_logs_lock);
@@ -625,7 +631,8 @@ bool touch_logs_controller_is_visible(void)
 
 bool touch_logs_controller_is_paused(void)
 {
-    if (!s_logs) return false;
+    if (!s_logs)
+        return false;
     portENTER_CRITICAL(&s_logs_lock);
     bool paused = s_logs->paused;
     portEXIT_CRITICAL(&s_logs_lock);
@@ -635,7 +642,8 @@ bool touch_logs_controller_is_paused(void)
 void touch_logs_controller_refresh(bool card_available)
 {
     logs_controller_t *controller = s_logs;
-    if (!controller || !touch_logs_controller_is_visible()) return;
+    if (!controller || !touch_logs_controller_is_visible())
+        return;
 
     log_stream_retained_info_t info = {0};
     esp_err_t info_result = log_stream_retained_get_info(&info);
@@ -647,8 +655,8 @@ void touch_logs_controller_refresh(bool card_available)
 #endif
     bool start_snapshot = false;
     portENTER_CRITICAL(&s_logs_lock);
-    bool available_changed = controller->info.available != info.available ||
-                             controller->info_result != info_result;
+    bool available_changed =
+        controller->info.available != info.available || controller->info_result != info_result;
     bool total_changed = controller->info.total_count != info.total_count;
     bool generation_changed = controller->info.generation != info.generation;
     if (controller->card_available != card_available) {
@@ -660,8 +668,7 @@ void touch_logs_controller_refresh(bool card_available)
     if (available_changed || (controller->paused && total_changed))
         controller->model_revision++;
     if (!info.available || info_result != ESP_OK) {
-        controller->page_result = info_result != ESP_OK
-                                ? info_result : info.last_error;
+        controller->page_result = info_result != ESP_OK ? info_result : info.last_error;
         /* Keep the last completed page readable during service recovery. */
     } else if (!controller->snapshot_busy) {
         if (!controller->paused && generation_changed &&
@@ -669,21 +676,23 @@ void touch_logs_controller_refresh(bool card_available)
             mark_view_dirty_locked(controller);
         }
         start_snapshot = !controller->page_valid ||
-            controller->completed_revision != controller->desired_revision;
+                         controller->completed_revision != controller->desired_revision;
     }
     portEXIT_CRITICAL(&s_logs_lock);
 
     publish_model(controller);
-    if (start_snapshot) (void)start_snapshot_worker(controller);
+    if (start_snapshot)
+        (void)start_snapshot_worker(controller);
 }
 
 esp_err_t touch_logs_controller_destroy(void)
 {
     logs_controller_t *controller = s_logs;
-    if (!controller) return ESP_OK;
+    if (!controller)
+        return ESP_OK;
     portENTER_CRITICAL(&s_logs_lock);
-    if (controller->workers != 0 || controller->snapshot_busy ||
-        controller->save_busy || controller->retry_busy) {
+    if (controller->workers != 0 || controller->snapshot_busy || controller->save_busy ||
+        controller->retry_busy) {
         portEXIT_CRITICAL(&s_logs_lock);
         return ESP_ERR_INVALID_STATE;
     }

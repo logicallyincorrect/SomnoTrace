@@ -8,6 +8,7 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 HEADER = (ROOT / "main/touch_logs_ui.h").read_text(encoding="utf-8")
 SOURCE = (ROOT / "main/touch_logs_ui.c").read_text(encoding="utf-8")
+C_STRING_JOINED_SOURCE = re.sub(r'"\s*"', "", SOURCE)
 
 
 def require(text: str, pattern: str, description: str) -> None:
@@ -149,7 +150,7 @@ require(SOURCE,
 # Four stable columns use the compiled data face. Fixed x positions ensure tag
 # length and live movement never shift the message column.
 for x in ("21", "125", "183", "285"):
-    require(SOURCE, rf"make_label\(row->surface,.*?\n\s*{x},",
+    require(SOURCE, rf"make_label\s*\(\s*row->surface\s*,.*?\s{x}\s*,",
             f"fixed log column at x={x}")
 assert "somnotrace_space_grotesk" in SOURCE, "Space Grotesk UI font missing"
 assert "somnotrace_ibm_plex_mono" in SOURCE, "IBM Plex Mono row font missing"
@@ -172,7 +173,7 @@ for copy in (
     "Save to card",
     "Jump to newest",
 ):
-    assert copy in SOURCE, f"missing required state copy: {copy}"
+    assert copy in C_STRING_JOINED_SOURCE, f"missing required state copy: {copy}"
 assert '"Filter by tag or message"' in SOURCE, "handoff search placeholder drifted"
 require(SOURCE,
         r"ACTION_SEARCH_FOCUS:.*?view_forced_pause\s*=\s*true",

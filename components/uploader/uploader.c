@@ -27,7 +27,7 @@
 #include "upload_index.h"
 #include "upload_scan.h"
 #include "upload_sched.h"
-#include "upload_migrate.h"   /* DECOMMISSION AFTER v0.7.x */
+#include "upload_migrate.h" /* DECOMMISSION AFTER v0.7.x */
 
 #include <stdio.h>
 #include <string.h>
@@ -42,7 +42,7 @@
 
 static const char *TAG = "uploader";
 
-#define NVS_NAMESPACE  "uploader"
+#define NVS_NAMESPACE "uploader"
 
 /* ── Internal state ───────────────────────────────────────────────────
  *
@@ -61,7 +61,8 @@ static int s_n_backends = 0;
 
 void uploader_register_backend(const upload_backend_t *backend)
 {
-    if (!backend || s_n_backends >= MAX_BACKENDS) return;
+    if (!backend || s_n_backends >= MAX_BACKENDS)
+        return;
     s_backends[s_n_backends++] = backend;
     ESP_LOGI(TAG, "registered backend: %s", backend->id);
 }
@@ -87,11 +88,11 @@ static esp_err_t do_uploader_load_config(void *arg)
     memset(&local, 0, sizeof(local));
 
     /* Defaults: all toggles enabled for backward compatibility */
-    local.smb_enabled   = true;
-    local.shq_enabled   = true;
-    local.ftp_enabled   = true;
+    local.smb_enabled = true;
+    local.shq_enabled = true;
+    local.ftp_enabled = true;
     local.ftp_anonymous = true;
-    local.max_days      = UPLOAD_DEFAULT_MAX_DAYS;
+    local.max_days = UPLOAD_DEFAULT_MAX_DAYS;
 
     nvs_handle_t h;
     if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &h) != ESP_OK) {
@@ -102,18 +103,20 @@ static esp_err_t do_uploader_load_config(void *arg)
      * If key is missing (first boot after upgrade), default to enabled
      * for SMB/SHQ and FTP so existing setups keep working. */
     uint8_t u8val;
-    local.smb_enabled   = (nvs_get_u8(h, "smb_en", &u8val) == ESP_OK) ? u8val : 1;
-    local.shq_enabled   = (nvs_get_u8(h, "shq_en", &u8val) == ESP_OK) ? u8val : 1;
-    local.ftp_enabled   = (nvs_get_u8(h, "ftp_en", &u8val) == ESP_OK) ? u8val : 1;
+    local.smb_enabled = (nvs_get_u8(h, "smb_en", &u8val) == ESP_OK) ? u8val : 1;
+    local.shq_enabled = (nvs_get_u8(h, "shq_en", &u8val) == ESP_OK) ? u8val : 1;
+    local.ftp_enabled = (nvs_get_u8(h, "ftp_en", &u8val) == ESP_OK) ? u8val : 1;
     local.ftp_anonymous = (nvs_get_u8(h, "ftp_anon", &u8val) == ESP_OK) ? u8val : 1;
 
     /* Upload window: how many of the newest days are ever considered. Caps a
      * manual "reset state" so it cannot kick off months of re-uploading. */
     int32_t i32val;
-    local.max_days = (nvs_get_i32(h, "max_days", &i32val) == ESP_OK)
-                     ? (int)i32val : UPLOAD_DEFAULT_MAX_DAYS;
-    if (local.max_days < 1) local.max_days = 1;
-    if (local.max_days > UPLOAD_MAX_DAYS_CAP) local.max_days = UPLOAD_MAX_DAYS_CAP;
+    local.max_days =
+        (nvs_get_i32(h, "max_days", &i32val) == ESP_OK) ? (int)i32val : UPLOAD_DEFAULT_MAX_DAYS;
+    if (local.max_days < 1)
+        local.max_days = 1;
+    if (local.max_days > UPLOAD_MAX_DAYS_CAP)
+        local.max_days = UPLOAD_MAX_DAYS_CAP;
 
     size_t len;
     len = sizeof(local.smb_host);
@@ -142,21 +145,22 @@ static esp_err_t do_uploader_load_config(void *arg)
 
 esp_err_t uploader_load_config(uploader_config_t *cfg)
 {
-    if (!cfg) return ESP_ERR_INVALID_ARG;
+    if (!cfg)
+        return ESP_ERR_INVALID_ARG;
     memset(cfg, 0, sizeof(*cfg));
 
     /* Defaults: all toggles enabled for backward compatibility */
-    cfg->smb_enabled   = true;
-    cfg->shq_enabled   = true;
-    cfg->ftp_enabled   = true;
+    cfg->smb_enabled = true;
+    cfg->shq_enabled = true;
+    cfg->ftp_enabled = true;
     cfg->ftp_anonymous = true;
-    cfg->max_days      = UPLOAD_DEFAULT_MAX_DAYS;
+    cfg->max_days = UPLOAD_DEFAULT_MAX_DAYS;
 
     /* Use the injected NVS executor (nvs_writer_run) if available so the
      * read is serialized with all other NVS access.  Fall back to direct
      * access only before the executor is set (early boot, internal stack). */
-    esp_err_t err = s_nvs_exec ? s_nvs_exec(do_uploader_load_config, cfg)
-                               : do_uploader_load_config(cfg);
+    esp_err_t err =
+        s_nvs_exec ? s_nvs_exec(do_uploader_load_config, cfg) : do_uploader_load_config(cfg);
     if (err != ESP_OK) {
         ESP_LOGI(TAG, "no uploader config in NVS — using defaults");
     }
@@ -165,17 +169,25 @@ esp_err_t uploader_load_config(uploader_config_t *cfg)
 
 /* Injected storage-lease hooks (the app's sd_storage arbitration). */
 static uploader_cancel_fn_t s_should_cancel;
-void uploader_set_cancel_fn(uploader_cancel_fn_t fn) { s_should_cancel = fn; }
-bool uploader_should_cancel(void) { return s_should_cancel && s_should_cancel(); }
+void uploader_set_cancel_fn(uploader_cancel_fn_t fn)
+{
+    s_should_cancel = fn;
+}
+bool uploader_should_cancel(void)
+{
+    return s_should_cancel && s_should_cancel();
+}
 
 bool uploader_resolve_host(const char *host, char *out, size_t out_size)
 {
-    if (uploader_should_cancel()) return false;
-    struct addrinfo hints = { .ai_family = AF_INET, .ai_socktype = SOCK_STREAM };
+    if (uploader_should_cancel())
+        return false;
+    struct addrinfo hints = {.ai_family = AF_INET, .ai_socktype = SOCK_STREAM};
     struct addrinfo *result = NULL;
-    if (getaddrinfo(host, NULL, &hints, &result) != 0) return false;
-    bool ok = result && inet_ntop(AF_INET,
-        &((struct sockaddr_in *)result->ai_addr)->sin_addr, out, out_size);
+    if (getaddrinfo(host, NULL, &hints, &result) != 0)
+        return false;
+    bool ok = result &&
+              inet_ntop(AF_INET, &((struct sockaddr_in *)result->ai_addr)->sin_addr, out, out_size);
     freeaddrinfo(result);
     return ok && !uploader_should_cancel();
 }
@@ -203,7 +215,8 @@ void uploader_set_progress_notify_fn(uploader_progress_notify_fn_t fn)
  * expected only to set a flag for another task to act on. */
 void uploader_notify_progress_changed(void)
 {
-    if (s_progress_notify) s_progress_notify();
+    if (s_progress_notify)
+        s_progress_notify();
 }
 
 void uploader_set_nvs_executor(uploader_nvs_exec_fn_t exec)
@@ -220,23 +233,39 @@ static esp_err_t do_uploader_save_config(void *arg)
     uploader_config_t local = *cfg;
     nvs_handle_t h;
     esp_err_t ret = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
-    if (ret != ESP_OK) return ret;
+    if (ret != ESP_OK)
+        return ret;
 
-    if (ret == ESP_OK) ret = nvs_set_u8(h, "smb_en", local.smb_enabled ? 1 : 0);
-    if (ret == ESP_OK) ret = nvs_set_u8(h, "shq_en", local.shq_enabled ? 1 : 0);
-    if (ret == ESP_OK) ret = nvs_set_u8(h, "ftp_en", local.ftp_enabled ? 1 : 0);
-    if (ret == ESP_OK) ret = nvs_set_u8(h, "ftp_anon", local.ftp_anonymous ? 1 : 0);
-    if (ret == ESP_OK) ret = nvs_set_i32(h, "max_days", local.max_days);
-    if (ret == ESP_OK) ret = nvs_set_str(h, "smb_host", local.smb_host);
-    if (ret == ESP_OK) ret = nvs_set_str(h, "smb_share", local.smb_share);
-    if (ret == ESP_OK) ret = nvs_set_str(h, "smb_user", local.smb_user);
-    if (ret == ESP_OK) ret = nvs_set_str(h, "smb_pass", local.smb_pass);
-    if (ret == ESP_OK) ret = nvs_set_str(h, "smb_path", local.smb_path);
-    if (ret == ESP_OK) ret = nvs_set_str(h, "shq_cid", local.shq_client_id);
-    if (ret == ESP_OK) ret = nvs_set_str(h, "shq_secret", local.shq_client_secret);
-    if (ret == ESP_OK) ret = nvs_set_str(h, "ftp_user", local.ftp_user);
-    if (ret == ESP_OK) ret = nvs_set_str(h, "ftp_pass", local.ftp_pass);
-    if (ret == ESP_OK) ret = nvs_commit(h);
+    if (ret == ESP_OK)
+        ret = nvs_set_u8(h, "smb_en", local.smb_enabled ? 1 : 0);
+    if (ret == ESP_OK)
+        ret = nvs_set_u8(h, "shq_en", local.shq_enabled ? 1 : 0);
+    if (ret == ESP_OK)
+        ret = nvs_set_u8(h, "ftp_en", local.ftp_enabled ? 1 : 0);
+    if (ret == ESP_OK)
+        ret = nvs_set_u8(h, "ftp_anon", local.ftp_anonymous ? 1 : 0);
+    if (ret == ESP_OK)
+        ret = nvs_set_i32(h, "max_days", local.max_days);
+    if (ret == ESP_OK)
+        ret = nvs_set_str(h, "smb_host", local.smb_host);
+    if (ret == ESP_OK)
+        ret = nvs_set_str(h, "smb_share", local.smb_share);
+    if (ret == ESP_OK)
+        ret = nvs_set_str(h, "smb_user", local.smb_user);
+    if (ret == ESP_OK)
+        ret = nvs_set_str(h, "smb_pass", local.smb_pass);
+    if (ret == ESP_OK)
+        ret = nvs_set_str(h, "smb_path", local.smb_path);
+    if (ret == ESP_OK)
+        ret = nvs_set_str(h, "shq_cid", local.shq_client_id);
+    if (ret == ESP_OK)
+        ret = nvs_set_str(h, "shq_secret", local.shq_client_secret);
+    if (ret == ESP_OK)
+        ret = nvs_set_str(h, "ftp_user", local.ftp_user);
+    if (ret == ESP_OK)
+        ret = nvs_set_str(h, "ftp_pass", local.ftp_pass);
+    if (ret == ESP_OK)
+        ret = nvs_commit(h);
     nvs_close(h);
     return ret;
 }
@@ -246,10 +275,13 @@ esp_err_t uploader_save_config(const uploader_config_t *cfg)
     if (!cfg || cfg->max_days < 1 || cfg->max_days > UPLOAD_MAX_DAYS_CAP ||
         !memchr(cfg->smb_host, 0, sizeof(cfg->smb_host)) ||
         !memchr(cfg->smb_share, 0, sizeof(cfg->smb_share)) ||
-        !memchr(cfg->smb_path, 0, sizeof(cfg->smb_path))) return ESP_ERR_INVALID_ARG;
+        !memchr(cfg->smb_path, 0, sizeof(cfg->smb_path)))
+        return ESP_ERR_INVALID_ARG;
     if (strpbrk(cfg->smb_host, " /\\\r\n") || strpbrk(cfg->smb_share, "/\\\r\n") ||
-        strstr(cfg->smb_path, "..")) return ESP_ERR_INVALID_ARG;
-    if (cfg->ftp_enabled && !cfg->ftp_anonymous && (!cfg->ftp_user[0] || !cfg->ftp_pass[0])) return ESP_ERR_INVALID_ARG;
+        strstr(cfg->smb_path, ".."))
+        return ESP_ERR_INVALID_ARG;
+    if (cfg->ftp_enabled && !cfg->ftp_anonymous && (!cfg->ftp_user[0] || !cfg->ftp_pass[0]))
+        return ESP_ERR_INVALID_ARG;
 
     /* Delegate the flash write to the injected executor (internal-stack
      * nvs_writer) so a caller on a PSRAM stack (httpd) is safe. Runs inline
@@ -266,14 +298,13 @@ esp_err_t uploader_save_config(const uploader_config_t *cfg)
 
 bool uploader_is_smb_configured(void)
 {
-    return s_config.smb_enabled &&
-           s_config.smb_host[0] != '\0' && s_config.smb_share[0] != '\0';
+    return s_config.smb_enabled && s_config.smb_host[0] != '\0' && s_config.smb_share[0] != '\0';
 }
 
 bool uploader_is_sleephq_configured(void)
 {
-    return s_config.shq_enabled &&
-           s_config.shq_client_id[0] != '\0' && s_config.shq_client_secret[0] != '\0';
+    return s_config.shq_enabled && s_config.shq_client_id[0] != '\0' &&
+           s_config.shq_client_secret[0] != '\0';
 }
 
 bool uploader_is_smb_enabled(void)
@@ -295,7 +326,8 @@ bool uploader_is_ftp_enabled(void)
 
 esp_err_t uploader_get_config_json(char **out_json)
 {
-    if (!out_json) return ESP_ERR_INVALID_ARG;
+    if (!out_json)
+        return ESP_ERR_INVALID_ARG;
 
     cJSON *root = cJSON_CreateObject();
 
@@ -336,7 +368,8 @@ esp_err_t uploader_get_config_json(char **out_json)
 
 esp_err_t uploader_save_config_json(const char *json_str)
 {
-    if (!json_str) return ESP_ERR_INVALID_ARG;
+    if (!json_str)
+        return ESP_ERR_INVALID_ARG;
 
     cJSON *root = cJSON_Parse(json_str);
     if (!root) {
@@ -345,7 +378,7 @@ esp_err_t uploader_save_config_json(const char *json_str)
     }
 
     uploader_config_t cfg;
-    memcpy(&cfg, &s_config, sizeof(cfg));  /* start from current */
+    memcpy(&cfg, &s_config, sizeof(cfg)); /* start from current */
 
     cJSON *smb = cJSON_GetObjectItem(root, "smb");
     if (smb) {
@@ -383,8 +416,10 @@ esp_err_t uploader_save_config_json(const char *json_str)
     cJSON *md = cJSON_GetObjectItem(root, "max_days");
     if (md && cJSON_IsNumber(md)) {
         int v = md->valueint;
-        if (v < 1) v = 1;
-        if (v > UPLOAD_MAX_DAYS_CAP) v = UPLOAD_MAX_DAYS_CAP;
+        if (v < 1)
+            v = 1;
+        if (v > UPLOAD_MAX_DAYS_CAP)
+            v = UPLOAD_MAX_DAYS_CAP;
         cfg.max_days = v;
     }
 
@@ -422,15 +457,18 @@ esp_err_t uploader_save_config_json(const char *json_str)
  * and aborted, so both entry points are gated on full initialisation. */
 esp_err_t uploader_get_progress_json(char **out_json)
 {
-    if (!s_initialised) return ESP_ERR_INVALID_STATE;
+    if (!s_initialised)
+        return ESP_ERR_INVALID_STATE;
     return upload_sched_progress_json(out_json);
 }
 
 void uploader_get_summary(int *out_pending, const char **out_worst)
 {
     if (!s_initialised) {
-        if (out_pending) *out_pending = 0;
-        if (out_worst) *out_worst = "idle";
+        if (out_pending)
+            *out_pending = 0;
+        if (out_worst)
+            *out_worst = "idle";
         return;
     }
     upload_sched_summary(out_pending, out_worst);
@@ -438,7 +476,8 @@ void uploader_get_summary(int *out_pending, const char **out_worst)
 
 esp_err_t uploader_get_day_state_json(const char *day, char **out_json)
 {
-    if (!day || !out_json) return ESP_ERR_INVALID_ARG;
+    if (!day || !out_json)
+        return ESP_ERR_INVALID_ARG;
     return upload_index_day_to_json((uint32_t)strtoul(day, NULL, 10), out_json);
 }
 
@@ -457,8 +496,10 @@ esp_err_t uploader_reset_state(void)
 int uploader_max_days(void)
 {
     int d = s_config.max_days;
-    if (d <= 0) d = UPLOAD_DEFAULT_MAX_DAYS;
-    if (d > UPLOAD_MAX_DAYS_CAP) d = UPLOAD_MAX_DAYS_CAP;
+    if (d <= 0)
+        d = UPLOAD_DEFAULT_MAX_DAYS;
+    if (d > UPLOAD_MAX_DAYS_CAP)
+        d = UPLOAD_MAX_DAYS_CAP;
     return d;
 }
 
@@ -466,32 +507,35 @@ int uploader_enabled_backends(const upload_backend_t **out, int max_out)
 {
     int n = 0;
     for (int i = 0; i < s_n_backends && n < max_out; i++) {
-        if (s_backends[i]) out[n++] = s_backends[i];
+        if (s_backends[i])
+            out[n++] = s_backends[i];
     }
     return n;
 }
 
 bool uploader_lease_take(uint32_t timeout_ms)
 {
-    return !uploader_should_cancel() &&
-           (s_lease_acquire ? s_lease_acquire(timeout_ms) : true);
+    return !uploader_should_cancel() && (s_lease_acquire ? s_lease_acquire(timeout_ms) : true);
 }
 
 void uploader_lease_give(void)
 {
-    if (s_lease_release) s_lease_release();
+    if (s_lease_release)
+        s_lease_release();
 }
 
 /* ── Public API ─────────────────────────────────────────────────────── */
 
 esp_err_t uploader_init(void)
 {
-    if (s_initialised) return ESP_OK;
+    if (s_initialised)
+        return ESP_OK;
 
     uploader_load_config(&s_config);
 
     esp_err_t ret = upload_index_init();
-    if (ret != ESP_OK) return ret;
+    if (ret != ESP_OK)
+        return ret;
 
     /* Backends must be registered before the index loads, so that their slots
      * are assigned in a stable order and the state files can be attributed. */
@@ -509,7 +553,8 @@ esp_err_t uploader_init(void)
     upload_migrate_legacy_state();
 
     ret = upload_sched_init();
-    if (ret != ESP_OK) return ret;
+    if (ret != ESP_OK)
+        return ret;
 
     s_initialised = true;
     ESP_LOGI(TAG, "uploader initialised (window %d days)", uploader_max_days());
@@ -520,19 +565,23 @@ esp_err_t uploader_init(void)
 
 static uint32_t day_to_num(const char *day_folder)
 {
-    if (!day_folder || strlen(day_folder) != 8) return 0;
+    if (!day_folder || strlen(day_folder) != 8)
+        return 0;
     for (int i = 0; i < 8; i++) {
-        if (day_folder[i] < '0' || day_folder[i] > '9') return 0;
+        if (day_folder[i] < '0' || day_folder[i] > '9')
+            return 0;
     }
     return (uint32_t)strtoul(day_folder, NULL, 10);
 }
 
 void uploader_on_export_complete(const char *day_folder)
 {
-    if (!s_initialised) return;
+    if (!s_initialised)
+        return;
     uint32_t day = day_to_num(day_folder);
     if (!day) {
-        ESP_LOGW(TAG, "ignoring export notification for invalid day '%s'",
+        ESP_LOGW(TAG,
+                 "ignoring export notification for invalid day '%s'",
                  day_folder ? day_folder : "(null)");
         return;
     }
@@ -542,31 +591,35 @@ void uploader_on_export_complete(const char *day_folder)
 
 void uploader_on_day_invalidated(const char *day_folder)
 {
-    if (!s_initialised) return;
+    if (!s_initialised)
+        return;
     uint32_t day = day_to_num(day_folder);
-    if (!day) return;
+    if (!day)
+        return;
     ESP_LOGI(TAG, "day %s invalidation pending", day_folder);
     upload_sched_notify_invalidate(day);
 }
 
 void uploader_set_invalidation_hooks(uploader_invalidation_next_fn_t next,
-                                      uploader_invalidation_ack_fn_t ack)
+                                     uploader_invalidation_ack_fn_t ack)
 {
     upload_sched_set_invalidation_hooks(next, ack);
 }
 
 void uploader_request_scan(void)
 {
-    if (!s_initialised) return;
+    if (!s_initialised)
+        return;
     upload_sched_request_scan();
 }
 
 /* ── "Test connection" (web UI) ─────────────────────────────────────── */
 
-esp_err_t uploader_test_connection(const char *backend_id, const uploader_config_t *cfg,
-                                   bool *out_ok, char *msg, size_t msg_len)
+esp_err_t uploader_test_connection(
+    const char *backend_id, const uploader_config_t *cfg, bool *out_ok, char *msg, size_t msg_len)
 {
-    if (!backend_id || !out_ok || !msg || msg_len == 0) return ESP_ERR_INVALID_ARG;
+    if (!backend_id || !out_ok || !msg || msg_len == 0)
+        return ESP_ERR_INVALID_ARG;
     *out_ok = false;
 
     const upload_backend_t *be = NULL;
@@ -606,8 +659,7 @@ esp_err_t uploader_test_connection(const char *backend_id, const uploader_config
     }
     ESP_LOGI(TAG, "%s: connection test requested", be->id);
     *out_ok = be->test(cfg, msg, msg_len);
-    ESP_LOGI(TAG, "%s: connection test %s: %s", be->id,
-             *out_ok ? "passed" : "failed", msg);
+    ESP_LOGI(TAG, "%s: connection test %s: %s", be->id, *out_ok ? "passed" : "failed", msg);
     /* Released on BOTH outcomes.  There is no early return between the claim
      * and here, which is what keeps the pairing checkable by reading rather
      * than by trusting every future edit to remember. */
@@ -617,8 +669,10 @@ esp_err_t uploader_test_connection(const char *backend_id, const uploader_config
 
 esp_err_t uploader_get_progress_snapshot(uploader_progress_snapshot_t *out)
 {
-    if (!out) return ESP_ERR_INVALID_ARG;
+    if (!out)
+        return ESP_ERR_INVALID_ARG;
     memset(out, 0, sizeof(*out));
-    if (!s_initialised) return ESP_ERR_INVALID_STATE;
+    if (!s_initialised)
+        return ESP_ERR_INVALID_STATE;
     return upload_sched_progress_snapshot(out);
 }

@@ -31,10 +31,10 @@ void controller_diagnostics_init(bool simulated)
     DIAG_UNLOCK();
 }
 
-void controller_diagnostics_record(controller_operation_t operation,
-                                   esp_err_t result)
+void controller_diagnostics_record(controller_operation_t operation, esp_err_t result)
 {
-    if ((unsigned)operation >= CONTROLLER_OPERATION_COUNT) return;
+    if ((unsigned)operation >= CONTROLLER_OPERATION_COUNT)
+        return;
     DIAG_LOCK();
     if (!s_snapshot.initialized) {
         DIAG_UNLOCK();
@@ -55,14 +55,18 @@ void controller_diagnostics_record(controller_operation_t operation,
                 if (s_snapshot.history[i].operation == operation) {
                     /* The newest episode for this operation is the only one
                      * that can still be active. Never join a pre-recovery one. */
-                    if (s_snapshot.history[i].result == result) found = i;
+                    if (s_snapshot.history[i].result == result)
+                        found = i;
                     break;
                 }
             }
         }
         controller_error_episode_t episode = {
-            .operation = operation, .result = result, .occurrences = 1,
-            .first_us = now, .last_us = now,
+            .operation = operation,
+            .result = result,
+            .occurrences = 1,
+            .first_us = now,
+            .last_us = now,
         };
         size_t move;
         if (found < s_snapshot.history_count) {
@@ -75,8 +79,8 @@ void controller_diagnostics_record(controller_operation_t operation,
                 ++s_snapshot.history_count;
             move = s_snapshot.history_count - 1U;
         }
-        memmove(&s_snapshot.history[1], &s_snapshot.history[0],
-                move * sizeof(s_snapshot.history[0]));
+        memmove(
+            &s_snapshot.history[1], &s_snapshot.history[0], move * sizeof(s_snapshot.history[0]));
         s_snapshot.history[0] = episode;
     }
     DIAG_UNLOCK();
@@ -84,7 +88,8 @@ void controller_diagnostics_record(controller_operation_t operation,
 
 void controller_diagnostics_get_snapshot(controller_diagnostics_snapshot_t *out)
 {
-    if (!out) return;
+    if (!out)
+        return;
     DIAG_LOCK();
     *out = s_snapshot;
     DIAG_UNLOCK();
@@ -93,11 +98,17 @@ void controller_diagnostics_get_snapshot(controller_diagnostics_snapshot_t *out)
 const char *controller_diagnostics_operation_name(controller_operation_t operation)
 {
     static const char *const names[] = {
-        "Display initialization", "RGB frame submission", "RGB frame handoff",
-        "Touch initialization", "Touch read", "Backlight power",
+        "Display initialization",
+        "RGB frame submission",
+        "RGB frame handoff",
+        "Touch initialization",
+        "Touch read",
+        "Backlight power",
         "Backlight brightness",
-        "Touch recovery", "Controller output mode", "LCD power",
+        "Touch recovery",
+        "Controller output mode",
+        "LCD power",
     };
-    return (unsigned)operation < CONTROLLER_OPERATION_COUNT
-               ? names[operation] : "Unknown controller operation";
+    return (unsigned)operation < CONTROLLER_OPERATION_COUNT ? names[operation]
+                                                            : "Unknown controller operation";
 }

@@ -60,47 +60,47 @@
  *  main/sd_storage.h (this component does not depend on main).
  * ──────────────────────────────────────────────────────────────────── */
 
-#define UPLOAD_STATE_DIR          "/somnotrace/.somnotrace/upload_state"
-#define UPLOAD_BUNDLE_STATE_PATH  UPLOAD_STATE_DIR "/bundle.json"
+#define UPLOAD_STATE_DIR "/somnotrace/.somnotrace/upload_state"
+#define UPLOAD_BUNDLE_STATE_PATH UPLOAD_STATE_DIR "/bundle.json"
 
-#define UPLOAD_MAX_BACKENDS        4
-#define UPLOAD_BACKEND_ID_LEN      12
-#define UPLOAD_MAX_GROUPS_PER_DAY  128
-#define UPLOAD_MAX_DAYS_CAP        366   /* hard ceiling for max_days     */
-#define UPLOAD_DEFAULT_MAX_DAYS    30
+#define UPLOAD_MAX_BACKENDS 4
+#define UPLOAD_BACKEND_ID_LEN 12
+#define UPLOAD_MAX_GROUPS_PER_DAY 128
+#define UPLOAD_MAX_DAYS_CAP 366 /* hard ceiling for max_days     */
+#define UPLOAD_DEFAULT_MAX_DAYS 30
 
 /* Per-group, per-backend upload status. */
 typedef enum {
-    UG_PENDING = 0,   /* never uploaded, or invalidated                   */
-    UG_OK,            /* every file in the group transferred successfully */
-    UG_FAILED,        /* attempted and failed; retried via the ladder     */
+    UG_PENDING = 0, /* never uploaded, or invalidated                   */
+    UG_OK,          /* every file in the group transferred successfully */
+    UG_FAILED,      /* attempted and failed; retried via the ladder     */
 } upload_unit_status_t;
 
 /* Which EDF kinds a group contains.  Kept for change detection and to make
  * the state files self-describing. */
-#define UGK_BRP  (1u << 0)
-#define UGK_PLD  (1u << 1)
-#define UGK_SA2  (1u << 2)
-#define UGK_EVE  (1u << 3)
-#define UGK_CSL  (1u << 4)
+#define UGK_BRP (1u << 0)
+#define UGK_PLD (1u << 1)
+#define UGK_SA2 (1u << 2)
+#define UGK_EVE (1u << 3)
+#define UGK_CSL (1u << 4)
 
 typedef struct {
-    uint8_t  status;       /* upload_unit_status_t                        */
-    uint8_t  attempts;
-    uint32_t last_try_s;   /* epoch seconds of last attempt, 0 = never    */
+    uint8_t status; /* upload_unit_status_t                        */
+    uint8_t attempts;
+    uint32_t last_try_s; /* epoch seconds of last attempt, 0 = never    */
 } upload_unit_t;
 
 typedef struct {
-    uint32_t      prefix_sec;   /* HHMMSS of the prefix, as seconds        */
-    uint8_t       kinds;        /* UGK_* bitmask                           */
-    uint8_t       n_files;
+    uint32_t prefix_sec; /* HHMMSS of the prefix, as seconds        */
+    uint8_t kinds;       /* UGK_* bitmask                           */
+    uint8_t n_files;
     upload_unit_t be[UPLOAD_MAX_BACKENDS];
 } upload_group_t;
 
 typedef struct {
-    uint32_t       day;         /* 20260807                                */
-    int            n_groups;
-    bool           dirty;       /* needs persisting                        */
+    uint32_t day; /* 20260807                                */
+    int n_groups;
+    bool dirty; /* needs persisting                        */
     upload_group_t groups[UPLOAD_MAX_GROUPS_PER_DAY];
 } upload_day_t;
 
@@ -120,9 +120,9 @@ esp_err_t upload_index_clear(void);
  * Backends are addressed by slot.  Slots are assigned on first use and
  * persisted by name, so adding a backend later cannot renumber existing
  * state files. */
-int  upload_index_backend_slot(const char *backend_id);
+int upload_index_backend_slot(const char *backend_id);
 const char *upload_index_backend_name(int slot);
-int  upload_index_backend_count(void);
+int upload_index_backend_count(void);
 
 /* ── Day / group access ───────────────────────────────────────────── */
 
@@ -131,14 +131,13 @@ int  upload_index_backend_count(void);
 upload_day_t *upload_index_day(uint32_t day, bool create);
 
 /* Find a group within a day by prefix, optionally creating it. */
-upload_group_t *upload_index_group(upload_day_t *d, uint32_t prefix_sec,
-                                   bool create);
+upload_group_t *upload_index_group(upload_day_t *d, uint32_t prefix_sec, bool create);
 
 /* Remove a group from a day (the file disappeared from the card). */
 void upload_index_drop_group(upload_day_t *d, uint32_t prefix_sec);
 
 /* Iteration, ordered newest day first. */
-int           upload_index_day_count(void);
+int upload_index_day_count(void);
 upload_day_t *upload_index_day_at(int i);
 
 /* Forget one day entirely: deletes its state file and drops it from the
@@ -172,8 +171,7 @@ esp_err_t upload_index_set_bundle_ok(int slot, uint64_t fp);
 
 /* Count days that have at least one group, and days where every group is OK
  * for this backend, within the newest max_days. */
-void upload_index_backend_progress(int slot, int max_days,
-                                   int *out_days_done, int *out_days_total);
+void upload_index_backend_progress(int slot, int max_days, int *out_days_done, int *out_days_total);
 
 /* Total number of groups still pending or failed for this backend. */
 int upload_index_backend_pending(int slot, int max_days);

@@ -33,14 +33,14 @@ extern "C" {
 
 /* ── .snt file format constants ─────────────────────────────────────── */
 
-#define SNT_MAGIC          0x534E5442u  /* "SNTB" in little-endian */
-#define SNT_VERSION        2            /* current SNT writer version */
-#define SNT_MISSING_V1     (-1)         /* v1 missing-data sentinel */
-#define SNT_MISSING_V2     INT16_MIN    /* v2 unambiguous missing-data sentinel */
-#define SNT_MISSING        SNT_MISSING_V2
+#define SNT_MAGIC 0x534E5442u    /* "SNTB" in little-endian */
+#define SNT_VERSION 2            /* current SNT writer version */
+#define SNT_MISSING_V1 (-1)      /* v1 missing-data sentinel */
+#define SNT_MISSING_V2 INT16_MIN /* v2 unambiguous missing-data sentinel */
+#define SNT_MISSING SNT_MISSING_V2
 
-#define SNT_TIER_RAW       0            /* L0 raw sample stream */
-#define SNT_TIER_MINMAX    1            /* L1 MinMax stream */
+#define SNT_TIER_RAW 0    /* L0 raw sample stream */
+#define SNT_TIER_MINMAX 1 /* L1 MinMax stream */
 
 /* header.reserved bit: the source contains positioned missing-data gaps.
  * Continuous EDF export must retain these streams as raw SNT. */
@@ -48,19 +48,19 @@ extern "C" {
 
 /* Authoritative 28-byte packed SNT header */
 typedef struct __attribute__((packed)) {
-    uint32_t magic;            /* 0x534E5442 "SNTB"                  */
-    uint8_t  version;          /* format version (1, 2)              */
-    uint8_t  tier;             /* 0 = L0 raw, 1 = L1 MinMax          */
-    uint8_t  n_channels;       /* channels per record                 */
-    uint8_t  sample_bytes;     /* 2 (int16)                           */
-    uint16_t sample_hz_x10;   /* rate × 10 (250 = 25 Hz)            */
+    uint32_t magic;         /* 0x534E5442 "SNTB"                  */
+    uint8_t version;        /* format version (1, 2)              */
+    uint8_t tier;           /* 0 = L0 raw, 1 = L1 MinMax          */
+    uint8_t n_channels;     /* channels per record                 */
+    uint8_t sample_bytes;   /* 2 (int16)                           */
+    uint16_t sample_hz_x10; /* rate × 10 (250 = 25 Hz)            */
     uint16_t reserved;
-    int64_t  start_epoch_ms;  /* session start (NTP clock)           */
-    uint32_t sample_count;    /* records written (updated each flush) */
+    int64_t start_epoch_ms; /* session start (NTP clock)           */
+    uint32_t sample_count;  /* records written (updated each flush) */
     uint32_t reserved2;
-} snt_header_t;              /* exactly 28 bytes (packed) */
+} snt_header_t; /* exactly 28 bytes (packed) */
 
-#define SNT_HEADER_SIZE    sizeof(snt_header_t)
+#define SNT_HEADER_SIZE sizeof(snt_header_t)
 
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
 _Static_assert(sizeof(snt_header_t) == 28, "snt_header_t must be exactly 28 bytes");
@@ -75,23 +75,28 @@ static inline int16_t snt_missing_for(uint8_t version)
 
 static inline int16_t clamp_i16(int val, int16_t min_val, int16_t max_val)
 {
-    if (val > max_val) return max_val;
-    if (val < min_val) return min_val;
+    if (val > max_val)
+        return max_val;
+    if (val < min_val)
+        return min_val;
     return (int16_t)val;
 }
 
 static inline bool is_channel_map_valid(const int *map, int n_signals, int snt_channels)
 {
-    if (!map) return (snt_channels == n_signals);
+    if (!map)
+        return (snt_channels == n_signals);
     for (int i = 0; i < n_signals; i++) {
-        if (map[i] < 0 || map[i] >= snt_channels) return false;
+        if (map[i] < 0 || map[i] >= snt_channels)
+            return false;
     }
     return true;
 }
 
 static inline int snt_read_header(FILE *f, snt_header_t *hdr)
 {
-    if (!f || !hdr) return -1;
+    if (!f || !hdr)
+        return -1;
     if (fread(hdr, 1, sizeof(snt_header_t), f) != sizeof(snt_header_t)) {
         return -1;
     }
@@ -100,7 +105,6 @@ static inline int snt_read_header(FILE *f, snt_header_t *hdr)
     }
     return 0;
 }
-
 
 #ifdef __cplusplus
 }

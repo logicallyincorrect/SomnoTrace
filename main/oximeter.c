@@ -58,8 +58,7 @@ static void load_driver_type(void)
     if (nvs_open(OX_NVS_NS, NVS_READONLY, &h) == ESP_OK) {
         uint8_t drv;
         uint8_t forgotten_value = 0;
-        forgotten = nvs_get_u8(h, "forgotten", &forgotten_value) == ESP_OK &&
-                    forgotten_value == 1;
+        forgotten = nvs_get_u8(h, "forgotten", &forgotten_value) == ESP_OK && forgotten_value == 1;
         if (nvs_get_u8(h, "driver", &drv) == ESP_OK && drv <= OX_DRIVER_LEGACY)
             s_driver_type = (ox_driver_t)drv;
         nvs_close(h);
@@ -69,19 +68,15 @@ static void load_driver_type(void)
     /* Fall back to paired.json on SD */
     if (!forgotten && s_driver_type == OX_DRIVER_OXYII) {
         char drv[16] = {0};
-        if (ox_store_load_paired(NULL, 0, NULL, 0, NULL, 0, NULL, 0,
-                                 drv, sizeof(drv), NULL, 0)) {
+        if (ox_store_load_paired(NULL, 0, NULL, 0, NULL, 0, NULL, 0, drv, sizeof(drv), NULL, 0)) {
             if (strcmp(drv, "wellue_legacy") == 0)
                 s_driver_type = OX_DRIVER_LEGACY;
         }
     }
 
-    s_active = (s_driver_type == OX_DRIVER_LEGACY)
-        ? &legacy_driver_ops
-        : &oxyii_driver_ops;
+    s_active = (s_driver_type == OX_DRIVER_LEGACY) ? &legacy_driver_ops : &oxyii_driver_ops;
 
-    ESP_LOGI(TAG, "active driver: %s",
-             s_driver_type == OX_DRIVER_LEGACY ? "legacy" : "oxyii");
+    ESP_LOGI(TAG, "active driver: %s", s_driver_type == OX_DRIVER_LEGACY ? "legacy" : "oxyii");
 }
 
 /* ── Public API — delegates to active driver ──────────────────────── */
@@ -110,9 +105,12 @@ cJSON *oximeter_get_scan_results(void)
     cJSON *oxyii = oxyii_driver_ops.get_scan_results();
     cJSON *legacy = legacy_driver_ops.get_scan_results();
     if (!merged || !oxyii || !legacy) {
-        if (merged) cJSON_Delete(merged);
-        if (oxyii) cJSON_Delete(oxyii);
-        if (legacy) cJSON_Delete(legacy);
+        if (merged)
+            cJSON_Delete(merged);
+        if (oxyii)
+            cJSON_Delete(oxyii);
+        if (legacy)
+            cJSON_Delete(legacy);
         return cJSON_CreateArray();
     }
     cJSON *item;
@@ -125,11 +123,14 @@ cJSON *oximeter_get_scan_results(void)
      * and falls back to Legacy.  The detected driver is persisted to NVS
      * by the winning driver's pair_task, so subsequent boots use the
      * correct protocol without user intervention. */
-    cJSON_ArrayForEach(item, legacy) {
+    cJSON_ArrayForEach(item, legacy)
+    {
         cJSON *copy = cJSON_Duplicate(item, true);
-        if (copy) cJSON_AddItemToArray(merged, copy);
+        if (copy)
+            cJSON_AddItemToArray(merged, copy);
     }
-    cJSON_ArrayForEach(item, oxyii) {
+    cJSON_ArrayForEach(item, oxyii)
+    {
         cJSON *addr = cJSON_GetObjectItem(item, "addr");
         bool dup = false;
         for (int i = 0; i < cJSON_GetArraySize(merged); i++) {
@@ -143,7 +144,8 @@ cJSON *oximeter_get_scan_results(void)
         }
         if (!dup) {
             cJSON *copy = cJSON_Duplicate(item, true);
-            if (copy) cJSON_AddItemToArray(merged, copy);
+            if (copy)
+                cJSON_AddItemToArray(merged, copy);
         }
     }
     cJSON_Delete(oxyii);
@@ -187,7 +189,8 @@ static bool s_pair_in_progress = false;
 static bool pair_settled(const char **state_out)
 {
     const char *st = s_active->get_status();
-    if (state_out) *state_out = st;
+    if (state_out)
+        *state_out = st;
     if (strcmp(st, OX_STATUS_ERROR) == 0)
         return true;
     if (strcmp(st, OX_STATUS_PAIRED) == 0)
@@ -199,12 +202,9 @@ static esp_err_t try_pair(const char *addr, ox_driver_t driver)
 {
     if (driver != s_driver_type) {
         s_driver_type = driver;
-        s_active = (driver == OX_DRIVER_LEGACY)
-            ? &legacy_driver_ops
-            : &oxyii_driver_ops;
+        s_active = (driver == OX_DRIVER_LEGACY) ? &legacy_driver_ops : &oxyii_driver_ops;
         s_active->init();
-        ESP_LOGI(TAG, "switched to driver: %s",
-                 driver == OX_DRIVER_LEGACY ? "legacy" : "oxyii");
+        ESP_LOGI(TAG, "switched to driver: %s", driver == OX_DRIVER_LEGACY ? "legacy" : "oxyii");
     }
     return s_active->pair(addr);
 }
@@ -220,15 +220,14 @@ static void auto_pair_task(void *arg)
     ESP_LOGI(TAG, "auto-pair: trying OxyII (Gen2) for %s", addr);
     esp_err_t rc = try_pair(addr, OX_DRIVER_OXYII);
     if (rc != ESP_OK) {
-        ESP_LOGW(TAG, "auto-pair: OxyII pair start failed (%s) — trying Legacy",
-                 esp_err_to_name(rc));
+        ESP_LOGW(
+            TAG, "auto-pair: OxyII pair start failed (%s) — trying Legacy", esp_err_to_name(rc));
         /* pair() failed to start the task (BLE host not ready, OOM).
          * Try Legacy directly — it might succeed if the issue was
          * driver-specific (unlikely, but worth a shot). */
         rc = try_pair(addr, OX_DRIVER_LEGACY);
         if (rc != ESP_OK) {
-            ESP_LOGW(TAG, "auto-pair: Legacy pair start also failed (%s)",
-                     esp_err_to_name(rc));
+            ESP_LOGW(TAG, "auto-pair: Legacy pair start also failed (%s)", esp_err_to_name(rc));
             s_pair_in_progress = false;
             free(pa);
             psram_task_delete(NULL);
@@ -245,7 +244,8 @@ static void auto_pair_task(void *arg)
         vTaskDelay(pdMS_TO_TICKS(200));
 
     if (st && strcmp(st, OX_STATUS_PAIRED) == 0) {
-        ESP_LOGI(TAG, "auto-pair: succeeded — device is %s",
+        ESP_LOGI(TAG,
+                 "auto-pair: succeeded — device is %s",
                  s_driver_type == OX_DRIVER_LEGACY ? "Gen1 (Legacy)" : "Gen2 (OxyII)");
         s_pair_in_progress = false;
         free(pa);
@@ -257,8 +257,7 @@ static void auto_pair_task(void *arg)
      * don't retry Legacy again. */
     if (s_driver_type == OX_DRIVER_LEGACY) {
         const char *lerr = s_active->get_error();
-        ESP_LOGW(TAG, "auto-pair: Legacy failed (%s)",
-                 lerr ? lerr : "unknown");
+        ESP_LOGW(TAG, "auto-pair: Legacy failed (%s)", lerr ? lerr : "unknown");
         s_pair_in_progress = false;
         free(pa);
         psram_task_delete(NULL);
@@ -274,17 +273,16 @@ static void auto_pair_task(void *arg)
      * otherwise we might see a stale error from a previous operation
      * (forget() doesn't clear s_error), or the poll timed out without
      * the pair_task ever running (pull_task was holding the mutex). */
-    const char *err = (st && strcmp(st, OX_STATUS_ERROR) == 0)
-        ? s_active->get_error() : NULL;
-    bool protocol_mismatch = err && (
-        strstr(err, "MTU=23") ||
-        strstr(err, "OxyII service not found") ||
-        strstr(err, "service range empty") ||
-        strstr(err, "write/notify char not found"));
+    const char *err = (st && strcmp(st, OX_STATUS_ERROR) == 0) ? s_active->get_error() : NULL;
+    bool protocol_mismatch =
+        err && (strstr(err, "MTU=23") || strstr(err, "OxyII service not found") ||
+                strstr(err, "service range empty") || strstr(err, "write/notify char not found"));
 
     if (!protocol_mismatch) {
-        ESP_LOGI(TAG, "auto-pair: OxyII failed (state=%s, err=%s) — not a protocol mismatch, giving up",
-                 st ? st : "null", err ? err : "none");
+        ESP_LOGI(TAG,
+                 "auto-pair: OxyII failed (state=%s, err=%s) — not a protocol mismatch, giving up",
+                 st ? st : "null",
+                 err ? err : "none");
         s_pair_in_progress = false;
         free(pa);
         psram_task_delete(NULL);
@@ -298,8 +296,7 @@ static void auto_pair_task(void *arg)
     ESP_LOGI(TAG, "auto-pair: OxyII protocol mismatch — retrying as Legacy (Gen1)");
     rc = try_pair(addr, OX_DRIVER_LEGACY);
     if (rc != ESP_OK) {
-        ESP_LOGW(TAG, "auto-pair: Legacy pair start failed (%s)",
-                 esp_err_to_name(rc));
+        ESP_LOGW(TAG, "auto-pair: Legacy pair start failed (%s)", esp_err_to_name(rc));
         s_pair_in_progress = false;
         free(pa);
         psram_task_delete(NULL);
@@ -314,8 +311,7 @@ static void auto_pair_task(void *arg)
         ESP_LOGI(TAG, "auto-pair: Legacy succeeded — device is Gen1");
     } else {
         const char *lerr = s_active->get_error();
-        ESP_LOGW(TAG, "auto-pair: Legacy also failed (%s)",
-                 lerr ? lerr : "unknown");
+        ESP_LOGW(TAG, "auto-pair: Legacy also failed (%s)", lerr ? lerr : "unknown");
     }
 
     s_pair_in_progress = false;
@@ -332,12 +328,17 @@ esp_err_t oximeter_pair(const char *addr_str, ox_driver_t driver)
 
     if (driver == OX_DRIVER_AUTO) {
         struct auto_pair_arg *pa = calloc(1, sizeof(*pa));
-        if (!pa) return ESP_ERR_NO_MEM;
+        if (!pa)
+            return ESP_ERR_NO_MEM;
         strlcpy(pa->addr, addr_str, sizeof(pa->addr));
         s_pair_in_progress = true;
-        TaskHandle_t h = psram_task_create(auto_pair_task, "ox_auto_pair",
-                                           8192, pa, 5, tskNO_AFFINITY, NULL, NULL);
-        if (!h) { s_pair_in_progress = false; free(pa); return ESP_ERR_NO_MEM; }
+        TaskHandle_t h = psram_task_create(
+            auto_pair_task, "ox_auto_pair", 8192, pa, 5, tskNO_AFFINITY, NULL, NULL);
+        if (!h) {
+            s_pair_in_progress = false;
+            free(pa);
+            return ESP_ERR_NO_MEM;
+        }
         return ESP_OK;
     }
 
@@ -345,15 +346,12 @@ esp_err_t oximeter_pair(const char *addr_str, ox_driver_t driver)
     if (driver != s_driver_type) {
         /* Switch driver */
         s_driver_type = driver;
-        s_active = (driver == OX_DRIVER_LEGACY)
-            ? &legacy_driver_ops
-            : &oxyii_driver_ops;
+        s_active = (driver == OX_DRIVER_LEGACY) ? &legacy_driver_ops : &oxyii_driver_ops;
 
         /* Initialize the new driver if not already done */
         s_active->init();
 
-        ESP_LOGI(TAG, "switched to driver: %s",
-                 driver == OX_DRIVER_LEGACY ? "legacy" : "oxyii");
+        ESP_LOGI(TAG, "switched to driver: %s", driver == OX_DRIVER_LEGACY ? "legacy" : "oxyii");
     }
 
     return s_active->pair(addr_str);

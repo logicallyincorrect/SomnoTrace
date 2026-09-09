@@ -15,10 +15,9 @@
 #include <stddef.h>
 
 #define STEP_BIT(step) ((uint8_t)(1U << (unsigned)(step)))
-#define ALL_STEP_BITS  ((uint8_t)((1U << FIRST_RUN_SETUP_STEP_COUNT) - 1U))
+#define ALL_STEP_BITS ((uint8_t)((1U << FIRST_RUN_SETUP_STEP_COUNT) - 1U))
 
-_Static_assert(FIRST_RUN_SETUP_STEP_COUNT <= 8,
-               "first-run step masks need a wider stored schema");
+_Static_assert(FIRST_RUN_SETUP_STEP_COUNT <= 8, "first-run step masks need a wider stored schema");
 
 static uint8_t resolved_mask(const first_run_setup_state_t *state)
 {
@@ -31,12 +30,10 @@ static uint8_t resolved_mask(const first_run_setup_state_t *state)
 
 static bool is_named_step(first_run_setup_step_t step)
 {
-    return step >= FIRST_RUN_SETUP_STEP_WIFI &&
-           step < FIRST_RUN_SETUP_STEP_COUNT;
+    return step >= FIRST_RUN_SETUP_STEP_WIFI && step < FIRST_RUN_SETUP_STEP_COUNT;
 }
 
-static void advance_after(first_run_setup_state_t *state,
-                          first_run_setup_step_t resolved_step)
+static void advance_after(first_run_setup_state_t *state, first_run_setup_step_t resolved_step)
 {
     uint8_t resolved = resolved_mask(state);
     if (resolved == ALL_STEP_BITS) {
@@ -45,8 +42,7 @@ static void advance_after(first_run_setup_state_t *state,
     }
 
     for (unsigned offset = 1; offset <= FIRST_RUN_SETUP_STEP_COUNT; offset++) {
-        unsigned candidate = ((unsigned)resolved_step + offset) %
-                             FIRST_RUN_SETUP_STEP_COUNT;
+        unsigned candidate = ((unsigned)resolved_step + offset) % FIRST_RUN_SETUP_STEP_COUNT;
         if ((resolved & STEP_BIT(candidate)) == 0) {
             state->current_step = (first_run_setup_step_t)candidate;
             return;
@@ -56,8 +52,9 @@ static void advance_after(first_run_setup_state_t *state,
 
 void first_run_setup_model_defaults(first_run_setup_state_t *state)
 {
-    if (!state) return;
-    *state = (first_run_setup_state_t) {
+    if (!state)
+        return;
+    *state = (first_run_setup_state_t){
         .schema_version = FIRST_RUN_SETUP_SCHEMA_VERSION,
         .current_step = FIRST_RUN_SETUP_STEP_WIFI,
         .completed_mask = 0,
@@ -82,23 +79,24 @@ const char *first_run_setup_step_name(first_run_setup_step_t step)
 bool first_run_setup_step_can_skip(first_run_setup_step_t step)
 {
     switch (step) {
-        case FIRST_RUN_SETUP_STEP_WIFI:
-        case FIRST_RUN_SETUP_STEP_TIME:
-        case FIRST_RUN_SETUP_STEP_AIRSENSE:
-        case FIRST_RUN_SETUP_STEP_ALERTS:
-        case FIRST_RUN_SETUP_STEP_UPLOADS:
-            return true;
-        case FIRST_RUN_SETUP_STEP_CARD:
-        case FIRST_RUN_SETUP_STEP_FINISHED:
-        default:
-            return false;
+    case FIRST_RUN_SETUP_STEP_WIFI:
+    case FIRST_RUN_SETUP_STEP_TIME:
+    case FIRST_RUN_SETUP_STEP_AIRSENSE:
+    case FIRST_RUN_SETUP_STEP_ALERTS:
+    case FIRST_RUN_SETUP_STEP_UPLOADS:
+        return true;
+    case FIRST_RUN_SETUP_STEP_CARD:
+    case FIRST_RUN_SETUP_STEP_FINISHED:
+    default:
+        return false;
     }
 }
 
 bool first_run_setup_step_is_resolved(const first_run_setup_state_t *state,
                                       first_run_setup_step_t step)
 {
-    if (!state || !is_named_step(step)) return false;
+    if (!state || !is_named_step(step))
+        return false;
     return (resolved_mask(state) & STEP_BIT(step)) != 0;
 }
 
@@ -118,7 +116,8 @@ bool first_run_setup_model_is_valid(const first_run_setup_state_t *state)
     if (((state->completed_mask | state->skipped_mask) & ~ALL_STEP_BITS) != 0) {
         return false;
     }
-    if ((state->completed_mask & state->skipped_mask) != 0) return false;
+    if ((state->completed_mask & state->skipped_mask) != 0)
+        return false;
     if ((state->skipped_mask & STEP_BIT(FIRST_RUN_SETUP_STEP_CARD)) != 0) {
         return false;
     }
@@ -143,41 +142,42 @@ bool first_run_setup_model_apply(first_run_setup_state_t *state,
 
     uint8_t bit = STEP_BIT(step);
     switch (update) {
-        case FIRST_RUN_SETUP_UPDATE_SELECT:
-            state->current_step = step;
-            return true;
+    case FIRST_RUN_SETUP_UPDATE_SELECT:
+        state->current_step = step;
+        return true;
 
-        case FIRST_RUN_SETUP_UPDATE_COMPLETE:
-            state->completed_mask |= bit;
-            state->skipped_mask &= (uint8_t)~bit;
-            if (step == FIRST_RUN_SETUP_STEP_CARD) {
-                state->continue_without_recording = false;
-            }
-            break;
+    case FIRST_RUN_SETUP_UPDATE_COMPLETE:
+        state->completed_mask |= bit;
+        state->skipped_mask &= (uint8_t)~bit;
+        if (step == FIRST_RUN_SETUP_STEP_CARD) {
+            state->continue_without_recording = false;
+        }
+        break;
 
-        case FIRST_RUN_SETUP_UPDATE_SKIP:
-            if (!first_run_setup_step_can_skip(step)) return false;
-            state->skipped_mask |= bit;
-            state->completed_mask &= (uint8_t)~bit;
-            break;
-
-        case FIRST_RUN_SETUP_UPDATE_CONTINUE_WITHOUT_RECORDING:
-            if (step != FIRST_RUN_SETUP_STEP_CARD) return false;
-            state->completed_mask &= (uint8_t)~bit;
-            state->skipped_mask &= (uint8_t)~bit;
-            state->continue_without_recording = true;
-            break;
-
-        default:
+    case FIRST_RUN_SETUP_UPDATE_SKIP:
+        if (!first_run_setup_step_can_skip(step))
             return false;
+        state->skipped_mask |= bit;
+        state->completed_mask &= (uint8_t)~bit;
+        break;
+
+    case FIRST_RUN_SETUP_UPDATE_CONTINUE_WITHOUT_RECORDING:
+        if (step != FIRST_RUN_SETUP_STEP_CARD)
+            return false;
+        state->completed_mask &= (uint8_t)~bit;
+        state->skipped_mask &= (uint8_t)~bit;
+        state->continue_without_recording = true;
+        break;
+
+    default:
+        return false;
     }
 
     advance_after(state, step);
     return first_run_setup_model_is_valid(state);
 }
 
-static void complete_observed(first_run_setup_state_t *state,
-                              first_run_setup_step_t step)
+static void complete_observed(first_run_setup_state_t *state, first_run_setup_step_t step)
 {
     uint8_t bit = STEP_BIT(step);
     state->completed_mask |= bit;
@@ -187,12 +187,12 @@ static void complete_observed(first_run_setup_state_t *state,
     }
 }
 
-bool first_run_setup_model_reconcile(
-    first_run_setup_state_t *state,
-    const first_run_setup_observed_t *observed,
-    bool had_persisted_state)
+bool first_run_setup_model_reconcile(first_run_setup_state_t *state,
+                                     const first_run_setup_observed_t *observed,
+                                     bool had_persisted_state)
 {
-    if (!first_run_setup_model_is_valid(state) || !observed) return false;
+    if (!first_run_setup_model_is_valid(state) || !observed)
+        return false;
 
     const bool present[FIRST_RUN_SETUP_STEP_COUNT] = {
         [FIRST_RUN_SETUP_STEP_WIFI] = observed->wifi_configured,
@@ -214,7 +214,8 @@ bool first_run_setup_model_reconcile(
      * always remains resumable and is never silently completed on upgrade. */
     if (!had_persisted_state && observed->established_installation) {
         for (unsigned step = 0; step < FIRST_RUN_SETUP_STEP_COUNT; step++) {
-            if (present[step]) continue;
+            if (present[step])
+                continue;
             if (step == FIRST_RUN_SETUP_STEP_CARD) {
                 state->continue_without_recording = true;
             } else {
@@ -228,10 +229,9 @@ bool first_run_setup_model_reconcile(
         state->current_step = FIRST_RUN_SETUP_STEP_FINISHED;
     } else if (state->current_step == FIRST_RUN_SETUP_STEP_FINISHED ||
                first_run_setup_step_is_resolved(state, state->current_step)) {
-        first_run_setup_step_t anchor =
-            state->current_step == FIRST_RUN_SETUP_STEP_FINISHED
-                ? FIRST_RUN_SETUP_STEP_UPLOADS
-                : state->current_step;
+        first_run_setup_step_t anchor = state->current_step == FIRST_RUN_SETUP_STEP_FINISHED
+                                            ? FIRST_RUN_SETUP_STEP_UPLOADS
+                                            : state->current_step;
         advance_after(state, anchor);
     }
 

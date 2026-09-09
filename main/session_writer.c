@@ -110,7 +110,8 @@ uint32_t session_writer_stream_epoch(void)
 
 static void sw_start_intent_begin(void)
 {
-    if (s_start_intent) return;
+    if (s_start_intent)
+        return;
     sd_storage_recording_intent_begin();
     s_start_intent = true;
     s_pending_start_us = esp_timer_get_time();
@@ -119,7 +120,8 @@ static void sw_start_intent_begin(void)
 
 static void sw_start_intent_end(void)
 {
-    if (!s_start_intent) return;
+    if (!s_start_intent)
+        return;
     s_start_intent = false;
     sd_storage_recording_intent_end();
 }
@@ -131,27 +133,27 @@ static void sw_start_intent_end(void)
  * number and a valid CRC, which makes a torn write during the checkpoint
  * update harmless (the older slot is still intact). */
 
-#define CKPT_MAGIC      0x534E5443u   /* "SNTC" */
-#define CKPT_VERSION    1
-#define CKPT_SLOTS      2
+#define CKPT_MAGIC 0x534E5443u /* "SNTC" */
+#define CKPT_VERSION 1
+#define CKPT_SLOTS 2
 
 typedef struct __attribute__((packed)) {
     uint32_t magic;
     uint16_t version;
     uint16_t reserved;
-    uint32_t seq;              /* monotonically increasing               */
-    uint32_t flow_count;       /* durable per-stream record counts       */
+    uint32_t seq;        /* monotonically increasing               */
+    uint32_t flow_count; /* durable per-stream record counts       */
     uint32_t press_count;
     uint32_t flow_mm_count;
     uint32_t sa2_count;
     uint32_t pld_count;
-    int64_t  start_epoch_ms;
-    int64_t  elapsed_us;       /* monotonic since session start          */
-    int64_t  last_stream_us;   /* monotonic at last StreamData received   */
-    uint32_t crc32;            /* over all preceding bytes               */
+    int64_t start_epoch_ms;
+    int64_t elapsed_us;     /* monotonic since session start          */
+    int64_t last_stream_us; /* monotonic at last StreamData received   */
+    uint32_t crc32;         /* over all preceding bytes               */
 } snt_ckpt_t;
 
-#define CKPT_SLOT_SIZE  sizeof(snt_ckpt_t)
+#define CKPT_SLOT_SIZE sizeof(snt_ckpt_t)
 
 /* ── Buffer geometry ──────────────────────────────────────────────────
  * Capacities are per batch, and a session holds SW_BATCH_POOL batches, so
@@ -159,144 +161,144 @@ typedef struct __attribute__((packed)) {
  * RAM than one larger buffer: it absorbs a slow card without ever letting
  * the producer block on I/O. */
 
-#define BRP_CAP              1500   /* 60 s @ 25 Hz, per channel */
-#define SA2_CAP               180   /* 180 s @ 1 Hz              */
-#define PLD_CAP               300   /* 600 s @ 0.5 Hz            */
-#define BRP_COMMIT_THRESHOLD 1400   /* hand off before clipping  */
-#define SW_BATCH_POOL           3
+#define BRP_CAP 1500              /* 60 s @ 25 Hz, per channel */
+#define SA2_CAP 180               /* 180 s @ 1 Hz              */
+#define PLD_CAP 300               /* 600 s @ 0.5 Hz            */
+#define BRP_COMMIT_THRESHOLD 1400 /* hand off before clipping  */
+#define SW_BATCH_POOL 3
 
 /* Maximum time therapy data may sit uncommitted.  Configurable policy
  * rather than a hardcoded tick: this bounds crash loss.  30 s is the
  * deliberate starting point — tightening it increases SD activity, which
  * is still a suspect for the INT_WDT reset. */
 #ifndef SW_COMMIT_INTERVAL_MS
-#define SW_COMMIT_INTERVAL_MS   30000
+#define SW_COMMIT_INTERVAL_MS 30000
 #endif
 
 /* Close an orphaned session when StreamData stops arriving (missed
  * TherapyStop with no following TherapyStart).  Monotonic, not wall clock. */
 #ifndef SW_STALE_TIMEOUT_MS
-#define SW_STALE_TIMEOUT_MS     600000   /* 10 min */
+#define SW_STALE_TIMEOUT_MS 600000 /* 10 min */
 #endif
 
 /* A StreamData discontinuity at least this long is not compensated — the
  * session is split so the gap is never rendered as continuous samples. */
 #ifndef SW_SPLIT_GAP_MS
-#define SW_SPLIT_GAP_MS         120000   /* 2 min */
+#define SW_SPLIT_GAP_MS 120000 /* 2 min */
 #endif
 
 /* Ignore a repeated TherapyStart this soon after a session started; it is
  * an echo, not a new therapy cycle. */
-#define SW_START_DEBOUNCE_MS    15000
+#define SW_START_DEBOUNCE_MS 15000
 
-#define SW_STORAGE_QUEUE_LEN    24
+#define SW_STORAGE_QUEUE_LEN 24
 #define SW_STORAGE_TERMINAL_RESERVE 1
-#define SW_POST_QUEUE_LEN        4
-#define MAX_SESSION_DIR_LEN    128
+#define SW_POST_QUEUE_LEN 4
+#define MAX_SESSION_DIR_LEN 128
 
 /* A rapid stop/start sequence must not run BLE pulls or derived-file writes
  * alongside the next raw recording.  Require storage to remain idle for this
  * long before beginning each expensive post-stop phase. */
-#define SW_POST_QUIET_MS       5000
+#define SW_POST_QUIET_MS 5000
 
 /* ── Stream batch ─────────────────────────────────────────────────────
  * Immutable once handed to the storage worker.  Flow and pressure share
  * n_brp: they are appended in lockstep and must be written in lockstep. */
 
 typedef struct {
-    int16_t  brp_flow[BRP_CAP];
-    int16_t  brp_press[BRP_CAP];
+    int16_t brp_flow[BRP_CAP];
+    int16_t brp_press[BRP_CAP];
     uint32_t n_brp;
     uint32_t brp_position[BRP_CAP];
     uint32_t brp_end;
-    int16_t  sa2_hr[SA2_CAP];
-    int16_t  sa2_spo2[SA2_CAP];
+    int16_t sa2_hr[SA2_CAP];
+    int16_t sa2_spo2[SA2_CAP];
     uint32_t n_sa2;
     uint32_t sa2_position[SA2_CAP];
     uint32_t sa2_end;
-    int16_t  pld[PLD_CAP][12];
+    int16_t pld[PLD_CAP][12];
     uint32_t n_pld;
     uint32_t pld_position[PLD_CAP];
     uint32_t pld_end;
     bool timing_uncertain;
-    int64_t  elapsed_us;      /* monotonic span covered by this batch */
-    int64_t  last_stream_us;
+    int64_t elapsed_us; /* monotonic span covered by this batch */
+    int64_t last_stream_us;
 } stream_batch_t;
 
 /* ── Storage worker commands ──────────────────────────────────────── */
 
 typedef enum {
-    SW_CMD_OPEN = 0,   /* create dir, open files, sync headers        */
-    SW_CMD_BATCH,      /* write one detached batch                    */
-    SW_CMD_EVENT,      /* write one pre-formatted JSON event line     */
-    SW_CMD_COMMIT,     /* FIFO durability barrier, ordered with events */
-    SW_CMD_FINALIZE,   /* final commit, close, write manifest         */
+    SW_CMD_OPEN = 0, /* create dir, open files, sync headers        */
+    SW_CMD_BATCH,    /* write one detached batch                    */
+    SW_CMD_EVENT,    /* write one pre-formatted JSON event line     */
+    SW_CMD_COMMIT,   /* FIFO durability barrier, ordered with events */
+    SW_CMD_FINALIZE, /* final commit, close, write manifest         */
 } sw_cmd_type_t;
 
 typedef struct {
-    sw_cmd_type_t     type;
+    sw_cmd_type_t type;
     session_writer_t *s;
-    stream_batch_t   *batch;        /* SW_CMD_BATCH: returned to pool  */
-    char             *event_json;   /* SW_CMD_EVENT: worker frees      */
+    stream_batch_t *batch; /* SW_CMD_BATCH: returned to pool  */
+    char *event_json;      /* SW_CMD_EVENT: worker frees      */
     /* SW_CMD_FINALIZE payload */
-    int64_t           end_epoch_ms;
-    int64_t           clock_drift_ms;
-    bool              drift_valid;
-    const char       *drift_source;
-    int64_t           drift_measured_at_ms;
-    const char       *state;        /* static string                   */
-    bool              queue_post;   /* dispatch immutable post work after close */
-    bool              allow_ble;
+    int64_t end_epoch_ms;
+    int64_t clock_drift_ms;
+    bool drift_valid;
+    const char *drift_source;
+    int64_t drift_measured_at_ms;
+    const char *state; /* static string                   */
+    bool queue_post;   /* dispatch immutable post work after close */
+    bool allow_ble;
 } sw_cmd_t;
 
 /* ── Post-stop pipeline job ───────────────────────────────────────── */
 
 typedef struct {
-    char              session_dir[MAX_SESSION_DIR_LEN];
-    char              session_id[40];
-    int64_t           start_epoch_ms;
-    int64_t           end_epoch_ms;
-    int64_t           stop_boot_us;
-    int64_t           clock_drift_ms;
-    bool              drift_valid;
-    char              drift_source[24];
-    int64_t           drift_measured_at_ms;
-    bool              allow_ble;    /* false when BLE is the reason    */
+    char session_dir[MAX_SESSION_DIR_LEN];
+    char session_id[40];
+    int64_t start_epoch_ms;
+    int64_t end_epoch_ms;
+    int64_t stop_boot_us;
+    int64_t clock_drift_ms;
+    bool drift_valid;
+    char drift_source[24];
+    int64_t drift_measured_at_ms;
+    bool allow_ble; /* false when BLE is the reason    */
 } sw_post_job_t;
 
 /* ── Per-stream file state (storage worker only) ──────────────────── */
 
 typedef struct {
-    FILE    *f_l0;
-    FILE    *f_l1;
-    uint32_t sample_count;   /* records written (per channel) */
-    bool position_gap;       /* header provenance durable before missing slots */
+    FILE *f_l0;
+    FILE *f_l1;
+    uint32_t sample_count; /* records written (per channel) */
+    bool position_gap;     /* header provenance durable before missing slots */
 } stream_files_t;
 
 struct session_writer {
     /* ── identity (set by producer at create, dir/id finalised by worker) */
-    char     dir[MAX_SESSION_DIR_LEN];
-    char     session_id[40];
-    int64_t  start_time_us;
-    int64_t  start_epoch_ms;
-    int64_t  end_time_us;
-    int64_t  end_epoch_ms;
+    char dir[MAX_SESSION_DIR_LEN];
+    char session_id[40];
+    int64_t start_time_us;
+    int64_t start_epoch_ms;
+    int64_t end_time_us;
+    int64_t end_epoch_ms;
 
     /* ── producer state ──────────────────────────────────────────── */
-    volatile bool     active;
-    bool              finalize_requested;
+    volatile bool active;
+    bool finalize_requested;
     /* Held from publication until the storage worker has closed every file
      * and committed the terminal manifest.  `active` only describes whether
      * producers may append; it is deliberately cleared earlier. */
-    bool              recording_claim_held;
+    bool recording_claim_held;
     SemaphoreHandle_t fill_mutex;
-    stream_batch_t   *fill;          /* current producer batch          */
-    QueueHandle_t     batch_pool;    /* free stream_batch_t*            */
-    stream_batch_t   *batches[SW_BATCH_POOL];
+    stream_batch_t *fill;     /* current producer batch          */
+    QueueHandle_t batch_pool; /* free stream_batch_t*            */
+    stream_batch_t *batches[SW_BATCH_POOL];
 
     /* Source positions; no hold-last-value compensation. */
-    int64_t  prev_stream_ms;
-    bool     prev_stream_ms_valid;
+    int64_t prev_stream_ms;
+    bool prev_stream_ms_valid;
     uint64_t stream_elapsed_ms;
     bool stream_position_valid;
     uint32_t next_sa2_position;
@@ -305,10 +307,10 @@ struct session_writer {
     uint32_t stream_notifications;
     uint32_t gap_events;
     uint32_t gap_missing_total;
-    uint32_t gap_long_events;      /* uncompensated discontinuities    */
+    uint32_t gap_long_events; /* uncompensated discontinuities    */
     uint64_t gap_long_ms_total;
-    int64_t  gap_long_first_ms;    /* offset from session start        */
-    int64_t  gap_long_last_ms;
+    int64_t gap_long_first_ms; /* offset from session start        */
+    int64_t gap_long_last_ms;
     uint32_t brp_dropped;
     uint32_t sa2_dropped;
     uint32_t pld_dropped;
@@ -323,40 +325,40 @@ struct session_writer {
     stream_files_t press;
     stream_files_t sa2;
     stream_files_t pld_f;
-    FILE    *f_events;
-    FILE    *f_ckpt;
+    FILE *f_events;
+    FILE *f_ckpt;
     uint32_t flow_mm_count;
     uint8_t flow_mm_fill;
     int16_t flow_mm_min, flow_mm_max;
     bool flow_mm_missing;
     uint32_t ckpt_seq;
-    int64_t  committed_elapsed_us;
-    int64_t  committed_last_stream_us;
-    bool     files_open;
-    bool     have_uncommitted;
-    bool     commit_queued;    /* storage-owned; producer fill lock protects enqueue */
+    int64_t committed_elapsed_us;
+    int64_t committed_last_stream_us;
+    bool files_open;
+    bool have_uncommitted;
+    bool commit_queued; /* storage-owned; producer fill lock protects enqueue */
 
     /* ── failure state (worker writes, anyone reads) ──────────────── */
     volatile bool storage_failed;
     volatile uint32_t io_errors;
-    char     first_io_error[80];
+    char first_io_error[80];
 
     /* ── drift / timing metadata (filled at finalize) ─────────────── */
-    int64_t  clock_drift_ms;
-    bool     clock_drift_valid;
+    int64_t clock_drift_ms;
+    bool clock_drift_valid;
     const char *clock_drift_source;
-    int64_t  clock_drift_measured_at_ms;
+    int64_t clock_drift_measured_at_ms;
 };
 
 /* ── Module state ─────────────────────────────────────────────────── */
 
 static session_writer_t *s_active = NULL;
 static SemaphoreHandle_t s_active_mutex = NULL;
-static QueueHandle_t     s_storage_q = NULL;
-static QueueHandle_t     s_post_q = NULL;
-static TaskHandle_t      s_storage_task = NULL;
-static TaskHandle_t      s_post_task = NULL;
-static bool              s_ready = false;
+static QueueHandle_t s_storage_q = NULL;
+static QueueHandle_t s_post_q = NULL;
+static TaskHandle_t s_storage_task = NULL;
+static TaskHandle_t s_post_task = NULL;
+static bool s_ready = false;
 
 /* Set on TherapyStop/Cooldown, cleared on TherapyStart.  RAM-only, so it is false
  * after any reset — which is what arms mid-therapy auto-start.  The stale
@@ -374,7 +376,7 @@ static bool s_started_from_event = false;
 /* TherapyStart de-duplication: an echoed start must not rotate a healthy
  * session, but a genuine one must (a missed TherapyStop otherwise glues
  * two nights together, and StreamData keeps resetting any timeout). */
-static char    s_last_start_report[32] = {0};
+static char s_last_start_report[32] = {0};
 
 static volatile bool s_snc_changed = false;
 static volatile int64_t s_snc_value = -1;
@@ -382,14 +384,16 @@ static volatile int64_t s_snc_value = -1;
 static char s_device_addr[32] = {0};
 static char s_client_id[64] = {0};
 
-static void sw_request_finalize(session_writer_t *s, const char *state,
-                                int64_t end_epoch_ms, bool allow_ble);
+static void sw_request_finalize(session_writer_t *s,
+                                const char *state,
+                                int64_t end_epoch_ms,
+                                bool allow_ble);
 static bool pending_export_mark(const char *day);
 static bool pending_export_mark_session(const char *key, const char *day);
 static void pending_export_ack_session(const char *key);
 static bool pending_upload_ready(const char *path, char *out_day, char *out_generation);
-static bool pending_update(const char *path, const char *day, int attempts,
-                           bool stalled, esp_err_t err);
+static bool pending_update(
+    const char *path, const char *day, int attempts, bool stalled, esp_err_t err);
 
 /* OPEN is lifecycle work, but it also creates the next producer.  It may not
  * consume the final free slot: that slot belongs to the new session's future
@@ -400,12 +404,12 @@ static bool storage_queue_send_open(const sw_cmd_t *cmd, uint32_t timeout_ms)
     TickType_t wait = pdMS_TO_TICKS(timeout_ms);
 
     do {
-        if (uxQueueSpacesAvailable(s_storage_q) >
-                SW_STORAGE_TERMINAL_RESERVE &&
+        if (uxQueueSpacesAvailable(s_storage_q) > SW_STORAGE_TERMINAL_RESERVE &&
             xQueueSend(s_storage_q, cmd, 0) == pdTRUE) {
             return true;
         }
-        if (wait == 0 || (xTaskGetTickCount() - started) >= wait) break;
+        if (wait == 0 || (xTaskGetTickCount() - started) >= wait)
+            break;
         vTaskDelay(1);
     } while (true);
 
@@ -414,15 +418,20 @@ static bool storage_queue_send_open(const sw_cmd_t *cmd, uint32_t timeout_ms)
 
 /* ── Helpers ──────────────────────────────────────────────────────── */
 
-
 static void make_session_id(char *out, size_t out_len)
 {
     time_t now = time(NULL);
     struct tm tm;
     localtime_r(&now, &tm);
-    snprintf(out, out_len, "%04d%02d%02d_%02d%02d%02d",
-             tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-             tm.tm_hour, tm.tm_min, tm.tm_sec);
+    snprintf(out,
+             out_len,
+             "%04d%02d%02d_%02d%02d%02d",
+             tm.tm_year + 1900,
+             tm.tm_mon + 1,
+             tm.tm_mday,
+             tm.tm_hour,
+             tm.tm_min,
+             tm.tm_sec);
 }
 
 static uint32_t snt_record_bytes(const snt_header_t *h)
@@ -450,8 +459,7 @@ typedef enum {
 } sw_op_t;
 
 static const char *const sw_op_names[SW_OP_COUNT] = {
-    "open", "write", "flush", "header", "fsync", "manifest", "ckpt"
-};
+    "open", "write", "flush", "header", "fsync", "manifest", "ckpt"};
 
 static struct {
     uint32_t max_us[SW_OP_COUNT];
@@ -462,70 +470,92 @@ static struct {
 } s_lat;
 
 /* Slow enough to be worth a line in the log on its own. */
-#define SW_SLOW_OP_US   250000
+#define SW_SLOW_OP_US 250000
 
-static inline int64_t lat_begin(void) { return esp_timer_get_time(); }
+static inline int64_t lat_begin(void)
+{
+    return esp_timer_get_time();
+}
 
 static void lat_end(sw_op_t op, int64_t t0)
 {
     int64_t dt = esp_timer_get_time() - t0;
-    if (dt < 0) return;
+    if (dt < 0)
+        return;
     uint32_t us = (uint32_t)dt;
-    if (us > s_lat.max_us[op]) s_lat.max_us[op] = us;
+    if (us > s_lat.max_us[op])
+        s_lat.max_us[op] = us;
     s_lat.total_us[op] += us;
     s_lat.count[op]++;
-    if (us >= 1000000) s_lat.over_1s++;
-    else if (us >= 100000) s_lat.over_100ms++;
+    if (us >= 1000000)
+        s_lat.over_1s++;
+    else if (us >= 100000)
+        s_lat.over_100ms++;
     if (us >= SW_SLOW_OP_US) {
-        ESP_LOGW(TAG, "slow SD %s: %u ms (core %d)", sw_op_names[op],
-                 (unsigned)(us / 1000), xPortGetCoreID());
+        ESP_LOGW(TAG,
+                 "slow SD %s: %u ms (core %d)",
+                 sw_op_names[op],
+                 (unsigned)(us / 1000),
+                 xPortGetCoreID());
     }
 }
 
 static void lat_report(void)
 {
-    ESP_LOGI(TAG, "SD latency (max/avg us): "
-             "write=%u/%u flush=%u/%u header=%u/%u fsync=%u/%u "
-             "ckpt=%u/%u manifest=%u/%u open=%u/%u; >100ms=%u >1s=%u",
-             (unsigned)s_lat.max_us[SW_OP_WRITE],
-             (unsigned)(s_lat.count[SW_OP_WRITE] ? s_lat.total_us[SW_OP_WRITE] / s_lat.count[SW_OP_WRITE] : 0),
-             (unsigned)s_lat.max_us[SW_OP_FLUSH],
-             (unsigned)(s_lat.count[SW_OP_FLUSH] ? s_lat.total_us[SW_OP_FLUSH] / s_lat.count[SW_OP_FLUSH] : 0),
-             (unsigned)s_lat.max_us[SW_OP_HEADER],
-             (unsigned)(s_lat.count[SW_OP_HEADER] ? s_lat.total_us[SW_OP_HEADER] / s_lat.count[SW_OP_HEADER] : 0),
-             (unsigned)s_lat.max_us[SW_OP_FSYNC],
-             (unsigned)(s_lat.count[SW_OP_FSYNC] ? s_lat.total_us[SW_OP_FSYNC] / s_lat.count[SW_OP_FSYNC] : 0),
-             (unsigned)s_lat.max_us[SW_OP_CKPT],
-             (unsigned)(s_lat.count[SW_OP_CKPT] ? s_lat.total_us[SW_OP_CKPT] / s_lat.count[SW_OP_CKPT] : 0),
-             (unsigned)s_lat.max_us[SW_OP_MANIFEST],
-             (unsigned)(s_lat.count[SW_OP_MANIFEST] ? s_lat.total_us[SW_OP_MANIFEST] / s_lat.count[SW_OP_MANIFEST] : 0),
-             (unsigned)s_lat.max_us[SW_OP_OPEN],
-             (unsigned)(s_lat.count[SW_OP_OPEN] ? s_lat.total_us[SW_OP_OPEN] / s_lat.count[SW_OP_OPEN] : 0),
-             (unsigned)s_lat.over_100ms, (unsigned)s_lat.over_1s);
+    ESP_LOGI(
+        TAG,
+        "SD latency (max/avg us): "
+        "write=%u/%u flush=%u/%u header=%u/%u fsync=%u/%u "
+        "ckpt=%u/%u manifest=%u/%u open=%u/%u; >100ms=%u >1s=%u",
+        (unsigned)s_lat.max_us[SW_OP_WRITE],
+        (unsigned)(s_lat.count[SW_OP_WRITE] ? s_lat.total_us[SW_OP_WRITE] / s_lat.count[SW_OP_WRITE]
+                                            : 0),
+        (unsigned)s_lat.max_us[SW_OP_FLUSH],
+        (unsigned)(s_lat.count[SW_OP_FLUSH] ? s_lat.total_us[SW_OP_FLUSH] / s_lat.count[SW_OP_FLUSH]
+                                            : 0),
+        (unsigned)s_lat.max_us[SW_OP_HEADER],
+        (unsigned)(s_lat.count[SW_OP_HEADER]
+                       ? s_lat.total_us[SW_OP_HEADER] / s_lat.count[SW_OP_HEADER]
+                       : 0),
+        (unsigned)s_lat.max_us[SW_OP_FSYNC],
+        (unsigned)(s_lat.count[SW_OP_FSYNC] ? s_lat.total_us[SW_OP_FSYNC] / s_lat.count[SW_OP_FSYNC]
+                                            : 0),
+        (unsigned)s_lat.max_us[SW_OP_CKPT],
+        (unsigned)(s_lat.count[SW_OP_CKPT] ? s_lat.total_us[SW_OP_CKPT] / s_lat.count[SW_OP_CKPT]
+                                           : 0),
+        (unsigned)s_lat.max_us[SW_OP_MANIFEST],
+        (unsigned)(s_lat.count[SW_OP_MANIFEST]
+                       ? s_lat.total_us[SW_OP_MANIFEST] / s_lat.count[SW_OP_MANIFEST]
+                       : 0),
+        (unsigned)s_lat.max_us[SW_OP_OPEN],
+        (unsigned)(s_lat.count[SW_OP_OPEN] ? s_lat.total_us[SW_OP_OPEN] / s_lat.count[SW_OP_OPEN]
+                                           : 0),
+        (unsigned)s_lat.over_100ms,
+        (unsigned)s_lat.over_1s);
 }
 
 /* Record an I/O failure once, loudly, and surface it to the user.  Silent
  * loss becoming visible loss is most of the value of this path. */
 static void io_fail(session_writer_t *s, const char *what)
 {
-    if (!s) return;
+    if (!s)
+        return;
     s->io_errors++;
     if (!s->storage_failed) {
         s->storage_failed = true;
-        snprintf(s->first_io_error, sizeof(s->first_io_error), "%s: %s",
-                 what, strerror(errno));
-        ESP_LOGE(TAG, "STORAGE FAILURE (%s) — errno=%d (%s)",
-                 what, errno, strerror(errno));
+        snprintf(s->first_io_error, sizeof(s->first_io_error), "%s: %s", what, strerror(errno));
+        ESP_LOGE(TAG, "STORAGE FAILURE (%s) — errno=%d (%s)", what, errno, strerror(errno));
         bsp_display_set_critical_notice("microSD write error");
     } else {
         ESP_LOGW(TAG, "storage error #%u (%s)", (unsigned)s->io_errors, what);
     }
 }
 
-static bool write_exact(session_writer_t *s, FILE *f, const void *data,
-                        size_t len, const char *what)
+static bool write_exact(
+    session_writer_t *s, FILE *f, const void *data, size_t len, const char *what)
 {
-    if (!f || len == 0) return f != NULL;
+    if (!f || len == 0)
+        return f != NULL;
     int64_t t0 = lat_begin();
     size_t n = fwrite(data, 1, len, f);
     lat_end(SW_OP_WRITE, t0);
@@ -538,8 +568,11 @@ static bool write_exact(session_writer_t *s, FILE *f, const void *data,
 
 /* ── Header write / repair ────────────────────────────────────────── */
 
-static bool write_snt_header(session_writer_t *s, FILE *f, uint8_t tier,
-                             uint16_t hz_x10, uint8_t n_ch,
+static bool write_snt_header(session_writer_t *s,
+                             FILE *f,
+                             uint8_t tier,
+                             uint16_t hz_x10,
+                             uint8_t n_ch,
                              int64_t start_epoch_ms)
 {
     snt_header_t hdr = {
@@ -557,10 +590,10 @@ static bool write_snt_header(session_writer_t *s, FILE *f, uint8_t tier,
     return write_exact(s, f, &hdr, SNT_HEADER_SIZE, "header write");
 }
 
-static bool update_snt_header_sample_count(session_writer_t *s, FILE *f,
-                                           uint32_t count)
+static bool update_snt_header_sample_count(session_writer_t *s, FILE *f, uint32_t count)
 {
-    if (!f) return true;
+    if (!f)
+        return true;
     int64_t th = lat_begin();
     long pos = ftell(f);
     if (fseek(f, offsetof(snt_header_t, sample_count), SEEK_SET) != 0) {
@@ -568,9 +601,15 @@ static bool update_snt_header_sample_count(session_writer_t *s, FILE *f,
         return false;
     }
     bool ok = write_exact(s, f, &count, sizeof(uint32_t), "header update");
-    if (fflush(f) != 0) { io_fail(s, "header flush"); ok = false; }
+    if (fflush(f) != 0) {
+        io_fail(s, "header flush");
+        ok = false;
+    }
     lat_end(SW_OP_HEADER, th);
-    if (fseek(f, pos, SEEK_SET) != 0) { io_fail(s, "header restore"); ok = false; }
+    if (fseek(f, pos, SEEK_SET) != 0) {
+        io_fail(s, "header restore");
+        ok = false;
+    }
     return ok;
 }
 
@@ -590,12 +629,13 @@ static void batch_reset(stream_batch_t *b)
 static bool batch_pool_create(session_writer_t *s)
 {
     s->batch_pool = xQueueCreate(SW_BATCH_POOL, sizeof(stream_batch_t *));
-    if (!s->batch_pool) return false;
+    if (!s->batch_pool)
+        return false;
     for (int i = 0; i < SW_BATCH_POOL; i++) {
         /* Large sample buffers live in PSRAM: they are never touched from an
          * ISR, and internal RAM is shared with Wi-Fi/BLE DMA. */
-        s->batches[i] = heap_caps_calloc(1, sizeof(stream_batch_t),
-                                         MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        s->batches[i] =
+            heap_caps_calloc(1, sizeof(stream_batch_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
         if (!s->batches[i]) {
             s->batches[i] = calloc(1, sizeof(stream_batch_t));
         }
@@ -617,7 +657,8 @@ static void batch_pool_destroy(session_writer_t *s)
 {
     if (s->batch_pool) {
         stream_batch_t *b;
-        while (xQueueReceive(s->batch_pool, &b, 0) == pdTRUE) { /* drain */ }
+        while (xQueueReceive(s->batch_pool, &b, 0) == pdTRUE) { /* drain */
+        }
         vQueueDelete(s->batch_pool);
         s->batch_pool = NULL;
     }
@@ -633,7 +674,8 @@ static void batch_pool_destroy(session_writer_t *s)
  * session-owned buffer or queue still exists. */
 static void session_start_discard(session_writer_t *s)
 {
-    if (!s) return;
+    if (!s)
+        return;
     batch_pool_destroy(s);
     if (s->fill_mutex) {
         vSemaphoreDelete(s->fill_mutex);
@@ -653,9 +695,9 @@ static void session_start_discard(session_writer_t *s)
 static bool swap_and_enqueue_locked(session_writer_t *s)
 {
     if (!s->fill || s->fill->n_brp == 0) {
-        if (!s->fill || (s->fill->n_sa2 == 0 && s->fill->n_pld == 0 &&
-                         s->fill->brp_end == 0 && !s->fill->timing_uncertain))
-            return true;   /* nothing to commit */
+        if (!s->fill || (s->fill->n_sa2 == 0 && s->fill->n_pld == 0 && s->fill->brp_end == 0 &&
+                         !s->fill->timing_uncertain))
+            return true; /* nothing to commit */
     }
 
     stream_batch_t *next = NULL;
@@ -668,7 +710,7 @@ static bool swap_and_enqueue_locked(session_writer_t *s)
     full->last_stream_us = s->last_stream_us;
     full->elapsed_us = esp_timer_get_time() - s->start_time_us;
 
-    sw_cmd_t cmd = { .type = SW_CMD_BATCH, .s = s, .batch = full };
+    sw_cmd_t cmd = {.type = SW_CMD_BATCH, .s = s, .batch = full};
     /* BATCH and EVENT producers are serialised by fill_mutex.  Keep one
      * queue slot unavailable to regular work so STOP can always enqueue the
      * terminal command without blocking the sole BLE notification consumer. */
@@ -689,7 +731,8 @@ static bool swap_and_enqueue_locked(session_writer_t *s)
 
 static void ckpt_write(session_writer_t *s)
 {
-    if (!s->f_ckpt || s->storage_failed) return;
+    if (!s->f_ckpt || s->storage_failed)
+        return;
 
     snt_ckpt_t c = {
         .magic = CKPT_MAGIC,
@@ -706,15 +749,22 @@ static void ckpt_write(session_writer_t *s)
         .last_stream_us = s->committed_last_stream_us,
         .crc32 = 0,
     };
-    c.crc32 = esp_rom_crc32_le(0, (const uint8_t *)&c,
-                               sizeof(c) - sizeof(uint32_t));
+    c.crc32 = esp_rom_crc32_le(0, (const uint8_t *)&c, sizeof(c) - sizeof(uint32_t));
 
     int64_t t0 = lat_begin();
     long off = (long)((s->ckpt_seq % CKPT_SLOTS) * CKPT_SLOT_SIZE);
-    if (fseek(s->f_ckpt, off, SEEK_SET) != 0) { io_fail(s, "ckpt seek"); return; }
-    if (!write_exact(s, s->f_ckpt, &c, sizeof(c), "ckpt write")) return;
-    if (fflush(s->f_ckpt) != 0) { io_fail(s, "ckpt flush"); return; }
-    if (fsync(fileno(s->f_ckpt)) != 0) io_fail(s, "ckpt fsync");
+    if (fseek(s->f_ckpt, off, SEEK_SET) != 0) {
+        io_fail(s, "ckpt seek");
+        return;
+    }
+    if (!write_exact(s, s->f_ckpt, &c, sizeof(c), "ckpt write"))
+        return;
+    if (fflush(s->f_ckpt) != 0) {
+        io_fail(s, "ckpt flush");
+        return;
+    }
+    if (fsync(fileno(s->f_ckpt)) != 0)
+        io_fail(s, "ckpt fsync");
     lat_end(SW_OP_CKPT, t0);
 }
 
@@ -722,17 +772,24 @@ static void ckpt_write(session_writer_t *s)
 static bool ckpt_read_best(const char *path, snt_ckpt_t *out)
 {
     FILE *f = fopen(path, "rb");
-    if (!f) return false;
+    if (!f)
+        return false;
     bool found = false;
     for (int i = 0; i < CKPT_SLOTS; i++) {
         snt_ckpt_t c;
-        if (fseek(f, (long)(i * CKPT_SLOT_SIZE), SEEK_SET) != 0) break;
-        if (fread(&c, 1, sizeof(c), f) != sizeof(c)) continue;
-        if (c.magic != CKPT_MAGIC || c.version != CKPT_VERSION) continue;
-        uint32_t crc = esp_rom_crc32_le(0, (const uint8_t *)&c,
-                                        sizeof(c) - sizeof(uint32_t));
-        if (crc != c.crc32) continue;
-        if (!found || c.seq > out->seq) { *out = c; found = true; }
+        if (fseek(f, (long)(i * CKPT_SLOT_SIZE), SEEK_SET) != 0)
+            break;
+        if (fread(&c, 1, sizeof(c), f) != sizeof(c))
+            continue;
+        if (c.magic != CKPT_MAGIC || c.version != CKPT_VERSION)
+            continue;
+        uint32_t crc = esp_rom_crc32_le(0, (const uint8_t *)&c, sizeof(c) - sizeof(uint32_t));
+        if (crc != c.crc32)
+            continue;
+        if (!found || c.seq > out->seq) {
+            *out = c;
+            found = true;
+        }
     }
     fclose(f);
     return found;
@@ -746,8 +803,7 @@ static void storage_open(session_writer_t *s)
     int64_t t_open = lat_begin();
 
     if (mkdir(s->dir, 0775) != 0 && errno != EEXIST) {
-        ESP_LOGE(TAG, "failed to create noon-day dir %s: %s",
-                 s->dir, strerror(errno));
+        ESP_LOGE(TAG, "failed to create noon-day dir %s: %s", s->dir, strerror(errno));
         io_fail(s, "mkdir");
         return;
     }
@@ -805,11 +861,13 @@ static void storage_open(session_writer_t *s)
 
     snprintf(path, sizeof(path), "%s/%s_events.snt", s->dir, s->session_id);
     s->f_events = fopen(path, "w");
-    if (!s->f_events) ESP_LOGW(TAG, "failed to open events file (non-fatal)");
+    if (!s->f_events)
+        ESP_LOGW(TAG, "failed to open events file (non-fatal)");
 
     snprintf(path, sizeof(path), "%s/%s.ckpt", s->dir, s->session_id);
     s->f_ckpt = fopen(path, "wb+");
-    if (!s->f_ckpt) ESP_LOGW(TAG, "failed to open checkpoint file (non-fatal)");
+    if (!s->f_ckpt)
+        ESP_LOGW(TAG, "failed to open checkpoint file (non-fatal)");
 
     if (!ok) {
         ESP_LOGE(TAG, "failed to open/initialise .snt files for %s", s->session_id);
@@ -821,12 +879,15 @@ static void storage_open(session_writer_t *s)
      * into FATFS RAM; without fsync() the directory entry still reports 0
      * bytes, which is how a reset inside the first commit interval used to
      * leave an unrecoverable session. */
-    FILE *all[] = { s->flow.f_l0, s->press.f_l0, s->flow.f_l1,
-                    s->sa2.f_l0, s->pld_f.f_l0, s->f_events };
+    FILE *all[] = {
+        s->flow.f_l0, s->press.f_l0, s->flow.f_l1, s->sa2.f_l0, s->pld_f.f_l0, s->f_events};
     for (size_t i = 0; i < sizeof(all) / sizeof(all[0]); i++) {
-        if (!all[i]) continue;
-        if (fflush(all[i]) != 0) io_fail(s, "open flush");
-        if (fsync(fileno(all[i])) != 0) io_fail(s, "open fsync");
+        if (!all[i])
+            continue;
+        if (fflush(all[i]) != 0)
+            io_fail(s, "open flush");
+        if (fsync(fileno(all[i])) != 0)
+            io_fail(s, "open fsync");
     }
 
     s->files_open = true;
@@ -843,7 +904,8 @@ static void storage_open(session_writer_t *s)
  * leave positioned missing slots behind an apparently gap-free header. */
 static bool storage_mark_position_gap(session_writer_t *s, stream_files_t *stream)
 {
-    if (stream->position_gap) return true;
+    if (stream->position_gap)
+        return true;
     long pos = ftell(stream->f_l0);
     uint16_t flags = SNT_POSITION_GAP_FLAG;
     if (pos < 0 || fseek(stream->f_l0, offsetof(snt_header_t, reserved), SEEK_SET) != 0 ||
@@ -859,10 +921,13 @@ static bool storage_mark_position_gap(session_writer_t *s, stream_files_t *strea
 
 static bool storage_write_brp_frame(session_writer_t *s, int16_t flow, int16_t press)
 {
-    if (flow == SNT_MISSING && !storage_mark_position_gap(s, &s->flow)) return false;
-    if (press == SNT_MISSING && !storage_mark_position_gap(s, &s->press)) return false;
+    if (flow == SNT_MISSING && !storage_mark_position_gap(s, &s->flow))
+        return false;
+    if (press == SNT_MISSING && !storage_mark_position_gap(s, &s->press))
+        return false;
     if (!write_exact(s, s->flow.f_l0, &flow, sizeof(flow), "flow write") ||
-        !write_exact(s, s->press.f_l0, &press, sizeof(press), "press write")) return false;
+        !write_exact(s, s->press.f_l0, &press, sizeof(press), "press write"))
+        return false;
     s->flow.sample_count++;
     s->press.sample_count++;
     if (s->flow_mm_fill == 0) {
@@ -870,15 +935,20 @@ static bool storage_write_brp_frame(session_writer_t *s, int16_t flow, int16_t p
         s->flow_mm_max = INT16_MIN;
         s->flow_mm_missing = false;
     }
-    if (flow == SNT_MISSING) s->flow_mm_missing = true;
+    if (flow == SNT_MISSING)
+        s->flow_mm_missing = true;
     else {
-        if (flow < s->flow_mm_min) s->flow_mm_min = flow;
-        if (flow > s->flow_mm_max) s->flow_mm_max = flow;
+        if (flow < s->flow_mm_min)
+            s->flow_mm_min = flow;
+        if (flow > s->flow_mm_max)
+            s->flow_mm_max = flow;
     }
     if (++s->flow_mm_fill == 25) {
         int16_t mm[2] = {s->flow_mm_min, s->flow_mm_max};
-        if (s->flow_mm_missing) mm[0] = mm[1] = SNT_MISSING;
-        if (s->flow.f_l1 && !write_exact(s, s->flow.f_l1, mm, sizeof(mm), "flow_mm write")) return false;
+        if (s->flow_mm_missing)
+            mm[0] = mm[1] = SNT_MISSING;
+        if (s->flow.f_l1 && !write_exact(s, s->flow.f_l1, mm, sizeof(mm), "flow_mm write"))
+            return false;
         s->flow_mm_count++;
         s->flow_mm_fill = 0;
     }
@@ -887,27 +957,37 @@ static bool storage_write_brp_frame(session_writer_t *s, int16_t flow, int16_t p
 
 static bool storage_fill_brp_until(session_writer_t *s, uint32_t position)
 {
-    if (s->flow.sample_count >= position) return true;
-    if (!storage_mark_position_gap(s, &s->flow) ||
-        !storage_mark_position_gap(s, &s->press)) return false;
+    if (s->flow.sample_count >= position)
+        return true;
+    if (!storage_mark_position_gap(s, &s->flow) || !storage_mark_position_gap(s, &s->press))
+        return false;
     while (s->flow.sample_count < position) {
-        if (!storage_write_brp_frame(s, SNT_MISSING, SNT_MISSING)) return false;
-        if ((s->flow.sample_count & 255U) == 0) vTaskDelay(1);
+        if (!storage_write_brp_frame(s, SNT_MISSING, SNT_MISSING))
+            return false;
+        if ((s->flow.sample_count & 255U) == 0)
+            vTaskDelay(1);
     }
     return true;
 }
 
-static bool storage_fill_stream_until(session_writer_t *s, stream_files_t *stream,
-                                      uint32_t position, unsigned channels)
+static bool storage_fill_stream_until(session_writer_t *s,
+                                      stream_files_t *stream,
+                                      uint32_t position,
+                                      unsigned channels)
 {
-    if (stream->sample_count >= position) return true;
-    if (!storage_mark_position_gap(s, stream)) return false;
+    if (stream->sample_count >= position)
+        return true;
+    if (!storage_mark_position_gap(s, stream))
+        return false;
     int16_t missing[12];
-    for (unsigned i = 0; i < channels; i++) missing[i] = SNT_MISSING;
+    for (unsigned i = 0; i < channels; i++)
+        missing[i] = SNT_MISSING;
     while (stream->sample_count < position) {
-        if (!write_exact(s, stream->f_l0, missing, channels * sizeof(int16_t), "missing write")) return false;
+        if (!write_exact(s, stream->f_l0, missing, channels * sizeof(int16_t), "missing write"))
+            return false;
         stream->sample_count++;
-        if ((stream->sample_count & 255U) == 0) vTaskDelay(1);
+        if ((stream->sample_count & 255U) == 0)
+            vTaskDelay(1);
     }
     return true;
 }
@@ -917,97 +997,128 @@ static bool storage_fill_stream_until(session_writer_t *s, stream_files_t *strea
  * tail when STOP occurs before another valid sample can be queued. */
 static void storage_write_batch(session_writer_t *s, stream_batch_t *b)
 {
-    if (!s->files_open) return;
+    if (!s->files_open)
+        return;
     if (b->timing_uncertain &&
-        (!storage_mark_position_gap(s, &s->flow) ||
-         !storage_mark_position_gap(s, &s->press) ||
-         !storage_mark_position_gap(s, &s->sa2) ||
-         !storage_mark_position_gap(s, &s->pld_f))) return;
+        (!storage_mark_position_gap(s, &s->flow) || !storage_mark_position_gap(s, &s->press) ||
+         !storage_mark_position_gap(s, &s->sa2) || !storage_mark_position_gap(s, &s->pld_f)))
+        return;
     for (uint32_t i = 0; i < b->n_brp; i++) {
-        if (b->brp_position[i] < s->flow.sample_count) continue;
+        if (b->brp_position[i] < s->flow.sample_count)
+            continue;
         if (!storage_fill_brp_until(s, b->brp_position[i]) ||
-            !storage_write_brp_frame(s, b->brp_flow[i], b->brp_press[i])) return;
+            !storage_write_brp_frame(s, b->brp_flow[i], b->brp_press[i]))
+            return;
     }
-    if (!storage_fill_brp_until(s, b->brp_end)) return;
+    if (!storage_fill_brp_until(s, b->brp_end))
+        return;
     for (uint32_t i = 0; i < b->n_sa2; i++) {
-        if (b->sa2_position[i] < s->sa2.sample_count) continue;
-        if (!storage_fill_stream_until(s, &s->sa2, b->sa2_position[i], 2)) return;
+        if (b->sa2_position[i] < s->sa2.sample_count)
+            continue;
+        if (!storage_fill_stream_until(s, &s->sa2, b->sa2_position[i], 2))
+            return;
         int16_t pair[2] = {b->sa2_hr[i], b->sa2_spo2[i]};
         if ((pair[0] == SNT_MISSING || pair[1] == SNT_MISSING) &&
-            !storage_mark_position_gap(s, &s->sa2)) return;
-        if (!write_exact(s, s->sa2.f_l0, pair, sizeof(pair), "sa2 write")) return;
+            !storage_mark_position_gap(s, &s->sa2))
+            return;
+        if (!write_exact(s, s->sa2.f_l0, pair, sizeof(pair), "sa2 write"))
+            return;
         s->sa2.sample_count++;
     }
-    if (!storage_fill_stream_until(s, &s->sa2, b->sa2_end, 2)) return;
+    if (!storage_fill_stream_until(s, &s->sa2, b->sa2_end, 2))
+        return;
     for (uint32_t i = 0; i < b->n_pld; i++) {
-        if (b->pld_position[i] < s->pld_f.sample_count) continue;
-        if (!storage_fill_stream_until(s, &s->pld_f, b->pld_position[i], 12)) return;
+        if (b->pld_position[i] < s->pld_f.sample_count)
+            continue;
+        if (!storage_fill_stream_until(s, &s->pld_f, b->pld_position[i], 12))
+            return;
         for (unsigned ch = 0; ch < 12; ++ch)
-            if (b->pld[i][ch] == SNT_MISSING &&
-                !storage_mark_position_gap(s, &s->pld_f)) return;
-        if (!write_exact(s, s->pld_f.f_l0, b->pld[i], sizeof(b->pld[i]), "pld write")) return;
+            if (b->pld[i][ch] == SNT_MISSING && !storage_mark_position_gap(s, &s->pld_f))
+                return;
+        if (!write_exact(s, s->pld_f.f_l0, b->pld[i], sizeof(b->pld[i]), "pld write"))
+            return;
         s->pld_f.sample_count++;
     }
-    if (!storage_fill_stream_until(s, &s->pld_f, b->pld_end, 12)) return;
-    if (b->elapsed_us > s->committed_elapsed_us) s->committed_elapsed_us = b->elapsed_us;
+    if (!storage_fill_stream_until(s, &s->pld_f, b->pld_end, 12))
+        return;
+    if (b->elapsed_us > s->committed_elapsed_us)
+        s->committed_elapsed_us = b->elapsed_us;
     /* Replay may drain much faster than source time. Recovery must not use
      * processing duration to truncate a correctly positioned raw stream. */
     int64_t source_extent_us = (int64_t)s->flow.sample_count * 40000;
     if (source_extent_us > s->committed_elapsed_us)
         s->committed_elapsed_us = source_extent_us;
-    if (b->last_stream_us > s->committed_last_stream_us) s->committed_last_stream_us = b->last_stream_us;
+    if (b->last_stream_us > s->committed_last_stream_us)
+        s->committed_last_stream_us = b->last_stream_us;
     s->have_uncommitted = true;
 }
 
 /* Ordered durability commit: data → headers → fsync → checkpoint → fsync. */
 static void storage_commit(session_writer_t *s)
 {
-    if (!s->files_open || !s->have_uncommitted) return;
+    if (!s->files_open || !s->have_uncommitted)
+        return;
 
-    struct { FILE *f; uint32_t count; } items[] = {
-        { s->flow.f_l0,  s->flow.sample_count  },
-        { s->flow.f_l1,  s->flow_mm_count      },
-        { s->press.f_l0, s->press.sample_count },
-        { s->sa2.f_l0,   s->sa2.sample_count   },
-        { s->pld_f.f_l0, s->pld_f.sample_count },
+    struct {
+        FILE *f;
+        uint32_t count;
+    } items[] = {
+        {s->flow.f_l0, s->flow.sample_count},
+        {s->flow.f_l1, s->flow_mm_count},
+        {s->press.f_l0, s->press.sample_count},
+        {s->sa2.f_l0, s->sa2.sample_count},
+        {s->pld_f.f_l0, s->pld_f.sample_count},
     };
 
     for (size_t i = 0; i < sizeof(items) / sizeof(items[0]); i++) {
-        if (!items[i].f) continue;
+        if (!items[i].f)
+            continue;
         int64_t t0 = lat_begin();
-        if (fflush(items[i].f) != 0) io_fail(s, "data flush");
+        if (fflush(items[i].f) != 0)
+            io_fail(s, "data flush");
         lat_end(SW_OP_FLUSH, t0);
     }
     for (size_t i = 0; i < sizeof(items) / sizeof(items[0]); i++) {
-        if (!items[i].f) continue;
+        if (!items[i].f)
+            continue;
         update_snt_header_sample_count(s, items[i].f, items[i].count);
     }
     for (size_t i = 0; i < sizeof(items) / sizeof(items[0]); i++) {
-        if (!items[i].f) continue;
+        if (!items[i].f)
+            continue;
         int64_t t0 = lat_begin();
-        if (fsync(fileno(items[i].f)) != 0) io_fail(s, "data fsync");
+        if (fsync(fileno(items[i].f)) != 0)
+            io_fail(s, "data fsync");
         lat_end(SW_OP_FSYNC, t0);
     }
     if (s->f_events) {
-        if (fflush(s->f_events) != 0) io_fail(s, "events flush");
-        if (fsync(fileno(s->f_events)) != 0) io_fail(s, "events fsync");
+        if (fflush(s->f_events) != 0)
+            io_fail(s, "events flush");
+        if (fsync(fileno(s->f_events)) != 0)
+            io_fail(s, "events fsync");
     }
 
     /* Failed payload/header/event sync must never advance the checkpoint. */
-    if (s->storage_failed) return;
+    if (s->storage_failed)
+        return;
     ckpt_write(s);
-    if (s->storage_failed) return;
+    if (s->storage_failed)
+        return;
     s->have_uncommitted = false;
 
-    ESP_LOGI(TAG, "commit: flow=%u press=%u sa2=%u pld=%u seq=%u",
-             (unsigned)s->flow.sample_count, (unsigned)s->press.sample_count,
-             (unsigned)s->sa2.sample_count, (unsigned)s->pld_f.sample_count,
+    ESP_LOGI(TAG,
+             "commit: flow=%u press=%u sa2=%u pld=%u seq=%u",
+             (unsigned)s->flow.sample_count,
+             (unsigned)s->press.sample_count,
+             (unsigned)s->sa2.sample_count,
+             (unsigned)s->pld_f.sample_count,
              (unsigned)s->ckpt_seq);
 
     /* Every 10th commit (~5 min at the default interval), summarise SD
      * latency so a degrading card shows up in the log before it costs a
      * night of data. */
-    if ((s->ckpt_seq % 10) == 0) lat_report();
+    if ((s->ckpt_seq % 10) == 0)
+        lat_report();
 }
 
 /* ── Manifest ─────────────────────────────────────────────────────── */
@@ -1020,7 +1131,11 @@ static void write_manifest(session_writer_t *s, const char *state)
     snprintf(tmp, sizeof(tmp), "%s.tmp", path);
 
     cJSON *root = cJSON_CreateObject();
-    if (!root) { errno = ENOMEM; io_fail(s, "manifest allocation"); return; }
+    if (!root) {
+        errno = ENOMEM;
+        io_fail(s, "manifest allocation");
+        return;
+    }
     cJSON_AddStringToObject(root, "id", s->session_id);
     cJSON_AddNumberToObject(root, "start_epoch_ms", (double)s->start_epoch_ms);
     if (s->end_epoch_ms > 0)
@@ -1041,7 +1156,10 @@ static void write_manifest(session_writer_t *s, const char *state)
 
     cJSON_AddStringToObject(root, "state", state);
     cJSON_AddNumberToObject(root, "fmt", 2);
-    cJSON_AddBoolToObject(root, "position_gaps", s->flow.position_gap || s->press.position_gap || s->sa2.position_gap || s->pld_f.position_gap);
+    cJSON_AddBoolToObject(root,
+                          "position_gaps",
+                          s->flow.position_gap || s->press.position_gap || s->sa2.position_gap ||
+                              s->pld_f.position_gap);
 
     cJSON_AddNumberToObject(root, "brp_samples", (double)s->flow.sample_count);
     cJSON_AddNumberToObject(root, "brp_mm_samples", (double)s->flow_mm_count);
@@ -1062,8 +1180,8 @@ static void write_manifest(session_writer_t *s, const char *state)
     }
 
     /* Silent loss becoming visible loss. */
-    if (s->brp_dropped || s->sa2_dropped || s->pld_dropped ||
-        s->batch_dropped || s->event_dropped) {
+    if (s->brp_dropped || s->sa2_dropped || s->pld_dropped || s->batch_dropped ||
+        s->event_dropped) {
         cJSON_AddNumberToObject(root, "brp_dropped", (double)s->brp_dropped);
         cJSON_AddNumberToObject(root, "sa2_dropped", (double)s->sa2_dropped);
         cJSON_AddNumberToObject(root, "pld_dropped", (double)s->pld_dropped);
@@ -1077,33 +1195,45 @@ static void write_manifest(session_writer_t *s, const char *state)
 
     cJSON_AddNumberToObject(root, "clock_drift_ms", (double)s->clock_drift_ms);
     cJSON_AddBoolToObject(root, "clock_drift_valid", s->clock_drift_valid);
-    cJSON_AddStringToObject(root, "clock_drift_source",
-                            s->clock_drift_source ? s->clock_drift_source : "none");
+    cJSON_AddStringToObject(
+        root, "clock_drift_source", s->clock_drift_source ? s->clock_drift_source : "none");
     if (s->clock_drift_measured_at_ms > 0)
-        cJSON_AddNumberToObject(root, "clock_drift_measured_at_ms",
-                                (double)s->clock_drift_measured_at_ms);
+        cJSON_AddNumberToObject(
+            root, "clock_drift_measured_at_ms", (double)s->clock_drift_measured_at_ms);
     /* A measured drift and an estimate must never look alike to a consumer. */
-    cJSON_AddBoolToObject(root, "clock_drift_usable",
-                          s->clock_drift_valid ||
-                          (s->clock_drift_source &&
-                           strcmp(s->clock_drift_source, "none") != 0));
+    cJSON_AddBoolToObject(root,
+                          "clock_drift_usable",
+                          s->clock_drift_valid || (s->clock_drift_source &&
+                                                   strcmp(s->clock_drift_source, "none") != 0));
 
     cJSON_AddNumberToObject(root, "end_source_checkpoint_seq", (double)s->ckpt_seq);
 
     const char *src_str = "none";
     switch (time_source_get()) {
-        case TIME_SRC_NTP:        src_str = "ntp"; break;
-        case TIME_SRC_AS11_DRIFT: src_str = "as11_drift"; break;
-        default:                  src_str = "none"; break;
+    case TIME_SRC_NTP:
+        src_str = "ntp";
+        break;
+    case TIME_SRC_AS11_DRIFT:
+        src_str = "as11_drift";
+        break;
+    default:
+        src_str = "none";
+        break;
     }
     cJSON_AddStringToObject(root, "time_source", src_str);
 
-    if (s_device_addr[0]) cJSON_AddStringToObject(root, "as11_device", s_device_addr);
-    if (s_client_id[0]) cJSON_AddStringToObject(root, "as11_client_id", s_client_id);
+    if (s_device_addr[0])
+        cJSON_AddStringToObject(root, "as11_device", s_device_addr);
+    if (s_client_id[0])
+        cJSON_AddStringToObject(root, "as11_client_id", s_client_id);
 
     char *json_str = cJSON_Print(root);
     cJSON_Delete(root);
-    if (!json_str) { errno = ENOMEM; io_fail(s, "manifest encoding"); return; }
+    if (!json_str) {
+        errno = ENOMEM;
+        io_fail(s, "manifest encoding");
+        return;
+    }
 
     /* temp → checked write → fflush → fsync → rename.  A crash must never
      * leave a half-written manifest that recovery would trust. */
@@ -1111,16 +1241,23 @@ static void write_manifest(session_writer_t *s, const char *state)
     int64_t t_man = lat_begin();
     size_t len = strlen(json_str);
     FILE *f = fopen(tmp, "w");
-    if (!f) first_error = errno ? errno : EIO;
+    if (!f)
+        first_error = errno ? errno : EIO;
     else {
-        if (fwrite(json_str, 1, len, f) != len) first_error = errno ? errno : EIO;
-        if (!first_error && fflush(f) != 0) first_error = errno ? errno : EIO;
-        if (!first_error && fsync(fileno(f)) != 0) first_error = errno ? errno : EIO;
-        if (fclose(f) != 0 && !first_error) first_error = errno ? errno : EIO;
+        if (fwrite(json_str, 1, len, f) != len)
+            first_error = errno ? errno : EIO;
+        if (!first_error && fflush(f) != 0)
+            first_error = errno ? errno : EIO;
+        if (!first_error && fsync(fileno(f)) != 0)
+            first_error = errno ? errno : EIO;
+        if (fclose(f) != 0 && !first_error)
+            first_error = errno ? errno : EIO;
     }
     if (!first_error) {
-        if (unlink(path) != 0 && errno != ENOENT) first_error = errno;
-        if (!first_error && rename(tmp, path) != 0) first_error = errno;
+        if (unlink(path) != 0 && errno != ENOENT)
+            first_error = errno;
+        if (!first_error && rename(tmp, path) != 0)
+            first_error = errno;
     }
     bool ok = first_error == 0;
     lat_end(SW_OP_MANIFEST, t_man);
@@ -1135,19 +1272,21 @@ static void write_manifest(session_writer_t *s, const char *state)
     free(json_str);
 }
 
-static void close_session_file(session_writer_t *s, FILE **file,
-                               const char *label)
+static void close_session_file(session_writer_t *s, FILE **file, const char *label)
 {
-    if (!file || !*file) return;
+    if (!file || !*file)
+        return;
     FILE *owned = *file;
     *file = NULL;
-    if (fclose(owned) != 0) io_fail(s, label);
+    if (fclose(owned) != 0)
+        io_fail(s, label);
 }
 
 static void storage_finalize(session_writer_t *s, const sw_cmd_t *cmd)
 {
     s->end_epoch_ms = cmd->end_epoch_ms;
-    if (s->end_time_us <= 0) s->end_time_us = esp_timer_get_time();
+    if (s->end_time_us <= 0)
+        s->end_time_us = esp_timer_get_time();
     s->clock_drift_ms = cmd->clock_drift_ms;
     s->clock_drift_valid = cmd->drift_valid;
     s->clock_drift_source = cmd->drift_source;
@@ -1156,9 +1295,8 @@ static void storage_finalize(session_writer_t *s, const sw_cmd_t *cmd)
     /* The terminal fill deliberately bypasses the bounded regular-command
      * path.  Producers are disabled, so the storage owner writes it after all
      * older FIFO batches/events and before the durability commit. */
-    if (s->fill &&
-        (s->fill->n_brp > 0 || s->fill->n_sa2 > 0 || s->fill->n_pld > 0 ||
-         s->fill->brp_end > 0 || s->fill->timing_uncertain)) {
+    if (s->fill && (s->fill->n_brp > 0 || s->fill->n_sa2 > 0 || s->fill->n_pld > 0 ||
+                    s->fill->brp_end > 0 || s->fill->timing_uncertain)) {
         s->fill->last_stream_us = s->last_stream_us;
         s->fill->elapsed_us = s->end_time_us - s->start_time_us;
         storage_write_batch(s, s->fill);
@@ -1167,24 +1305,25 @@ static void storage_finalize(session_writer_t *s, const sw_cmd_t *cmd)
 
     storage_commit(s);
     int64_t positioned_end_ms = s->start_epoch_ms + s->committed_elapsed_us / 1000;
-    if (positioned_end_ms > s->end_epoch_ms) s->end_epoch_ms = positioned_end_ms;
+    if (positioned_end_ms > s->end_epoch_ms)
+        s->end_epoch_ms = positioned_end_ms;
 
-    close_session_file(s, &s->flow.f_l0,  "flow close");
-    close_session_file(s, &s->flow.f_l1,  "flow_mm close");
+    close_session_file(s, &s->flow.f_l0, "flow close");
+    close_session_file(s, &s->flow.f_l1, "flow_mm close");
     close_session_file(s, &s->press.f_l0, "pressure close");
-    close_session_file(s, &s->sa2.f_l0,   "sa2 close");
+    close_session_file(s, &s->sa2.f_l0, "sa2 close");
     close_session_file(s, &s->pld_f.f_l0, "pld close");
-    close_session_file(s, &s->f_events,   "events close");
-    close_session_file(s, &s->f_ckpt,     "checkpoint close");
+    close_session_file(s, &s->f_events, "events close");
+    close_session_file(s, &s->f_ckpt, "checkpoint close");
     s->files_open = false;
 
     /* Never claim "completed" when storage failed — that is the difference
      * between a trustworthy manifest and a plausible-looking lie. */
     const char *state = cmd->state;
-    if (s->storage_failed) state = "storage_failed";
+    if (s->storage_failed)
+        state = "storage_failed";
     char export_day[16];
-    as11_time_noon_day(s->start_epoch_ms - cmd->clock_drift_ms,
-                       export_day, sizeof(export_day));
+    as11_time_noon_day(s->start_epoch_ms - cmd->clock_drift_ms, export_day, sizeof(export_day));
     /* Immutable session identity prevents an older export from acknowledging
      * newer work for the same day. Do not publish a terminal manifest unless
      * reboot can discover its export intent. */
@@ -1205,42 +1344,55 @@ static void storage_finalize(session_writer_t *s, const sw_cmd_t *cmd)
     }
 
     ESP_LOGI(TAG, "=== SESSION STOPPED: %s (%s) ===", s->session_id, state);
-    ESP_LOGI(TAG, "flow=%u press=%u sa2=%u pld=%u total samples",
-             (unsigned)s->flow.sample_count, (unsigned)s->press.sample_count,
-             (unsigned)s->sa2.sample_count, (unsigned)s->pld_f.sample_count);
+    ESP_LOGI(TAG,
+             "flow=%u press=%u sa2=%u pld=%u total samples",
+             (unsigned)s->flow.sample_count,
+             (unsigned)s->press.sample_count,
+             (unsigned)s->sa2.sample_count,
+             (unsigned)s->pld_f.sample_count);
 
     if (s->stream_notifications > 0) {
         uint32_t expected = s->stream_notifications + s->gap_missing_total;
         uint32_t loss_bps = expected ? (s->gap_missing_total * 10000) / expected : 0;
-        ESP_LOGI(TAG, "stream quality: %u notifications received, "
+        ESP_LOGI(TAG,
+                 "stream quality: %u notifications received, "
                  "%u gap events, %u missing compensated, loss rate %u.%02u%%",
-                 (unsigned)s->stream_notifications, (unsigned)s->gap_events,
-                 (unsigned)s->gap_missing_total, loss_bps / 100, loss_bps % 100);
+                 (unsigned)s->stream_notifications,
+                 (unsigned)s->gap_events,
+                 (unsigned)s->gap_missing_total,
+                 loss_bps / 100,
+                 loss_bps % 100);
     }
     if (s->gap_long_events) {
-        ESP_LOGW(TAG, "uncompensated discontinuities: %u events, %llu ms total",
+        ESP_LOGW(TAG,
+                 "uncompensated discontinuities: %u events, %llu ms total",
                  (unsigned)s->gap_long_events,
                  (unsigned long long)s->gap_long_ms_total);
     }
-    if (s->brp_dropped || s->sa2_dropped || s->pld_dropped ||
-        s->batch_dropped || s->event_dropped) {
-        ESP_LOGW(TAG, "dropped: brp=%u sa2=%u pld=%u batches=%u events=%u",
-                 (unsigned)s->brp_dropped, (unsigned)s->sa2_dropped,
-                 (unsigned)s->pld_dropped, (unsigned)s->batch_dropped,
+    if (s->brp_dropped || s->sa2_dropped || s->pld_dropped || s->batch_dropped ||
+        s->event_dropped) {
+        ESP_LOGW(TAG,
+                 "dropped: brp=%u sa2=%u pld=%u batches=%u events=%u",
+                 (unsigned)s->brp_dropped,
+                 (unsigned)s->sa2_dropped,
+                 (unsigned)s->pld_dropped,
+                 (unsigned)s->batch_dropped,
                  (unsigned)s->event_dropped);
     }
 
     lat_report();
 
     batch_pool_destroy(s);
-    if (s->fill_mutex) { vSemaphoreDelete(s->fill_mutex); s->fill_mutex = NULL; }
+    if (s->fill_mutex) {
+        vSemaphoreDelete(s->fill_mutex);
+        s->fill_mutex = NULL;
+    }
 }
 
 /* Raw files are closed on the storage worker before any slow BLE spool pull or
  * EDF generation begins. The post queue owns copied metadata, never a live
  * session or its seven FATFS descriptors. */
-static void storage_finish_and_dispatch(session_writer_t *s,
-                                        const sw_cmd_t *cmd)
+static void storage_finish_and_dispatch(session_writer_t *s, const sw_cmd_t *cmd)
 {
     storage_finalize(s, cmd);
 
@@ -1262,17 +1414,17 @@ static void storage_finish_and_dispatch(session_writer_t *s,
 
         if (xQueueSend(s_post_q, &job, 0) != pdTRUE) {
             char day[16];
-            as11_time_noon_day(s->start_epoch_ms - s->clock_drift_ms,
-                               day, sizeof(day));
-            ESP_LOGW(TAG, "post queue full — raw session %s is safe; "
-                          "deferring day %s export",
-                     s->session_id, day);
+            as11_time_noon_day(s->start_epoch_ms - s->clock_drift_ms, day, sizeof(day));
+            ESP_LOGW(TAG,
+                     "post queue full — raw session %s is safe; "
+                     "deferring day %s export",
+                     s->session_id,
+                     day);
             /* The session marker predates finalization and survives this
              * queue overflow; no second, coarser day marker is necessary. */
         }
     } else if (s->storage_failed) {
-        ESP_LOGE(TAG, "post: storage failed for %s — skipping export",
-                 s->session_id);
+        ESP_LOGE(TAG, "post: storage failed for %s — skipping export", s->session_id);
     }
 
     free(s);
@@ -1288,8 +1440,7 @@ static session_writer_t *active_session_lock(void)
 {
     session_writer_t *s = NULL;
     xSemaphoreTake(s_active_mutex, portMAX_DELAY);
-    if (s_active && s_active->active && !s_active->finalize_requested &&
-        s_active->fill_mutex) {
+    if (s_active && s_active->active && !s_active->finalize_requested && s_active->fill_mutex) {
         s = s_active;
         xSemaphoreTake(s->fill_mutex, portMAX_DELAY);
     }
@@ -1304,24 +1455,27 @@ static session_writer_t *active_session_lock(void)
 static session_writer_t *active_session_try_lock(bool *gate_acquired)
 {
     session_writer_t *s = NULL;
-    if (gate_acquired) *gate_acquired = false;
-    if (xSemaphoreTake(s_active_mutex, 0) != pdTRUE) return NULL;
-    if (s_active && s_active->active && !s_active->finalize_requested &&
-        s_active->fill_mutex) {
+    if (gate_acquired)
+        *gate_acquired = false;
+    if (xSemaphoreTake(s_active_mutex, 0) != pdTRUE)
+        return NULL;
+    if (s_active && s_active->active && !s_active->finalize_requested && s_active->fill_mutex) {
         if (xSemaphoreTake(s_active->fill_mutex, 0) != pdTRUE) {
             xSemaphoreGive(s_active_mutex);
             return NULL;
         }
         s = s_active;
     }
-    if (gate_acquired) *gate_acquired = true;
+    if (gate_acquired)
+        *gate_acquired = true;
     xSemaphoreGive(s_active_mutex);
     return s;
 }
 
 static void active_session_unlock(session_writer_t *s)
 {
-    if (s && s->fill_mutex) xSemaphoreGive(s->fill_mutex);
+    if (s && s->fill_mutex)
+        xSemaphoreGive(s->fill_mutex);
 }
 
 static void sw_storage_task(void *arg)
@@ -1409,21 +1563,20 @@ static void sw_storage_task(void *arg)
         session_writer_t *s = active_session_try_lock(&lifecycle_sampled);
         int64_t now = esp_timer_get_time();
 
-        if (!lifecycle_sampled) continue;
+        if (!lifecycle_sampled)
+            continue;
 
         if (s && s == file_owner) {
-            bool commit_due =
-                ((now - last_commit_us) / 1000 >= SW_COMMIT_INTERVAL_MS);
+            bool commit_due = ((now - last_commit_us) / 1000 >= SW_COMMIT_INTERVAL_MS);
             int64_t idle_ms = (now - s->last_stream_us) / 1000;
-            bool stale = s->last_stream_us > 0 &&
-                         idle_ms >= SW_STALE_TIMEOUT_MS;
+            bool stale = s->last_stream_us > 0 && idle_ms >= SW_STALE_TIMEOUT_MS;
 
             if (commit_due && !s->commit_queued) {
                 /* Keep the terminal reserve. A failed enqueue leaves the
                  * deadline due; the next pass retries after draining work. */
                 if (swap_and_enqueue_locked(s) &&
                     uxQueueSpacesAvailable(s_storage_q) > SW_STORAGE_TERMINAL_RESERVE) {
-                    sw_cmd_t barrier = { .type = SW_CMD_COMMIT, .s = s };
+                    sw_cmd_t barrier = {.type = SW_CMD_COMMIT, .s = s};
                     if (xQueueSend(s_storage_q, &barrier, 0) == pdTRUE)
                         s->commit_queued = true;
                 }
@@ -1433,10 +1586,10 @@ static void sw_storage_task(void *arg)
             /* Stale-session watchdog: monotonic, so a wall-clock step or an
              * AS11 time-of-day jump cannot defeat it. */
             if (stale) {
-                ESP_LOGW(TAG, "no StreamData for %lld ms — closing orphaned session",
+                ESP_LOGW(TAG,
+                         "no StreamData for %lld ms — closing orphaned session",
                          (long long)idle_ms);
-                sw_request_finalize(s, "timed_out",
-                                    (int64_t)time(NULL) * 1000, false);
+                sw_request_finalize(s, "timed_out", (int64_t)time(NULL) * 1000, false);
             }
         } else {
             active_session_unlock(s);
@@ -1476,20 +1629,20 @@ static void sw_storage_task(void *arg)
  * own manifest and its own per-session EDFs, and the gap between them stays
  * visible. */
 
-#define SD_PENDING_EXPORT_DIR  SD_APP_DIR "/pending_export"
+#define SD_PENDING_EXPORT_DIR SD_APP_DIR "/pending_export"
 
 /* Retry budget for transient failures (storage busy, out of memory, I/O).
  * Permanent failures are not retried at all — see pending_error_is_permanent. */
-#define PENDING_MAX_ATTEMPTS   12
+#define PENDING_MAX_ATTEMPTS 12
 
 /* How long the post worker waits for real work before servicing the queue of
  * recovered days. */
-#define SW_POST_IDLE_MS        30000
+#define SW_POST_IDLE_MS 30000
 
 /* Internal heap floor.  A rebuild allocates EDF buffers and can run while
  * BLE, Wi-Fi and TLS are all up; better to wait than to fail and burn an
  * attempt. */
-#define PENDING_MIN_FREE_HEAP  (12 * 1024)
+#define PENDING_MIN_FREE_HEAP (12 * 1024)
 
 static volatile bool s_deferred_export_enabled = false;
 
@@ -1502,29 +1655,40 @@ static void pending_path(const char *day, char *out, size_t out_len)
  * marker (possibly carrying an attempt count) is left alone. */
 static bool pending_export_mark_session(const char *key, const char *day)
 {
-    if (!key || !day || strlen(day) != 8 || strchr(key, '/')) return false;
+    if (!key || !day || strlen(day) != 8 || strchr(key, '/'))
+        return false;
     mkdir(SD_APP_DIR, 0775);
     mkdir(SD_PENDING_EXPORT_DIR, 0775);
     char path[160], tmp[172];
     pending_path(key, path, sizeof(path));
     struct stat st;
-    if (stat(path, &st) == 0) return true;
-    if (errno != ENOENT) return false;
+    if (stat(path, &st) == 0)
+        return true;
+    if (errno != ENOENT)
+        return false;
     snprintf(tmp, sizeof(tmp), "%s.tmp", path);
     FILE *f = fopen(tmp, "w");
-    if (!f) return false;
-    bool ok = fprintf(f, "{\"day\":\"%s\",\"attempts\":0,\"reason\":\"export_pending\"}\n", day) > 0;
-    if (ok && fflush(f) != 0) ok = false;
-    if (ok && fsync(fileno(f)) != 0) ok = false;
-    if (fclose(f) != 0) ok = false;
-    if (ok && rename(tmp, path) != 0) ok = false;
-    if (!ok) unlink(tmp);
+    if (!f)
+        return false;
+    bool ok =
+        fprintf(f, "{\"day\":\"%s\",\"attempts\":0,\"reason\":\"export_pending\"}\n", day) > 0;
+    if (ok && fflush(f) != 0)
+        ok = false;
+    if (ok && fsync(fileno(f)) != 0)
+        ok = false;
+    if (fclose(f) != 0)
+        ok = false;
+    if (ok && rename(tmp, path) != 0)
+        ok = false;
+    if (!ok)
+        unlink(tmp);
     return ok;
 }
 
 static bool pending_export_mark(const char *day)
 {
-    if (!pending_export_mark_session(day, day)) return false;
+    if (!pending_export_mark_session(day, day))
+        return false;
     char path[160];
     pending_path(day, path, sizeof(path));
     /* Boot recovery may discover new work under a legacy day key whose
@@ -1534,7 +1698,8 @@ static bool pending_export_mark(const char *day)
 
 static void pending_export_ack_session(const char *key)
 {
-    if (!sd_storage_lease_acquire(SD_LEASE_EXPORT, 250)) return;
+    if (!sd_storage_lease_acquire(SD_LEASE_EXPORT, 250))
+        return;
     if (sd_storage_is_ready()) {
         char path[160];
         pending_path(key, path, sizeof(path));
@@ -1546,26 +1711,34 @@ static void pending_export_ack_session(const char *key)
 /* Marker updates append complete JSON lines. Never unlink durable intent to
  * update an attempt counter: a torn tail is ignored and the prior line wins.
  * Existing single-object markers remain readable. */
-static void pending_read(const char *path, int *out_attempts, bool *out_stalled,
-                         char *out_day)
+static void pending_read(const char *path, int *out_attempts, bool *out_stalled, char *out_day)
 {
-    if (out_attempts) *out_attempts = 0;
-    if (out_stalled) *out_stalled = false;
-    if (out_day) out_day[0] = '\0';
+    if (out_attempts)
+        *out_attempts = 0;
+    if (out_stalled)
+        *out_stalled = false;
+    if (out_day)
+        out_day[0] = '\0';
     FILE *f = fopen(path, "r");
-    if (!f) return;
+    if (!f)
+        return;
     char line[512];
     while (fgets(line, sizeof(line), f)) {
-        if (!strchr(line, '\n')) continue;
+        if (!strchr(line, '\n'))
+            continue;
         cJSON *root = cJSON_Parse(line);
-        if (!root) continue;
+        if (!root)
+            continue;
         cJSON *d = cJSON_GetObjectItem(root, "day");
         if (d && cJSON_IsString(d) && strlen(d->valuestring) == 8) {
-            if (out_day) memcpy(out_day, d->valuestring, 9);
+            if (out_day)
+                memcpy(out_day, d->valuestring, 9);
             cJSON *a = cJSON_GetObjectItem(root, "attempts");
-            if (a && cJSON_IsNumber(a) && out_attempts) *out_attempts = (int)a->valuedouble;
+            if (a && cJSON_IsNumber(a) && out_attempts)
+                *out_attempts = (int)a->valuedouble;
             cJSON *v = cJSON_GetObjectItem(root, "stalled");
-            if (out_stalled) *out_stalled = v && cJSON_IsTrue(v);
+            if (out_stalled)
+                *out_stalled = v && cJSON_IsTrue(v);
         }
         cJSON_Delete(root);
     }
@@ -1576,36 +1749,45 @@ static void pending_read(const char *path, int *out_attempts, bool *out_stalled,
  * errors. A later ordinary retry record clears the upload-pending phase. */
 static bool pending_upload_ready(const char *path, char *out_day, char *out_generation)
 {
-    if (out_day) out_day[0] = '\0';
-    if (out_generation) out_generation[0] = '\0';
+    if (out_day)
+        out_day[0] = '\0';
+    if (out_generation)
+        out_generation[0] = '\0';
     FILE *f = fopen(path, "r");
-    if (!f) return false;
+    if (!f)
+        return false;
     char line[512];
     bool ready = false;
     while (fgets(line, sizeof(line), f)) {
-        if (!strchr(line, '\n')) continue;
+        if (!strchr(line, '\n'))
+            continue;
         cJSON *j = cJSON_Parse(line);
         cJSON *day = cJSON_GetObjectItem(j, "day");
         if (day && cJSON_IsString(day) && strlen(day->valuestring) == 8) {
             cJSON *phase = cJSON_GetObjectItem(j, "phase");
             cJSON *generation = cJSON_GetObjectItem(j, "generation");
             ready = phase && cJSON_IsString(phase) &&
-                    strcmp(phase->valuestring, "upload_pending") == 0 &&
-                    generation && cJSON_IsString(generation) && strlen(generation->valuestring) == 32;
+                    strcmp(phase->valuestring, "upload_pending") == 0 && generation &&
+                    cJSON_IsString(generation) && strlen(generation->valuestring) == 32;
             if (ready) {
                 for (int i = 0; i < 32; ++i) {
                     char c = generation->valuestring[i];
-                    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) ready = false;
+                    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')))
+                        ready = false;
                 }
             }
-            if (out_day) memcpy(out_day, day->valuestring, 9);
-            if (ready && out_generation) memcpy(out_generation, generation->valuestring, 33);
+            if (out_day)
+                memcpy(out_day, day->valuestring, 9);
+            if (ready && out_generation)
+                memcpy(out_generation, generation->valuestring, 33);
         }
         cJSON_Delete(j);
     }
     bool failed = ferror(f) != 0;
-    if (fclose(f) != 0) failed = true;
-    if (failed && out_day) out_day[0] = '\0';
+    if (fclose(f) != 0)
+        failed = true;
+    if (failed && out_day)
+        out_day[0] = '\0';
     return ready && !failed;
 }
 
@@ -1614,20 +1796,28 @@ static bool pending_upload_ready(const char *path, char *out_day, char *out_gene
 static bool pending_mark_upload_ready(const char *path, const char *day)
 {
     FILE *f = fopen(path, "a");
-    if (!f) return false;
+    if (!f)
+        return false;
     /* Persisted nonce fences same-day publication across reboot and marker
      * reuse. 128 random bits avoid relying on wall-clock or boot-time order. */
     uint32_t nonce[4];
     esp_fill_random(nonce, sizeof(nonce));
-    bool ok = fprintf(f, "\n{\"day\":\"%s\",\"attempts\":0,\"stalled\":false,"
-                        "\"phase\":\"upload_pending\","
-                        "\"generation\":\"%08lx%08lx%08lx%08lx\","
-                        "\"last_error\":\"upload_invalidation_pending\"}\n", day,
-                        (unsigned long)nonce[0], (unsigned long)nonce[1],
-                        (unsigned long)nonce[2], (unsigned long)nonce[3]) > 0;
-    if (ok && fflush(f) != 0) ok = false;
-    if (ok && fsync(fileno(f)) != 0) ok = false;
-    if (fclose(f) != 0) ok = false;
+    bool ok = fprintf(f,
+                      "\n{\"day\":\"%s\",\"attempts\":0,\"stalled\":false,"
+                      "\"phase\":\"upload_pending\","
+                      "\"generation\":\"%08lx%08lx%08lx%08lx\","
+                      "\"last_error\":\"upload_invalidation_pending\"}\n",
+                      day,
+                      (unsigned long)nonce[0],
+                      (unsigned long)nonce[1],
+                      (unsigned long)nonce[2],
+                      (unsigned long)nonce[3]) > 0;
+    if (ok && fflush(f) != 0)
+        ok = false;
+    if (ok && fsync(fileno(f)) != 0)
+        ok = false;
+    if (fclose(f) != 0)
+        ok = false;
     return ok;
 }
 
@@ -1636,17 +1826,21 @@ static bool pending_mark_upload_ready(const char *path, const char *day)
  * supersedes earlier invalidations only for that same exported day. */
 esp_err_t session_writer_mark_upload_invalidation(const char *day)
 {
-    if (!day || strlen(day) != 8) return ESP_ERR_INVALID_ARG;
+    if (!day || strlen(day) != 8)
+        return ESP_ERR_INVALID_ARG;
     for (int i = 0; i < 8; ++i)
-        if (day[i] < '0' || day[i] > '9') return ESP_ERR_INVALID_ARG;
-    if (!sd_storage_lease_acquire(SD_LEASE_EXPORT, 0)) return ESP_ERR_TIMEOUT;
+        if (day[i] < '0' || day[i] > '9')
+            return ESP_ERR_INVALID_ARG;
+    if (!sd_storage_lease_acquire(SD_LEASE_EXPORT, 0))
+        return ESP_ERR_TIMEOUT;
     esp_err_t ret = ESP_ERR_INVALID_STATE;
     if (sd_storage_is_ready()) {
         char key[32], path[160];
         snprintf(key, sizeof(key), "rebuild_%s", day);
         pending_path(key, path, sizeof(path));
         ret = pending_export_mark_session(key, day) && pending_mark_upload_ready(path, day)
-                  ? ESP_OK : ESP_FAIL;
+                  ? ESP_OK
+                  : ESP_FAIL;
     }
     sd_storage_lease_release(SD_LEASE_EXPORT);
     return ret;
@@ -1654,62 +1848,80 @@ esp_err_t session_writer_mark_upload_invalidation(const char *day)
 
 static bool pending_key_valid(const char *key)
 {
-    if (!key || !key[0] || strlen(key) >= 80) return false;
+    if (!key || !key[0] || strlen(key) >= 80)
+        return false;
     for (const char *p = key; *p; ++p)
-        if (!((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'z') ||
-              (*p >= 'A' && *p <= 'Z') || *p == '_' || *p == '-')) return false;
+        if (!((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
+              *p == '_' || *p == '-'))
+            return false;
     return true;
 }
 
 bool session_writer_next_upload_invalidation(uint32_t *day, char *token, size_t token_len)
 {
-    if (!day || !token || token_len < 2) return false;
+    if (!day || !token || token_len < 2)
+        return false;
     *day = 0;
     token[0] = '\0';
-    if (!sd_storage_lease_acquire(SD_LEASE_EXPORT, 0)) return false;
+    if (!sd_storage_lease_acquire(SD_LEASE_EXPORT, 0))
+        return false;
     DIR *dir = sd_storage_is_ready() ? opendir(SD_PENDING_EXPORT_DIR) : NULL;
     bool found = false;
     if (dir) {
         struct dirent *ent;
         while ((ent = readdir(dir)) != NULL) {
             size_t len = strlen(ent->d_name);
-            if (len <= 5 || len >= 80 || strcmp(ent->d_name + len - 5, ".json")) continue;
-            if (len - 5 + 1 + 32 >= token_len) continue;
+            if (len <= 5 || len >= 80 || strcmp(ent->d_name + len - 5, ".json"))
+                continue;
+            if (len - 5 + 1 + 32 >= token_len)
+                continue;
             char key[80], path[300], day_text[16], generation[33];
             memcpy(key, ent->d_name, len - 5);
             key[len - 5] = '\0';
-            if (!pending_key_valid(key)) continue;
+            if (!pending_key_valid(key))
+                continue;
             snprintf(path, sizeof(path), "%s/%s", SD_PENDING_EXPORT_DIR, ent->d_name);
-            if (!pending_upload_ready(path, day_text, generation)) continue;
+            if (!pending_upload_ready(path, day_text, generation))
+                continue;
             bool digits = true;
             for (int i = 0; i < 8; ++i)
-                if (day_text[i] < '0' || day_text[i] > '9') digits = false;
-            if (!digits) continue;
+                if (day_text[i] < '0' || day_text[i] > '9')
+                    digits = false;
+            if (!digits)
+                continue;
             uint32_t number = (uint32_t)strtoul(day_text, NULL, 10);
-            if (!number) continue;
+            if (!number)
+                continue;
             *day = number;
             snprintf(token, token_len, "%s:%s", key, generation);
             found = true;
             break;
         }
-        if (closedir(dir) != 0) found = false;
+        if (closedir(dir) != 0)
+            found = false;
     }
     sd_storage_lease_release_unchanged(SD_LEASE_EXPORT);
-    if (!found) { *day = 0; token[0] = '\0'; }
+    if (!found) {
+        *day = 0;
+        token[0] = '\0';
+    }
     return found;
 }
 
 esp_err_t session_writer_ack_upload_invalidation(uint32_t day, const char *token)
 {
-    if (!day || !token || strlen(token) >= 128) return ESP_ERR_INVALID_ARG;
+    if (!day || !token || strlen(token) >= 128)
+        return ESP_ERR_INVALID_ARG;
     const char *colon = strchr(token, ':');
     if (!colon || colon - token <= 0 || colon - token >= 80 || strlen(colon + 1) != 32)
         return ESP_ERR_INVALID_ARG;
     char key[80];
     memcpy(key, token, (size_t)(colon - token));
     key[colon - token] = '\0';
-    if (!pending_key_valid(key)) return ESP_ERR_INVALID_ARG;
-    if (!sd_storage_lease_acquire(SD_LEASE_EXPORT, 0)) return ESP_ERR_TIMEOUT;
+    if (!pending_key_valid(key))
+        return ESP_ERR_INVALID_ARG;
+    if (!sd_storage_lease_acquire(SD_LEASE_EXPORT, 0))
+        return ESP_ERR_TIMEOUT;
     esp_err_t ret = ESP_ERR_INVALID_STATE;
     if (sd_storage_is_ready()) {
         char path[160], day_text[16], generation[33];
@@ -1718,8 +1930,10 @@ esp_err_t session_writer_ack_upload_invalidation(uint32_t day, const char *token
             (uint32_t)strtoul(day_text, NULL, 10) == day && !strcmp(generation, colon + 1))
             ret = unlink(path) == 0 ? ESP_OK : ESP_FAIL;
     }
-    if (ret == ESP_OK) sd_storage_lease_release(SD_LEASE_EXPORT);
-    else sd_storage_lease_release_unchanged(SD_LEASE_EXPORT);
+    if (ret == ESP_OK)
+        sd_storage_lease_release(SD_LEASE_EXPORT);
+    else
+        sd_storage_lease_release_unchanged(SD_LEASE_EXPORT);
     return ret;
 }
 
@@ -1727,32 +1941,45 @@ static void pending_reason(const char *path, char *out, size_t out_len)
 {
     strlcpy(out, "export_pending", out_len);
     FILE *f = fopen(path, "r");
-    if (!f) return;
+    if (!f)
+        return;
     char line[512];
     while (fgets(line, sizeof(line), f)) {
-        if (!strchr(line, '\n')) continue;
+        if (!strchr(line, '\n'))
+            continue;
         cJSON *j = cJSON_Parse(line);
         cJSON *v = cJSON_GetObjectItem(j, "last_error");
-        if (v && cJSON_IsString(v)) strlcpy(out, v->valuestring, out_len);
+        if (v && cJSON_IsString(v))
+            strlcpy(out, v->valuestring, out_len);
         cJSON_Delete(j);
     }
     fclose(f);
 }
 
-static bool pending_update(const char *path, const char *day, int attempts,
-                           bool stalled, esp_err_t err)
+static bool pending_update(
+    const char *path, const char *day, int attempts, bool stalled, esp_err_t err)
 {
     FILE *f = fopen(path, "a");
-    if (!f) return false;
+    if (!f)
+        return false;
     /* Leading newline resynchronizes after a previous torn append. */
-    bool ok = fprintf(f, "\n{\"day\":\"%s\",\"attempts\":%d,\"stalled\":%s,"
-                        "\"last_error\":\"%s\"}\n", day, attempts,
-                        stalled ? "true" : "false",
-                        err == EDF_GEN_ERR_POSITION_GAPS ? "positioned_gaps_require_discontinuous_export" : esp_err_to_name(err)) > 0;
-    if (ok && fflush(f) != 0) ok = false;
-    if (ok && fsync(fileno(f)) != 0) ok = false;
-    if (fclose(f) != 0) ok = false;
-    if (!ok) ESP_LOGE(TAG, "pending-export update failed; retaining prior intent");
+    bool ok =
+        fprintf(f,
+                "\n{\"day\":\"%s\",\"attempts\":%d,\"stalled\":%s,"
+                "\"last_error\":\"%s\"}\n",
+                day,
+                attempts,
+                stalled ? "true" : "false",
+                err == EDF_GEN_ERR_POSITION_GAPS ? "positioned_gaps_require_discontinuous_export"
+                                                 : esp_err_to_name(err)) > 0;
+    if (ok && fflush(f) != 0)
+        ok = false;
+    if (ok && fsync(fileno(f)) != 0)
+        ok = false;
+    if (fclose(f) != 0)
+        ok = false;
+    if (!ok)
+        ESP_LOGE(TAG, "pending-export update failed; retaining prior intent");
     return ok;
 }
 
@@ -1760,30 +1987,35 @@ static bool pending_update(const char *path, const char *day, int attempts,
  * the real problem behind an ever-growing attempt count. */
 static bool pending_error_is_permanent(esp_err_t err)
 {
-    return err == EDF_GEN_ERR_POSITION_GAPS ||
-           err == ESP_ERR_INVALID_ARG ||    /* malformed day */
-           err == ESP_ERR_INVALID_SIZE ||   /* > REBUILD_MAX_SESSIONS */
-           err == ESP_ERR_NOT_FOUND;        /* no usable manifest in the day */
+    return err == EDF_GEN_ERR_POSITION_GAPS || err == ESP_ERR_INVALID_ARG || /* malformed day */
+           err == ESP_ERR_INVALID_SIZE || /* > REBUILD_MAX_SESSIONS */
+           err == ESP_ERR_NOT_FOUND;      /* no usable manifest in the day */
 }
 
 /* Service at most one pending day, then return so the worker stays responsive
  * to real post-stop jobs. */
 static void pending_export_service_unlocked(void)
 {
-    if (!s_deferred_export_enabled) return;
-    if (!sd_storage_is_ready()) return;
+    if (!s_deferred_export_enabled)
+        return;
+    if (!sd_storage_is_ready())
+        return;
 
     /* Raw capture always outranks derived output. */
-    if (sd_storage_recording_active() || s_active) return;
+    if (sd_storage_recording_active() || s_active)
+        return;
 
     /* The shared STR/Identification pass is written in the current clock
      * domain, so an unset clock would bake epoch-era values into the day. */
-    if ((int64_t)time(NULL) < 1700000000LL) return;
+    if ((int64_t)time(NULL) < 1700000000LL)
+        return;
 
-    if (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) < PENDING_MIN_FREE_HEAP) return;
+    if (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) < PENDING_MIN_FREE_HEAP)
+        return;
 
     DIR *dir = opendir(SD_PENDING_EXPORT_DIR);
-    if (!dir) return;
+    if (!dir)
+        return;
 
     char day[16] = {0};
     char path[300] = {0};
@@ -1792,27 +2024,31 @@ static void pending_export_service_unlocked(void)
 
     struct dirent *ent;
     while ((ent = readdir(dir)) != NULL) {
-        if (ent->d_name[0] == '.') continue;
+        if (ent->d_name[0] == '.')
+            continue;
         size_t len = strlen(ent->d_name);
-        if (len < 13 || len >= 80 || strcmp(ent->d_name + len - 5, ".json") != 0) continue;
+        if (len < 13 || len >= 80 || strcmp(ent->d_name + len - 5, ".json") != 0)
+            continue;
 
         char cand[16];
         memcpy(cand, ent->d_name, 8);
         cand[8] = '\0';
 
         char cand_path[300];
-        snprintf(cand_path, sizeof(cand_path), "%s/%s",
-                 SD_PENDING_EXPORT_DIR, ent->d_name);
+        snprintf(cand_path, sizeof(cand_path), "%s/%s", SD_PENDING_EXPORT_DIR, ent->d_name);
 
         /* Handoff work belongs to the scheduler and must not monopolize
          * another raw day's conversion while it waits for acknowledgement. */
-        if (pending_upload_ready(cand_path, NULL, NULL)) continue;
+        if (pending_upload_ready(cand_path, NULL, NULL))
+            continue;
 
         int cand_attempts = 0;
         bool cand_stalled = false;
         pending_read(cand_path, &cand_attempts, &cand_stalled, cand);
-        if (!cand[0]) continue;
-        if (cand_stalled || cand_attempts >= PENDING_MAX_ATTEMPTS) continue;
+        if (!cand[0])
+            continue;
+        if (cand_stalled || cand_attempts >= PENDING_MAX_ATTEMPTS)
+            continue;
 
         /* Missing/transiently unreadable source is unresolved work, not an
          * eligible rebuild. Retain it and continue this scan so a stable
@@ -1822,8 +2058,8 @@ static void pending_export_service_unlocked(void)
         struct stat st;
         int stat_result = stat(day_streams, &st);
         if (stat_result != 0 || !S_ISDIR(st.st_mode)) {
-            esp_err_t unavailable = stat_result != 0 && errno == ENOENT
-                                      ? ESP_ERR_NOT_FOUND : ESP_FAIL;
+            esp_err_t unavailable =
+                stat_result != 0 && errno == ENOENT ? ESP_ERR_NOT_FOUND : ESP_FAIL;
             char reason[96];
             pending_reason(cand_path, reason, sizeof(reason));
             /* Do not grow the journal on every idle poll of the same fault.
@@ -1842,10 +2078,10 @@ static void pending_export_service_unlocked(void)
     closedir(dir);
     (void)stalled;
 
-    if (!day[0]) return;
+    if (!day[0])
+        return;
 
-    ESP_LOGW(TAG, "pending export: rebuilding day %s (attempt %d)",
-             day, attempts + 1);
+    ESP_LOGW(TAG, "pending export: rebuilding day %s (attempt %d)", day, attempts + 1);
     crash_diag_note_activity("rebuild_day");
 
     esp_err_t ret = edf_gen_rebuild_day(day);
@@ -1856,18 +2092,26 @@ static void pending_export_service_unlocked(void)
         char handoff_key[32], handoff_path[160];
         snprintf(handoff_key, sizeof(handoff_key), "rebuild_%s", day);
         pending_path(handoff_key, handoff_path, sizeof(handoff_path));
-        if (strcmp(path, handoff_path) != 0) unlink(path);
+        if (strcmp(path, handoff_path) != 0)
+            unlink(path);
         uploader_request_scan(); /* optional nudge; polling owns delivery */
         ESP_LOGW(TAG, "pending export: day %s rebuilt; durable upload invalidation pending", day);
     } else if (pending_error_is_permanent(ret)) {
-        ESP_LOGE(TAG, "pending export: day %s failed permanently (%s) — "
-                 "needs attention, not retrying", day, esp_err_to_name(ret));
+        ESP_LOGE(TAG,
+                 "pending export: day %s failed permanently (%s) — "
+                 "needs attention, not retrying",
+                 day,
+                 esp_err_to_name(ret));
         pending_update(path, day, attempts + 1, true, ret);
     } else {
         int next = attempts + 1;
         bool give_up = (next >= PENDING_MAX_ATTEMPTS);
-        ESP_LOGE(TAG, "pending export: day %s failed (%s), attempt %d/%d%s",
-                 day, esp_err_to_name(ret), next, PENDING_MAX_ATTEMPTS,
+        ESP_LOGE(TAG,
+                 "pending export: day %s failed (%s), attempt %d/%d%s",
+                 day,
+                 esp_err_to_name(ret),
+                 next,
+                 PENDING_MAX_ATTEMPTS,
                  give_up ? " — giving up, needs attention" : "");
         pending_update(path, day, next, give_up, ret);
     }
@@ -1877,50 +2121,58 @@ static void pending_export_service_unlocked(void)
 static void pending_export_service(void)
 {
     if (!s_deferred_export_enabled || sd_storage_recording_active() ||
-        sd_storage_recording_pending()) return;
-    if (!sd_storage_lease_acquire(SD_LEASE_EXPORT, 0)) return;
-    if (sd_storage_is_ready()) pending_export_service_unlocked();
+        sd_storage_recording_pending())
+        return;
+    if (!sd_storage_lease_acquire(SD_LEASE_EXPORT, 0))
+        return;
+    if (sd_storage_is_ready())
+        pending_export_service_unlocked();
     sd_storage_lease_release(SD_LEASE_EXPORT);
 }
 
 void session_writer_enable_deferred_export(void)
 {
-    if (s_deferred_export_enabled) return;
+    if (s_deferred_export_enabled)
+        return;
     s_deferred_export_enabled = true;
     ESP_LOGI(TAG, "deferred export of recovered days enabled");
 }
 
 static esp_err_t pending_export_json_unlocked(char **out_json)
 {
-    if (!out_json) return ESP_ERR_INVALID_ARG;
+    if (!out_json)
+        return ESP_ERR_INVALID_ARG;
 
     cJSON *arr = cJSON_CreateArray();
-    if (!arr) return ESP_ERR_NO_MEM;
+    if (!arr)
+        return ESP_ERR_NO_MEM;
 
     DIR *dir = opendir(SD_PENDING_EXPORT_DIR);
     if (dir) {
         struct dirent *ent;
         while ((ent = readdir(dir)) != NULL) {
-            if (ent->d_name[0] == '.') continue;
+            if (ent->d_name[0] == '.')
+                continue;
             size_t len = strlen(ent->d_name);
-            if (len < 13 || len >= 80 || strcmp(ent->d_name + len - 5, ".json") != 0) continue;
+            if (len < 13 || len >= 80 || strcmp(ent->d_name + len - 5, ".json") != 0)
+                continue;
 
             char cand_path[300];
-            snprintf(cand_path, sizeof(cand_path), "%s/%s",
-                     SD_PENDING_EXPORT_DIR, ent->d_name);
+            snprintf(cand_path, sizeof(cand_path), "%s/%s", SD_PENDING_EXPORT_DIR, ent->d_name);
             int attempts = 0;
             bool stalled = false;
             char day[16];
             pending_read(cand_path, &attempts, &stalled, day);
-            if (!day[0]) continue;
+            if (!day[0])
+                continue;
             cJSON *o = cJSON_CreateObject();
             cJSON_AddStringToObject(o, "day", day);
             cJSON_AddNumberToObject(o, "attempts", attempts);
             char reason[96];
             pending_reason(cand_path, reason, sizeof(reason));
             cJSON_AddStringToObject(o, "reason", reason);
-            cJSON_AddBoolToObject(o, "needs_attention",
-                                  stalled || attempts >= PENDING_MAX_ATTEMPTS);
+            cJSON_AddBoolToObject(
+                o, "needs_attention", stalled || attempts >= PENDING_MAX_ATTEMPTS);
             cJSON_AddItemToArray(arr, o);
         }
         closedir(dir);
@@ -1933,11 +2185,13 @@ static esp_err_t pending_export_json_unlocked(char **out_json)
 
 esp_err_t session_writer_pending_export_json(char **out_json)
 {
-    if (!out_json) return ESP_ERR_INVALID_ARG;
+    if (!out_json)
+        return ESP_ERR_INVALID_ARG;
     *out_json = NULL;
-    if (!sd_storage_lease_acquire(SD_LEASE_EXPORT, 0)) return ESP_ERR_TIMEOUT;
-    esp_err_t ret = sd_storage_is_ready() ? pending_export_json_unlocked(out_json)
-                                           : ESP_ERR_INVALID_STATE;
+    if (!sd_storage_lease_acquire(SD_LEASE_EXPORT, 0))
+        return ESP_ERR_TIMEOUT;
+    esp_err_t ret =
+        sd_storage_is_ready() ? pending_export_json_unlocked(out_json) : ESP_ERR_INVALID_STATE;
     sd_storage_lease_release(SD_LEASE_EXPORT);
     return ret;
 }
@@ -1963,7 +2217,6 @@ static void post_wait_for_storage_quiet(void)
 
 /* Optional derived IO yields to a new recording, just like History reads. */
 
-
 static bool post_flow_cache_cancel(void *context)
 {
     (void)context;
@@ -1976,8 +2229,7 @@ static void sw_post_task(void *arg)
     /* See sw_storage_task(): init resumes both workers only after every
      * shared resource exists and s_ready has been published. */
     vTaskSuspend(NULL);
-    ESP_LOGI(TAG, "post worker started on core %d (idle; waiting for jobs)",
-             xPortGetCoreID());
+    ESP_LOGI(TAG, "post worker started on core %d (idle; waiting for jobs)", xPortGetCoreID());
 
     while (1) {
         sw_post_job_t job;
@@ -1999,57 +2251,60 @@ static void sw_post_task(void *arg)
          * degraded-mode session would feed its own estimate back in. */
         if (job.drift_valid && time_source_get() == TIME_SRC_NTP) {
             time_sync_save_drift(job.clock_drift_ms,
-                                 job.drift_measured_at_ms > 0
-                                     ? job.drift_measured_at_ms
-                                     : job.end_epoch_ms);
+                                 job.drift_measured_at_ms > 0 ? job.drift_measured_at_ms
+                                                              : job.end_epoch_ms);
         }
 
         /* 4. Post-therapy collection (BLE spool pulls + Get RPC). */
         bool spool_current = false;
         if (job.allow_ble) {
             ESP_LOGI(TAG, "post: starting post-therapy collection");
-            post_therapy_collect(job.session_dir, job.session_id,
-                                 job.start_epoch_ms, job.clock_drift_ms,
-                                 job.end_epoch_ms, &spool_current);
+            post_therapy_collect(job.session_dir,
+                                 job.session_id,
+                                 job.start_epoch_ms,
+                                 job.clock_drift_ms,
+                                 job.end_epoch_ms,
+                                 &spool_current);
             if (!spool_current) {
                 ESP_LOGI(TAG, "post: waiting for Summary spool to become current");
-                bool fresh = post_therapy_wait_spool_current(job.end_epoch_ms,
-                                                              job.clock_drift_ms);
-                int64_t elapsed_ms =
-                    (esp_timer_get_time() - job.stop_boot_us) / 1000;
-                ESP_LOGI(TAG, "post: spool %s after %lld ms from stop",
+                bool fresh = post_therapy_wait_spool_current(job.end_epoch_ms, job.clock_drift_ms);
+                int64_t elapsed_ms = (esp_timer_get_time() - job.stop_boot_us) / 1000;
+                ESP_LOGI(TAG,
+                         "post: spool %s after %lld ms from stop",
                          fresh ? "CURRENT" : "STALE (timeout)",
                          (long long)elapsed_ms);
             }
         } else {
-            ESP_LOGW(TAG, "post: BLE unavailable, skipping spool collection for %s",
-                     job.session_id);
+            ESP_LOGW(
+                TAG, "post: BLE unavailable, skipping spool collection for %s", job.session_id);
         }
 
         /* A new recording may have begun during a BLE RPC.  Wait it out before
          * opening the much heavier EDF generation pass. */
-        if (sd_storage_recording_active()) post_wait_for_storage_quiet();
+        if (sd_storage_recording_active())
+            post_wait_for_storage_quiet();
 
         /* 5. EDF generation + upload trigger.  Runs here rather than in a
          * per-stop task: one persistent worker means no allocation can fail
          * at the exact moment a session needs exporting. */
-        esp_err_t ret = edf_gen_generate(job.session_dir, job.session_id,
-                                         job.start_epoch_ms, job.end_epoch_ms,
+        esp_err_t ret = edf_gen_generate(job.session_dir,
+                                         job.session_id,
+                                         job.start_epoch_ms,
+                                         job.end_epoch_ms,
                                          job.clock_drift_ms);
         char day_folder[32];
-        as11_time_noon_day(job.start_epoch_ms - job.clock_drift_ms,
-                           day_folder, sizeof(day_folder));
+        as11_time_noon_day(job.start_epoch_ms - job.clock_drift_ms, day_folder, sizeof(day_folder));
         if (ret == ESP_OK) {
             uploader_on_export_complete(day_folder);
             pending_export_ack_session(job.session_id);
         } else {
-            ESP_LOGW(TAG, "post: EDF generation failed (%s), retaining export intent",
+            ESP_LOGW(TAG,
+                     "post: EDF generation failed (%s), retaining export intent",
                      esp_err_to_name(ret));
             if (sd_storage_lease_acquire(SD_LEASE_EXPORT, 250)) {
                 char marker[160], day[16];
                 pending_path(job.session_id, marker, sizeof(marker));
-                as11_time_noon_day(job.start_epoch_ms - job.clock_drift_ms,
-                                   day, sizeof(day));
+                as11_time_noon_day(job.start_epoch_ms - job.clock_drift_ms, day, sizeof(day));
                 pending_update(marker, day, 1, pending_error_is_permanent(ret), ret);
                 sd_storage_lease_release(SD_LEASE_EXPORT);
             }
@@ -2060,22 +2315,21 @@ static void sw_post_task(void *arg)
          * recording cancel derived IO; no raw file is modified here. */
         if (sd_storage_lease_acquire(SD_LEASE_UPLOAD, 0)) {
             char source[384];
-            int n = snprintf(source, sizeof(source), "%s/%s_flow_mm.snt",
-                             job.session_dir, job.session_id);
+            int n = snprintf(
+                source, sizeof(source), "%s/%s_flow_mm.snt", job.session_dir, job.session_id);
             if (n > 0 && n < (int)sizeof(source)) {
                 int cached = history_flow_cache_build(source, post_flow_cache_cancel, NULL);
-                if (cached) ESP_LOGI(TAG, "post: Flow cache deferred for %s", job.session_id);
+                if (cached)
+                    ESP_LOGI(TAG, "post: Flow cache deferred for %s", job.session_id);
             }
             sd_storage_lease_release(SD_LEASE_UPLOAD);
         }
 
         UBaseType_t free_bytes = uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t);
         if (free_bytes < 2048) {
-            ESP_LOGW(TAG, "post worker: LOW STACK — %u bytes free at peak",
-                     (unsigned)free_bytes);
+            ESP_LOGW(TAG, "post worker: LOW STACK — %u bytes free at peak", (unsigned)free_bytes);
         } else {
-            ESP_LOGI(TAG, "post worker: peak stack headroom %u bytes",
-                     (unsigned)free_bytes);
+            ESP_LOGI(TAG, "post worker: peak stack headroom %u bytes", (unsigned)free_bytes);
         }
     }
 }
@@ -2123,10 +2377,12 @@ static void session_writer_init_unwind(void)
 
 esp_err_t session_writer_init(void)
 {
-    if (s_ready) return ESP_OK;
+    if (s_ready)
+        return ESP_OK;
 
     s_active_mutex = xSemaphoreCreateMutex();
-    if (!s_active_mutex) return ESP_ERR_NO_MEM;
+    if (!s_active_mutex)
+        return ESP_ERR_NO_MEM;
 
     s_storage_q = xQueueCreate(SW_STORAGE_QUEUE_LEN, sizeof(sw_cmd_t));
     s_post_q = xQueueCreate(SW_POST_QUEUE_LEN, sizeof(sw_post_job_t));
@@ -2138,15 +2394,14 @@ esp_err_t session_writer_init(void)
     /* Persistent workers, created once.  If either cannot be created the
      * caller disables recording visibly, rather than discovering the
      * problem at TherapyStop when the night is already lost. */
-    s_storage_task = psram_task_create(sw_storage_task, "sw_storage", 8192,
-                                       NULL, 8, tskNO_AFFINITY, NULL, NULL);
+    s_storage_task =
+        psram_task_create(sw_storage_task, "sw_storage", 8192, NULL, 8, tskNO_AFFINITY, NULL, NULL);
     if (!s_storage_task) {
         ESP_LOGE(TAG, "storage worker creation failed");
         goto no_mem;
     }
     sw_wait_startup_parked(s_storage_task);
-    s_post_task = psram_task_create(sw_post_task, "sw_post", 16384,
-                                    NULL, 5, 1, NULL, NULL);
+    s_post_task = psram_task_create(sw_post_task, "sw_post", 16384, NULL, 5, 1, NULL, NULL);
     if (!s_post_task) {
         ESP_LOGE(TAG, "post worker creation failed");
         goto no_mem;
@@ -2156,8 +2411,11 @@ esp_err_t session_writer_init(void)
     s_ready = true;
     vTaskResume(s_storage_task);
     vTaskResume(s_post_task);
-    ESP_LOGI(TAG, "session writer initialised (commit interval %d ms, "
-             "stale timeout %d ms)", SW_COMMIT_INTERVAL_MS, SW_STALE_TIMEOUT_MS);
+    ESP_LOGI(TAG,
+             "session writer initialised (commit interval %d ms, "
+             "stale timeout %d ms)",
+             SW_COMMIT_INTERVAL_MS,
+             SW_STALE_TIMEOUT_MS);
     return ESP_OK;
 
 no_mem:
@@ -2170,15 +2428,18 @@ session_writer_t *session_writer_start(void)
     bool first_attempt = !s_start_intent;
     sw_start_intent_begin();
     if (!s_ready) {
-        if (first_attempt) ESP_LOGE(TAG, "cannot start session: writer not initialised");
+        if (first_attempt)
+            ESP_LOGE(TAG, "cannot start session: writer not initialised");
         return NULL;
     }
     if (!sd_storage_is_ready()) {
-        if (first_attempt) ESP_LOGE(TAG, "cannot start session: SD not ready");
+        if (first_attempt)
+            ESP_LOGE(TAG, "cannot start session: SD not ready");
         return NULL;
     }
     if (!sd_storage_reserve_for_recording_cached()) {
-        if (first_attempt) ESP_LOGE(TAG, "cannot start session: insufficient free space");
+        if (first_attempt)
+            ESP_LOGE(TAG, "cannot start session: insufficient free space");
         return NULL;
     }
 
@@ -2197,12 +2458,14 @@ session_writer_t *session_writer_start(void)
      * PSRAM batch pool. This is the atomic admission boundary against
      * History/upload/format; every failed start below releases the claim. */
     if (!sd_storage_recording_try_begin()) {
-        if (first_attempt) ESP_LOGW(TAG, "cannot start session: microSD reader or maintenance active");
+        if (first_attempt)
+            ESP_LOGW(TAG, "cannot start session: microSD reader or maintenance active");
         return NULL;
     }
 
     session_writer_t *s = heap_caps_calloc(1, sizeof(session_writer_t), MALLOC_CAP_SPIRAM);
-    if (!s) s = calloc(1, sizeof(session_writer_t));
+    if (!s)
+        s = calloc(1, sizeof(session_writer_t));
     if (!s) {
         sd_storage_recording_end();
         return NULL;
@@ -2253,7 +2516,7 @@ session_writer_t *session_writer_start(void)
      * start. If OPEN cannot be queued, clear it with the rest of the start. */
     crash_diag_note_session(s->session_id);
     crash_diag_note_activity("session_open");
-    sw_cmd_t cmd = { .type = SW_CMD_OPEN, .s = s };
+    sw_cmd_t cmd = {.type = SW_CMD_OPEN, .s = s};
     if (!storage_queue_send_open(&cmd, 0)) {
         ESP_LOGE(TAG, "failed to enqueue session open");
         s->active = false;
@@ -2272,19 +2535,20 @@ session_writer_t *session_writer_start(void)
 /* Request finalisation.  Never performs I/O or BLE work in the caller's
  * context: the storage worker closes the files and the post worker runs the
  * export pipeline. */
-static void sw_request_finalize(session_writer_t *s, const char *state,
-                                int64_t end_epoch_ms, bool allow_ble)
+static void sw_request_finalize(session_writer_t *s,
+                                const char *state,
+                                int64_t end_epoch_ms,
+                                bool allow_ble)
 {
-    if (!s) return;
+    if (!s)
+        return;
 
     /* The active mutex is also the lifecycle queue-order gate.  START holds it
      * from OPEN enqueue through publication, while STOP holds it from detach
      * through FINALIZE enqueue.  A later OPEN therefore cannot overtake this
      * close even when UI and BLE callbacks arrive on different tasks. */
-    bool on_storage_worker =
-        (xTaskGetCurrentTaskHandle() == s_storage_task);
-    if (xSemaphoreTake(s_active_mutex, on_storage_worker ? 0 : portMAX_DELAY) !=
-        pdTRUE) {
+    bool on_storage_worker = (xTaskGetCurrentTaskHandle() == s_storage_task);
+    if (xSemaphoreTake(s_active_mutex, on_storage_worker ? 0 : portMAX_DELAY) != pdTRUE) {
         /* The queue owner must remain able to drain capacity for an external
          * STOP that is holding this gate.  Its watchdog will retry later. */
         return;
@@ -2302,7 +2566,8 @@ static void sw_request_finalize(session_writer_t *s, const char *state,
 
     s->finalize_requested = true;
     s->active = false;
-    if (s_active == s) s_active = NULL;
+    if (s_active == s)
+        s_active = NULL;
     s->end_time_us = esp_timer_get_time();
 
     /* Wait behind any producer that already passed its active check.  Once
@@ -2352,8 +2617,7 @@ static void sw_request_finalize(session_writer_t *s, const char *state,
         s->active = true;
         s_active = s;
         xSemaphoreGive(s_active_mutex);
-        ESP_LOGW(TAG, "storage queue busy — deferring finalise of %s",
-                 s->session_id);
+        ESP_LOGW(TAG, "storage queue busy — deferring finalise of %s", s->session_id);
         return;
     }
 
@@ -2366,7 +2630,8 @@ esp_err_t session_writer_stop(session_writer_t *s)
 {
     s_stream_epoch++;
     sw_start_intent_end();
-    if (!s) return ESP_OK;
+    if (!s)
+        return ESP_OK;
     sw_request_finalize(s, "completed", (int64_t)time(NULL) * 1000, true);
     return ESP_OK;
 }
@@ -2383,15 +2648,19 @@ session_writer_t *session_writer_get_active(void)
 
 void session_writer_set_device_info(const char *addr, const char *client_id)
 {
-    if (addr) strlcpy(s_device_addr, addr, sizeof(s_device_addr));
-    if (client_id) strlcpy(s_client_id, client_id, sizeof(s_client_id));
+    if (addr)
+        strlcpy(s_device_addr, addr, sizeof(s_device_addr));
+    if (client_id)
+        strlcpy(s_client_id, client_id, sizeof(s_client_id));
 }
 
 bool session_writer_snc_changed(int64_t *out_value)
 {
-    if (!s_snc_changed) return false;
+    if (!s_snc_changed)
+        return false;
     s_snc_changed = false;
-    if (out_value) *out_value = s_snc_value;
+    if (out_value)
+        *out_value = s_snc_value;
     return true;
 }
 
@@ -2399,8 +2668,11 @@ bool session_writer_snc_changed(int64_t *out_value)
 
 static void queue_event_json(session_writer_t *s, char *json_str)
 {
-    if (!s || !json_str) { free(json_str); return; }
-    sw_cmd_t cmd = { .type = SW_CMD_EVENT, .s = s, .event_json = json_str };
+    if (!s || !json_str) {
+        free(json_str);
+        return;
+    }
+    sw_cmd_t cmd = {.type = SW_CMD_EVENT, .s = s, .event_json = json_str};
     if (uxQueueSpacesAvailable(s_storage_q) <= SW_STORAGE_TERMINAL_RESERVE ||
         xQueueSend(s_storage_q, &cmd, 0) != pdTRUE) {
         s->event_dropped++;
@@ -2410,7 +2682,8 @@ static void queue_event_json(session_writer_t *s, char *json_str)
 
 static void write_event(session_writer_t *s, const cJSON *msg)
 {
-    if (!s || !s->active) return;
+    if (!s || !s->active)
+        return;
     queue_event_json(s, cJSON_PrintUnformatted(msg));
 }
 
@@ -2431,20 +2704,25 @@ typedef enum {
 /* Check an EventNotification for therapy start/stop and lifecycle events. */
 static as11_event_t check_event_notification(const cJSON *msg, const char **out_report)
 {
-    if (out_report) *out_report = NULL;
+    if (out_report)
+        *out_report = NULL;
 
     cJSON *params = cJSON_GetObjectItem(msg, "params");
-    if (!params) return AS11_EV_NONE;
+    if (!params)
+        return AS11_EV_NONE;
 
     cJSON *events = cJSON_GetObjectItem(params, "events");
-    if (!events || !cJSON_IsArray(events)) return AS11_EV_NONE;
+    if (!events || !cJSON_IsArray(events))
+        return AS11_EV_NONE;
 
     int n = cJSON_GetArraySize(events);
     for (int i = 0; i < n; i++) {
         cJSON *ev = cJSON_GetArrayItem(events, i);
-        if (!ev) continue;
+        if (!ev)
+            continue;
         cJSON *event = cJSON_GetObjectItem(ev, "event");
-        if (!event || !cJSON_IsString(event)) continue;
+        if (!event || !cJSON_IsString(event))
+            continue;
         const char *name = event->valuestring;
 
         if (strcmp(name, "TherapyStart") == 0) {
@@ -2456,13 +2734,11 @@ static as11_event_t check_event_notification(const cJSON *msg, const char **out_
         if (strcmp(name, "TherapyStop") == 0) {
             return AS11_EV_THERAPY_STOP;
         }
-        if (strcmp(name, "MaskFitStart") == 0 ||
-            strcmp(name, "MaskfitStarted") == 0 ||
+        if (strcmp(name, "MaskFitStart") == 0 || strcmp(name, "MaskfitStarted") == 0 ||
             strcmp(name, "LearnTargetsStart") == 0) {
             return AS11_EV_MASK_FIT_START;
         }
-        if (strcmp(name, "MaskFitStop") == 0 ||
-            strcmp(name, "LearnTargetsStop") == 0) {
+        if (strcmp(name, "MaskFitStop") == 0 || strcmp(name, "LearnTargetsStop") == 0) {
             return AS11_EV_MASK_FIT_STOP;
         }
         if (strcmp(name, "CooldownStarted") == 0) {
@@ -2500,37 +2776,47 @@ enum {
     KEY_COUNT
 };
 
-typedef struct { const char *name; int len; int id; } key_entry_t;
+typedef struct {
+    const char *name;
+    int len;
+    int id;
+} key_entry_t;
 static const key_entry_t s_keys[] = {
-    {"SpO2",                          4,  KEY_SPO2},
-    {"Leak",                          4,  KEY_LEAK},
-    {"_RR2",                          4,  KEY_RR2},
-    {"_TD2",                          4,  KEY_TD2},
-    {"_MV2",                          4,  KEY_MV2},
-    {"_TGT",                          4,  KEY_TGT},
-    {"_IE2",                          4,  KEY_IE2},
-    {"HeartRate",                     9,  KEY_HEART_RATE},
-    {"SnoreIndex",                   10,  KEY_SNI},
-    {"PatientFlow",                  11,  KEY_PATIENT_FLOW},
-    {"MaskPressure",                 12,  KEY_MASK_PRESSURE},
-    {"FlowLimitation",               14,  KEY_FFL},
-    {"InspiratoryDuration",          19,  KEY_INT},
-    {"MaskPressure-TwoSecond",       22,  KEY_MASK_PRESSURE_2S},
-    {"ExpiratoryPressure-TwoSecond", 28,  KEY_EXPR_PRESSURE_2S},
-    {"InspiratoryPressure-TwoSecond",29,  KEY_INSP_PRESSURE_2S},
+    {"SpO2", 4, KEY_SPO2},
+    {"Leak", 4, KEY_LEAK},
+    {"_RR2", 4, KEY_RR2},
+    {"_TD2", 4, KEY_TD2},
+    {"_MV2", 4, KEY_MV2},
+    {"_TGT", 4, KEY_TGT},
+    {"_IE2", 4, KEY_IE2},
+    {"HeartRate", 9, KEY_HEART_RATE},
+    {"SnoreIndex", 10, KEY_SNI},
+    {"PatientFlow", 11, KEY_PATIENT_FLOW},
+    {"MaskPressure", 12, KEY_MASK_PRESSURE},
+    {"FlowLimitation", 14, KEY_FFL},
+    {"InspiratoryDuration", 19, KEY_INT},
+    {"MaskPressure-TwoSecond", 22, KEY_MASK_PRESSURE_2S},
+    {"ExpiratoryPressure-TwoSecond", 28, KEY_EXPR_PRESSURE_2S},
+    {"InspiratoryPressure-TwoSecond", 29, KEY_INSP_PRESSURE_2S},
 };
 #define N_KEYS (int)(sizeof(s_keys) / sizeof(s_keys[0]))
 
 static int parse_scaled_array(const char **p, const char *end, int16_t *out, int max_out)
 {
     const char *s = *p;
-    while (s < end && *s != '[') s++;
-    if (s >= end || *s != '[') { *p = s; return 0; }
+    while (s < end && *s != '[')
+        s++;
+    if (s >= end || *s != '[') {
+        *p = s;
+        return 0;
+    }
     s++;
     int count = 0;
     while (s < end && *s != ']' && count < max_out) {
-        while (s < end && (*s == ' ' || *s == ',' || *s == '\t' || *s == '\n')) s++;
-        if (s >= end || *s == ']') break;
+        while (s < end && (*s == ' ' || *s == ',' || *s == '\t' || *s == '\n'))
+            s++;
+        if (s >= end || *s == ']')
+            break;
 
         if (s + 3 < end && s[0] == 'n' && s[1] == 'u' && s[2] == 'l' && s[3] == 'l') {
             out[count++] = SNT_MISSING;
@@ -2539,30 +2825,46 @@ static int parse_scaled_array(const char **p, const char *end, int16_t *out, int
         }
 
         bool neg = false;
-        if (s < end && (*s == '-' || *s == '+')) { neg = (*s == '-'); s++; }
+        if (s < end && (*s == '-' || *s == '+')) {
+            neg = (*s == '-');
+            s++;
+        }
 
         long ip = 0;
-        while (s < end && *s >= '0' && *s <= '9') { ip = ip * 10 + (*s - '0'); s++; }
+        while (s < end && *s >= '0' && *s <= '9') {
+            ip = ip * 10 + (*s - '0');
+            s++;
+        }
 
         int frac = 0, fd = 0;
         if (s < end && *s == '.') {
             s++;
             while (s < end && *s >= '0' && *s <= '9') {
-                if (fd < 2) { frac = frac * 10 + (*s - '0'); fd++; }
+                if (fd < 2) {
+                    frac = frac * 10 + (*s - '0');
+                    fd++;
+                }
                 s++;
             }
         }
 
         long scaled = ip * 100;
-        if (fd == 1) scaled += frac * 10;
-        else if (fd == 2) scaled += frac;
-        if (neg) scaled = -scaled;
-        if (scaled > 32767) scaled = 32767;
-        if (scaled < -32768) scaled = -32768;
+        if (fd == 1)
+            scaled += frac * 10;
+        else if (fd == 2)
+            scaled += frac;
+        if (neg)
+            scaled = -scaled;
+        if (scaled > 32767)
+            scaled = 32767;
+        if (scaled < -32768)
+            scaled = -32768;
         out[count++] = (int16_t)scaled;
     }
-    while (s < end && *s != ']') s++;
-    if (s < end && *s == ']') s++;
+    while (s < end && *s != ']')
+        s++;
+    if (s < end && *s == ']')
+        s++;
     *p = s;
     return count;
 }
@@ -2570,29 +2872,37 @@ static int parse_scaled_array(const char **p, const char *end, int16_t *out, int
 static int match_key(const char *key, int klen)
 {
     for (int i = 0; i < N_KEYS; i++) {
-        if (s_keys[i].len != klen) continue;
-        if (strncmp(key, s_keys[i].name, klen) == 0) return s_keys[i].id;
+        if (s_keys[i].len != klen)
+            continue;
+        if (strncmp(key, s_keys[i].name, klen) == 0)
+            return s_keys[i].id;
     }
     return -1;
 }
 
 static int64_t parse_starttime_ms(const char *s, int len)
 {
-    if (len < 23 || s[13] != ':' || s[16] != ':' || s[19] != '.') return -1;
-    static const uint8_t digits[] = {11,12,14,15,17,18,20,21,22};
+    if (len < 23 || s[13] != ':' || s[16] != ':' || s[19] != '.')
+        return -1;
+    static const uint8_t digits[] = {11, 12, 14, 15, 17, 18, 20, 21, 22};
     for (unsigned i = 0; i < sizeof(digits); ++i)
-        if (s[digits[i]] < '0' || s[digits[i]] > '9') return -1;
-    int h   = (s[11] - '0') * 10 + (s[12] - '0');
-    int m   = (s[14] - '0') * 10 + (s[15] - '0');
+        if (s[digits[i]] < '0' || s[digits[i]] > '9')
+            return -1;
+    int h = (s[11] - '0') * 10 + (s[12] - '0');
+    int m = (s[14] - '0') * 10 + (s[15] - '0');
     int sec = (s[17] - '0') * 10 + (s[18] - '0');
-    int ms  = (s[20] - '0') * 100 + (s[21] - '0') * 10 + (s[22] - '0');
-    if (h >= 24 || m >= 60 || sec >= 60) return -1;
+    int ms = (s[20] - '0') * 100 + (s[21] - '0') * 10 + (s[22] - '0');
+    if (h >= 24 || m >= 60 || sec >= 60)
+        return -1;
     return (int64_t)h * 3600000 + m * 60000 + sec * 1000 + ms;
 }
 
-static void publish_live_stream(const int16_t *flow_vals, int flow_n,
-                                const int16_t *press_vals, int press_n,
-                                const int16_t *pld_vals, const bool *pld_found)
+static void publish_live_stream(const int16_t *flow_vals,
+                                int flow_n,
+                                const int16_t *press_vals,
+                                int press_n,
+                                const int16_t *pld_vals,
+                                const bool *pld_found)
 {
     /* PatientFlow is encoded as hundredths of a litre per second.  The
      * display API uses litres per minute, so convert at this boundary:
@@ -2620,23 +2930,19 @@ static void publish_live_stream(const int16_t *flow_vals, int flow_n,
     } else if (press_n > 0 && press_vals[press_n - 1] >= 0) {
         live_pressure = press_vals[press_n - 1] * 0.01f;
     }
-    float live_rr = (pld_found[4] && pld_vals[4] >= 0)
-                        ? pld_vals[4] * 0.01f : NAN;
-    float live_flow_lim = (pld_found[10] && pld_vals[10] >= 0)
-                              ? pld_vals[10] * 0.01f : NAN;
+    float live_rr = (pld_found[4] && pld_vals[4] >= 0) ? pld_vals[4] * 0.01f : NAN;
+    float live_flow_lim = (pld_found[10] && pld_vals[10] >= 0) ? pld_vals[10] * 0.01f : NAN;
     bsp_display_push_metrics(live_pressure, live_rr, live_flow_lim);
-
-
 }
 
 bool session_writer_try_stream_data_raw(const char *json, int len)
 {
-    if (!json || len <= 0) return true;
+    if (!json || len <= 0)
+        return true;
     static bool s_first_logged = false;
     if (!s_first_logged) {
         s_first_logged = true;
-        ESP_LOGI(TAG, "first StreamData (%d bytes): %.*s", len,
-                 len > 512 ? 512 : len, json);
+        ESP_LOGI(TAG, "first StreamData (%d bytes): %.*s", len, len > 512 ? 512 : len, json);
     }
 
     const char *p = json;
@@ -2648,7 +2954,8 @@ bool session_writer_try_stream_data_raw(const char *json, int len)
     bool hr_found = false, spo2_found = false;
     int16_t pld_vals[12];
     bool pld_found[12] = {false};
-    for (int i = 0; i < 12; i++) pld_vals[i] = -1;
+    for (int i = 0; i < 12; i++)
+        pld_vals[i] = -1;
 
     int64_t cur_stream_ms = -1;
     {
@@ -2658,31 +2965,41 @@ bool session_writer_try_stream_data_raw(const char *json, int len)
             if (q) {
                 q++;
                 const char *qe = strchr(q, '"');
-                if (qe) cur_stream_ms = parse_starttime_ms(q, (int)(qe - q));
+                if (qe)
+                    cur_stream_ms = parse_starttime_ms(q, (int)(qe - q));
             }
         }
     }
 
     while (p < end) {
-        while (p < end && *p != '"') p++;
-        if (p >= end) break;
+        while (p < end && *p != '"')
+            p++;
+        if (p >= end)
+            break;
         p++;
         const char *key_start = p;
-        while (p < end && *p != '"') p++;
-        if (p >= end) break;
+        while (p < end && *p != '"')
+            p++;
+        if (p >= end)
+            break;
         int klen = (int)(p - key_start);
         p++;
 
-        while (p < end && (*p == ' ' || *p == ':')) p++;
-        if (p >= end) break;
-        if (*p != '[') continue;
+        while (p < end && (*p == ' ' || *p == ':'))
+            p++;
+        if (p >= end)
+            break;
+        if (*p != '[')
+            continue;
 
         int id = match_key(key_start, klen);
-        if (id < 0) continue;
+        if (id < 0)
+            continue;
 
         int16_t vals[32];
         int n = parse_scaled_array(&p, end, vals, 32);
-        if (n <= 0) continue;
+        if (n <= 0)
+            continue;
 
         switch (id) {
         case KEY_PATIENT_FLOW:
@@ -2716,13 +3033,16 @@ bool session_writer_try_stream_data_raw(const char *json, int len)
         /* null samples are retained as gaps in the recording below, but are
          * not measurements and must neither move the live trace nor trigger
          * the mid-therapy recovery heuristic. */
-        if (flow_vals[j] == SNT_MISSING) continue;
-        if (abs(flow_vals[j]) > 50) has_active_flow = true;
+        if (flow_vals[j] == SNT_MISSING)
+            continue;
+        if (abs(flow_vals[j]) > 50)
+            has_active_flow = true;
     }
 
     bool has_therapy_pressure = false;
     for (int j = 0; j < press_n; j++) {
-        if (press_vals[j] > 200) has_therapy_pressure = true;
+        if (press_vals[j] > 200)
+            has_therapy_pressure = true;
     }
 
     /* Edge case: auto-start session if flow and pressure indicate active
@@ -2731,29 +3051,32 @@ bool session_writer_try_stream_data_raw(const char *json, int len)
      * blower air never opens a phantom therapy session (issue #149). */
     session_writer_t *s = active_session_lock();
 
-    if (!s && !s_therapy_stopped
-        && !s_in_mask_fit && !s_in_cooldown
-        && (s_start_intent || (has_active_flow && has_therapy_pressure))) {
+    if (!s && !s_therapy_stopped && !s_in_mask_fit && !s_in_cooldown &&
+        (s_start_intent || (has_active_flow && has_therapy_pressure))) {
         bool first_attempt = !s_start_intent;
-        if (first_attempt) ESP_LOGI(TAG, ">>> THERAPY detected via non-zero flow (reboot mid-therapy?)");
+        if (first_attempt)
+            ESP_LOGI(TAG, ">>> THERAPY detected via non-zero flow (reboot mid-therapy?)");
         if (!bsp_display_set_therapy_active(true)) {
             ESP_LOGW(TAG, "therapy recovery ignored: restart already committed");
         } else {
-            if (first_attempt) bsp_display_set_therapy_start_time(esp_timer_get_time());
+            if (first_attempt)
+                bsp_display_set_therapy_start_time(esp_timer_get_time());
             session_writer_t *started = session_writer_start();
             if (started) {
                 s_started_from_event = false;
                 s = active_session_lock();
             } else if (first_attempt) {
-                ESP_LOGW(TAG, "session_writer_start() failed — "
+                ESP_LOGW(TAG,
+                         "session_writer_start() failed — "
                          "graph active but NOT recording to SD");
             }
         }
     }
 
-    if (!s && s_start_intent) return false;
+    if (!s && s_start_intent)
+        return false;
     if (!s) {
-    publish_live_stream(flow_vals, flow_n, press_vals, press_n, pld_vals, pld_found);
+        publish_live_stream(flow_vals, flow_n, press_vals, press_n, pld_vals, pld_found);
         return true;
     }
 
@@ -2769,9 +3092,12 @@ bool session_writer_try_stream_data_raw(const char *json, int len)
     bool want_split = false;
     if (cur_stream_ms >= 0 && s->prev_stream_ms_valid) {
         delta_ms = cur_stream_ms - s->prev_stream_ms;
-        if (delta_ms < 0 && s->prev_stream_ms >= 23 * 3600000LL &&
-            cur_stream_ms < 3600000LL) delta_ms += 86400000LL;
-        if (delta_ms == 0) { active_session_unlock(s); return true; }
+        if (delta_ms < 0 && s->prev_stream_ms >= 23 * 3600000LL && cur_stream_ms < 3600000LL)
+            delta_ms += 86400000LL;
+        if (delta_ms == 0) {
+            active_session_unlock(s);
+            return true;
+        }
         /* Ordered intake can still contain an old source packet. Do not
          * publish it twice or rotate a fresh session for a small regression.
          * A sustained/large clock reset is handled as a separate span below. */
@@ -2787,7 +3113,8 @@ bool session_writer_try_stream_data_raw(const char *json, int len)
             if (delta_ms >= 10200) {
                 s->gap_long_events++;
                 s->gap_long_ms_total += (uint64_t)delta_ms;
-                if (!s->gap_long_first_ms) s->gap_long_first_ms = s->stream_elapsed_ms;
+                if (!s->gap_long_first_ms)
+                    s->gap_long_first_ms = s->stream_elapsed_ms;
                 s->gap_long_last_ms = s->stream_elapsed_ms + delta_ms;
             }
         }
@@ -2795,9 +3122,11 @@ bool session_writer_try_stream_data_raw(const char *json, int len)
     if (want_split) {
         active_session_unlock(s);
         sw_request_finalize(s, "split", (int64_t)time(NULL) * 1000, true);
-        if (!session_writer_start()) return false;
+        if (!session_writer_start())
+            return false;
         s = active_session_lock();
-        if (!s) return false;
+        if (!s)
+            return false;
         b = s->fill;
     }
     if (s->stream_position_valid && delta_ms > 200) {
@@ -2806,8 +3135,10 @@ bool session_writer_try_stream_data_raw(const char *json, int len)
     }
     publish_live_stream(flow_vals, flow_n, press_vals, press_n, pld_vals, pld_found);
 
-    if (s->stream_position_valid) s->stream_elapsed_ms += (uint64_t)delta_ms;
-    else s->stream_position_valid = true;
+    if (s->stream_position_valid)
+        s->stream_elapsed_ms += (uint64_t)delta_ms;
+    else
+        s->stream_position_valid = true;
     s->prev_stream_ms = cur_stream_ms;
     s->prev_stream_ms_valid = cur_stream_ms >= 0;
     b->timing_uncertain |= cur_stream_ms < 0 || s_transport_uncertain;
@@ -2837,9 +3168,9 @@ bool session_writer_try_stream_data_raw(const char *json, int len)
             b->sa2_position[i] = sa2_position;
             b->sa2_hr[i] = hr_found ? hr_val : SNT_MISSING;
             b->sa2_spo2[i] = spo2_found ? spo2_val : SNT_MISSING;
-        } else s->sa2_dropped++;
-    } else if (spo2_found && b->n_sa2 &&
-               b->sa2_position[b->n_sa2 - 1] == sa2_position) {
+        } else
+            s->sa2_dropped++;
+    } else if (spo2_found && b->n_sa2 && b->sa2_position[b->n_sa2 - 1] == sa2_position) {
         b->sa2_spo2[b->n_sa2 - 1] = spo2_val;
     }
     b->sa2_end = sa2_position + 1;
@@ -2850,16 +3181,16 @@ bool session_writer_try_stream_data_raw(const char *json, int len)
         if (b->n_pld < PLD_CAP) {
             uint32_t i = b->n_pld++;
             b->pld_position[i] = pld_position;
-            for (int k = 0; k < 12; k++) b->pld[i][k] = pld_found[k] ? pld_vals[k] : SNT_MISSING;
-        } else s->pld_dropped++;
+            for (int k = 0; k < 12; k++)
+                b->pld[i][k] = pld_found[k] ? pld_vals[k] : SNT_MISSING;
+        } else
+            s->pld_dropped++;
     }
     b->pld_end = pld_position + 1;
 
     /* Hand off to the storage worker before anything can be clipped.  No
      * file I/O happens here — only a pointer swap. */
-    if (b->n_brp >= BRP_COMMIT_THRESHOLD ||
-        b->n_sa2 >= SA2_CAP - 5 ||
-        b->n_pld >= PLD_CAP - 20) {
+    if (b->n_brp >= BRP_COMMIT_THRESHOLD || b->n_sa2 >= SA2_CAP - 5 || b->n_pld >= PLD_CAP - 20) {
         swap_and_enqueue_locked(s);
     }
 
@@ -2888,11 +3219,13 @@ void session_writer_on_transport_loss(void)
 
 void session_writer_on_notification(session_writer_t *s, const cJSON *msg)
 {
-    if (!msg) return;
+    if (!msg)
+        return;
 
     cJSON *method = cJSON_GetObjectItem(msg, "method");
     const char *method_str = method ? method->valuestring : NULL;
-    if (!method_str) return;
+    if (!method_str)
+        return;
 
     /* Do not trust a bare pointer captured by the caller.  Reacquire under
      * the lifecycle lock so the storage worker cannot destroy this session
@@ -2900,9 +3233,11 @@ void session_writer_on_notification(session_writer_t *s, const cJSON *msg)
     (void)s;
     s = active_session_lock();
     bool session_locked = (s != NULL);
-#define NOTIFY_RETURN() do {                         \
-        if (session_locked) active_session_unlock(s); \
-        return;                                       \
+#define NOTIFY_RETURN()                                                                            \
+    do {                                                                                           \
+        if (session_locked)                                                                        \
+            active_session_unlock(s);                                                              \
+        return;                                                                                    \
     } while (0)
 
     ESP_LOGD(TAG, "notification: %s", method_str);
@@ -2924,8 +3259,7 @@ void session_writer_on_notification(session_writer_t *s, const cJSON *msg)
                 write_event(s, msg);
                 active_session_unlock(s);
                 session_locked = false;
-                sw_request_finalize(s, "completed",
-                                    (int64_t)time(NULL) * 1000, true);
+                sw_request_finalize(s, "completed", (int64_t)time(NULL) * 1000, true);
                 s = NULL;
             }
             NOTIFY_RETURN();
@@ -2947,8 +3281,7 @@ void session_writer_on_notification(session_writer_t *s, const cJSON *msg)
             bool duplicate = false;
             if (report && report[0] && strcmp(report, s_last_start_report) == 0) {
                 duplicate = true;
-            } else if (s &&
-                       (now_us - s->start_time_us) / 1000 < SW_START_DEBOUNCE_MS) {
+            } else if (s && (now_us - s->start_time_us) / 1000 < SW_START_DEBOUNCE_MS) {
                 duplicate = true;
             }
             if (report && report[0])
@@ -2964,12 +3297,12 @@ void session_writer_on_notification(session_writer_t *s, const cJSON *msg)
                  * therapy).  Rotate: without this the sessions glue together,
                  * and an inactivity watchdog never fires because the new
                  * therapy's StreamData keeps resetting it. */
-                ESP_LOGW(TAG, "TherapyStart while session active — "
+                ESP_LOGW(TAG,
+                         "TherapyStart while session active — "
                          "missed TherapyStop, rotating session");
                 active_session_unlock(s);
                 session_locked = false;
-                sw_request_finalize(s, "rotated",
-                                    (int64_t)time(NULL) * 1000, true);
+                sw_request_finalize(s, "rotated", (int64_t)time(NULL) * 1000, true);
                 s = NULL;
             } else if (duplicate && s) {
                 ESP_LOGI(TAG, "duplicate TherapyStart ignored (echo)");
@@ -2985,7 +3318,8 @@ void session_writer_on_notification(session_writer_t *s, const cJSON *msg)
                 s_started_from_event = true;
                 write_event(s, msg);
             } else {
-                ESP_LOGW(TAG, "session_writer_start() failed — "
+                ESP_LOGW(TAG,
+                         "session_writer_start() failed — "
                          "graph active but NOT recording to SD");
             }
             NOTIFY_RETURN();
@@ -3001,12 +3335,12 @@ void session_writer_on_notification(session_writer_t *s, const cJSON *msg)
             if (s && !s_started_from_event) {
                 int64_t dur_ms = (esp_timer_get_time() - s->start_time_us) / 1000;
                 if (dur_ms < 15000) {
-                    ESP_LOGW(TAG, "aborting false session opened by Mask Fit airflow (%lld ms)",
+                    ESP_LOGW(TAG,
+                             "aborting false session opened by Mask Fit airflow (%lld ms)",
                              (long long)dur_ms);
                     active_session_unlock(s);
                     session_locked = false;
-                    sw_request_finalize(s, "aborted_mask_fit",
-                                        (int64_t)time(NULL) * 1000, false);
+                    sw_request_finalize(s, "aborted_mask_fit", (int64_t)time(NULL) * 1000, false);
                     s = NULL;
                 }
             }
@@ -3030,8 +3364,7 @@ void session_writer_on_notification(session_writer_t *s, const cJSON *msg)
                 write_event(s, msg);
                 active_session_unlock(s);
                 session_locked = false;
-                sw_request_finalize(s, "completed",
-                                    (int64_t)time(NULL) * 1000, true);
+                sw_request_finalize(s, "completed", (int64_t)time(NULL) * 1000, true);
                 s = NULL;
             }
             NOTIFY_RETURN();
@@ -3054,19 +3387,18 @@ void session_writer_on_notification(session_writer_t *s, const cJSON *msg)
                 write_event(s, msg);
                 active_session_unlock(s);
                 session_locked = false;
-                sw_request_finalize(s, "completed",
-                                    (int64_t)time(NULL) * 1000, true);
+                sw_request_finalize(s, "completed", (int64_t)time(NULL) * 1000, true);
                 s = NULL;
             }
             NOTIFY_RETURN();
         }
-        if (ev_type != AS11_EV_NONE) NOTIFY_RETURN();
+        if (ev_type != AS11_EV_NONE)
+            NOTIFY_RETURN();
 
         cJSON *params = cJSON_GetObjectItem(msg, "params");
         if (params) {
             cJSON *data_id = cJSON_GetObjectItem(params, "dataId");
-            if (data_id && cJSON_IsString(data_id) &&
-                strcmp(data_id->valuestring, "_SNC") == 0) {
+            if (data_id && cJSON_IsString(data_id) && strcmp(data_id->valuestring, "_SNC") == 0) {
                 cJSON *events = cJSON_GetObjectItem(params, "events");
                 if (events && cJSON_IsArray(events)) {
                     cJSON *ev = cJSON_GetArrayItem(events, 0);
@@ -3075,8 +3407,7 @@ void session_writer_on_notification(session_writer_t *s, const cJSON *msg)
                         if (val && cJSON_IsNumber(val)) {
                             s_snc_value = (int64_t)val->valuedouble;
                             s_snc_changed = true;
-                            ESP_LOGI(TAG, ">>> _SNC ValueChange: %lld",
-                                     (long long)s_snc_value);
+                            ESP_LOGI(TAG, ">>> _SNC ValueChange: %lld", (long long)s_snc_value);
                         }
                     }
                 }
@@ -3086,8 +3417,7 @@ void session_writer_on_notification(session_writer_t *s, const cJSON *msg)
              * the NTP time at receipt and inject it.  The pair (AS11 event +
              * ntpTimeMs) is also what lets crash recovery derive a
              * session-local drift instead of trusting a stale estimate. */
-            if (data_id && cJSON_IsString(data_id) &&
-                strcmp(data_id->valuestring, "_ZLE") == 0) {
+            if (data_id && cJSON_IsString(data_id) && strcmp(data_id->valuestring, "_ZLE") == 0) {
                 int zle_val = -1;
                 cJSON *events = cJSON_GetObjectItem(params, "events");
                 if (events && cJSON_IsArray(events)) {
@@ -3108,8 +3438,7 @@ void session_writer_on_notification(session_writer_t *s, const cJSON *msg)
                                 cJSON *zev = cJSON_GetArrayItem(ze, 0);
                                 if (zev) {
                                     int64_t ntp_ms = (int64_t)time(NULL) * 1000;
-                                    cJSON_AddNumberToObject(zev, "ntpTimeMs",
-                                                            (double)ntp_ms);
+                                    cJSON_AddNumberToObject(zev, "ntpTimeMs", (double)ntp_ms);
                                 }
                             }
                         }
@@ -3117,17 +3446,21 @@ void session_writer_on_notification(session_writer_t *s, const cJSON *msg)
                         cJSON_Delete(zle_copy);
                     }
                 }
-                ESP_LOGI(TAG, ">>> _ZLE ValueChange: %d (%s)",
-                         zle_val, zle_val == 1 ? "rising edge" : "falling edge");
+                ESP_LOGI(TAG,
+                         ">>> _ZLE ValueChange: %d (%s)",
+                         zle_val,
+                         zle_val == 1 ? "rising edge" : "falling edge");
                 NOTIFY_RETURN();
             }
         }
 
-        if (s) write_event(s, msg);
+        if (s)
+            write_event(s, msg);
         NOTIFY_RETURN();
     }
 
-    if (s) write_event(s, msg);
+    if (s)
+        write_event(s, msg);
     NOTIFY_RETURN();
 #undef NOTIFY_RETURN
 }
@@ -3146,57 +3479,66 @@ void session_writer_on_notification(session_writer_t *s, const cJSON *msg)
 
 typedef struct {
     uint32_t records;
-    int64_t  start_epoch_ms;
-    bool     valid;
-    bool     repaired;
+    int64_t start_epoch_ms;
+    bool valid;
+    bool repaired;
 } snt_scan_t;
 
 /* Validate geometry, count complete records from the file size, and repair
  * the header in both directions. */
-static snt_scan_t scan_and_repair_snt(const char *path, uint8_t want_ch,
-                                      uint16_t want_hz)
+static snt_scan_t scan_and_repair_snt(const char *path, uint8_t want_ch, uint16_t want_hz)
 {
     snt_scan_t r = {0};
     FILE *f = fopen(path, "r+b");
-    if (!f) return r;
+    if (!f)
+        return r;
 
     snt_header_t hdr;
-    if (fread(&hdr, 1, SNT_HEADER_SIZE, f) != SNT_HEADER_SIZE ||
-        hdr.magic != SNT_MAGIC) {
+    if (fread(&hdr, 1, SNT_HEADER_SIZE, f) != SNT_HEADER_SIZE || hdr.magic != SNT_MAGIC) {
         fclose(f);
         return r;
     }
     /* Reject implausible geometry rather than computing nonsense from it. */
-    if (hdr.version == 0 || hdr.version > SNT_VERSION ||
-        hdr.n_channels == 0 || hdr.n_channels > 16 ||
-        hdr.sample_bytes != 2 || hdr.sample_hz_x10 == 0) {
-        ESP_LOGW(TAG, "recover: %s has implausible geometry "
-                 "(v=%u ch=%u sb=%u hz10=%u)", path,
-                 hdr.version, hdr.n_channels, hdr.sample_bytes,
+    if (hdr.version == 0 || hdr.version > SNT_VERSION || hdr.n_channels == 0 ||
+        hdr.n_channels > 16 || hdr.sample_bytes != 2 || hdr.sample_hz_x10 == 0) {
+        ESP_LOGW(TAG,
+                 "recover: %s has implausible geometry "
+                 "(v=%u ch=%u sb=%u hz10=%u)",
+                 path,
+                 hdr.version,
+                 hdr.n_channels,
+                 hdr.sample_bytes,
                  hdr.sample_hz_x10);
         fclose(f);
         return r;
     }
     if (want_ch && hdr.n_channels != want_ch) {
-        ESP_LOGW(TAG, "recover: %s channel mismatch (%u != %u)",
-                 path, hdr.n_channels, want_ch);
+        ESP_LOGW(TAG, "recover: %s channel mismatch (%u != %u)", path, hdr.n_channels, want_ch);
     }
     if (want_hz && hdr.sample_hz_x10 != want_hz) {
-        ESP_LOGW(TAG, "recover: %s rate mismatch (%u != %u)",
-                 path, hdr.sample_hz_x10, want_hz);
+        ESP_LOGW(TAG, "recover: %s rate mismatch (%u != %u)", path, hdr.sample_hz_x10, want_hz);
     }
 
-    if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return r; }
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        return r;
+    }
     long size = ftell(f);
-    if (size < (long)SNT_HEADER_SIZE) { fclose(f); return r; }
+    if (size < (long)SNT_HEADER_SIZE) {
+        fclose(f);
+        return r;
+    }
 
     uint32_t rec_bytes = snt_record_bytes(&hdr);
     uint64_t payload = (uint64_t)size - SNT_HEADER_SIZE;
     uint32_t physical = (uint32_t)(payload / rec_bytes);
     uint64_t partial = payload % rec_bytes;
     if (partial) {
-        ESP_LOGW(TAG, "recover: %s has a %llu-byte partial trailing record "
-                 "(ignored)", path, (unsigned long long)partial);
+        ESP_LOGW(TAG,
+                 "recover: %s has a %llu-byte partial trailing record "
+                 "(ignored)",
+                 path,
+                 (unsigned long long)partial);
     }
 
     r.records = physical;
@@ -3204,12 +3546,14 @@ static snt_scan_t scan_and_repair_snt(const char *path, uint8_t want_ch,
     r.valid = true;
 
     if (hdr.sample_count != physical) {
-        ESP_LOGW(TAG, "recover: %s header says %u records, %u are present — "
-                 "repairing header", path,
-                 (unsigned)hdr.sample_count, (unsigned)physical);
+        ESP_LOGW(TAG,
+                 "recover: %s header says %u records, %u are present — "
+                 "repairing header",
+                 path,
+                 (unsigned)hdr.sample_count,
+                 (unsigned)physical);
         if (fseek(f, offsetof(snt_header_t, sample_count), SEEK_SET) == 0 &&
-            fwrite(&physical, sizeof(uint32_t), 1, f) == 1 &&
-            fflush(f) == 0) {
+            fwrite(&physical, sizeof(uint32_t), 1, f) == 1 && fflush(f) == 0) {
             fsync(fileno(f));
             r.repaired = true;
         } else {
@@ -3229,14 +3573,14 @@ static snt_scan_t scan_and_repair_snt(const char *path, uint8_t want_ch,
  * edf_gen.c:parse_iso8601_utc_ms() so both agree exactly. */
 static int64_t parse_iso8601_utc_ms(const char *iso_str)
 {
-    if (!iso_str) return -1;
+    if (!iso_str)
+        return -1;
     int year = 0, mon = 0, mday = 0, hour = 0, min = 0, sec = 0, ms = 0;
-    int n = sscanf(iso_str, "%d-%d-%dT%d:%d:%d.%dZ",
-                   &year, &mon, &mday, &hour, &min, &sec, &ms);
+    int n = sscanf(iso_str, "%d-%d-%dT%d:%d:%d.%dZ", &year, &mon, &mday, &hour, &min, &sec, &ms);
     if (n < 6) {
-        n = sscanf(iso_str, "%d-%d-%dT%d:%d:%dZ",
-                   &year, &mon, &mday, &hour, &min, &sec);
-        if (n < 6) return -1;
+        n = sscanf(iso_str, "%d-%d-%dT%d:%d:%dZ", &year, &mon, &mday, &hour, &min, &sec);
+        if (n < 6)
+            return -1;
         ms = 0;
     }
     /* Howard Hinnant's days-from-civil algorithm (public domain). */
@@ -3257,25 +3601,27 @@ static int64_t parse_iso8601_utc_ms(const char *iso_str)
 static inline void *psram_or_heap_malloc(size_t sz)
 {
     void *p = heap_caps_malloc(sz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!p) p = malloc(sz);
+    if (!p)
+        p = malloc(sz);
     return p;
 }
 
 static inline void *psram_or_heap_calloc(size_t n, size_t sz)
 {
     void *p = heap_caps_calloc(n, sz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!p) p = calloc(n, sz);
+    if (!p)
+        p = calloc(n, sz);
     return p;
 }
 
 /* Derive a session-local drift from a durable event carrying both the AS11
  * reportTime and the NTP time captured at receipt.  Preferred over any
  * persisted estimate because it belongs to *this* session. */
-static bool drift_from_events(const char *events_path, int64_t *out_drift,
-                              int64_t *out_at)
+static bool drift_from_events(const char *events_path, int64_t *out_drift, int64_t *out_at)
 {
     FILE *f = fopen(events_path, "r");
-    if (!f) return false;
+    if (!f)
+        return false;
 
     char *line = psram_or_heap_malloc(2048);
     if (!line) {
@@ -3284,13 +3630,14 @@ static bool drift_from_events(const char *events_path, int64_t *out_drift,
     }
     bool found = false;
     while (fgets(line, 2048, f)) {
-        if (!strstr(line, "ntpTimeMs")) continue;
+        if (!strstr(line, "ntpTimeMs"))
+            continue;
         cJSON *root = cJSON_Parse(line);
-        if (!root) continue;
+        if (!root)
+            continue;
         cJSON *params = cJSON_GetObjectItem(root, "params");
         cJSON *events = params ? cJSON_GetObjectItem(params, "events") : NULL;
-        cJSON *ev = (events && cJSON_IsArray(events)) ?
-                     cJSON_GetArrayItem(events, 0) : NULL;
+        cJSON *ev = (events && cJSON_IsArray(events)) ? cJSON_GetArrayItem(events, 0) : NULL;
         cJSON *ntp = ev ? cJSON_GetObjectItem(ev, "ntpTimeMs") : NULL;
         cJSON *rt = ev ? cJSON_GetObjectItem(ev, "reportTime") : NULL;
         if (ntp && cJSON_IsNumber(ntp) && rt && cJSON_IsString(rt)) {
@@ -3309,7 +3656,8 @@ static bool drift_from_events(const char *events_path, int64_t *out_drift,
             }
         }
         cJSON_Delete(root);
-        if (found) break;
+        if (found)
+            break;
     }
     free(line);
     fclose(f);
@@ -3322,14 +3670,21 @@ static bool drift_from_events(const char *events_path, int64_t *out_drift,
 static bool manifest_is_final(const char *path)
 {
     FILE *f = fopen(path, "r");
-    if (!f) return false;
+    if (!f)
+        return false;
     fseek(f, 0, SEEK_END);
     long size = ftell(f);
     fseek(f, 0, SEEK_SET);
-    if (size <= 0 || size > 16384) { fclose(f); return false; }
+    if (size <= 0 || size > 16384) {
+        fclose(f);
+        return false;
+    }
 
     char *buf = psram_or_heap_malloc(size + 1);
-    if (!buf) { fclose(f); return false; }
+    if (!buf) {
+        fclose(f);
+        return false;
+    }
     size_t rd = fread(buf, 1, size, f);
     fclose(f);
     buf[rd] = '\0';
@@ -3337,8 +3692,7 @@ static bool manifest_is_final(const char *path)
     cJSON *root = cJSON_Parse(buf);
     free(buf);
     if (!root) {
-        ESP_LOGW(TAG, "recover: %s is not valid JSON — treating as unfinished",
-                 path);
+        ESP_LOGW(TAG, "recover: %s is not valid JSON — treating as unfinished", path);
         return false;
     }
     cJSON *state = cJSON_GetObjectItem(root, "state");
@@ -3371,15 +3725,18 @@ typedef struct {
 
 void session_writer_recover(void)
 {
-    if (!sd_storage_is_ready()) return;
+    if (!sd_storage_is_ready())
+        return;
 
     /* A day rebuild that was interrupted while publishing left the export tree
      * for that day incomplete.  Re-queue it before touching anything else. */
     {
         char day[16];
         if (edf_gen_take_interrupted_rebuild(day, sizeof(day))) {
-            ESP_LOGW(TAG, "day %s was mid-publish when the device restarted — "
-                     "re-queueing its export", day);
+            ESP_LOGW(TAG,
+                     "day %s was mid-publish when the device restarted — "
+                     "re-queueing its export",
+                     day);
             pending_export_mark(day);
         }
     }
@@ -3400,42 +3757,55 @@ void session_writer_recover(void)
     int recovered = 0;
 
     while ((ent = readdir(dir)) != NULL) {
-        if (ent->d_name[0] == '.') continue;
-        if (strlen(ent->d_name) != 8) continue;  /* YYYYMMDD */
+        if (ent->d_name[0] == '.')
+            continue;
+        if (strlen(ent->d_name) != 8)
+            continue; /* YYYYMMDD */
 
         snprintf(ctx->day_path, sizeof(ctx->day_path), "%s/%s", SD_STREAMS_DIR, ent->d_name);
 
         DIR *day_dir = opendir(ctx->day_path);
-        if (!day_dir) continue;
+        if (!day_dir)
+            continue;
 
         struct dirent *day_ent;
         while ((day_ent = readdir(day_dir)) != NULL) {
-            if (day_ent->d_name[0] == '.') continue;
+            if (day_ent->d_name[0] == '.')
+                continue;
 
             const char *flow_suffix = strstr(day_ent->d_name, "_flow.snt");
-            const char *brp_suffix  = strstr(day_ent->d_name, "_brp.snt");
+            const char *brp_suffix = strstr(day_ent->d_name, "_brp.snt");
             const char *suffix = flow_suffix ? flow_suffix : brp_suffix;
-            if (!suffix) continue;
+            if (!suffix)
+                continue;
             bool is_v2 = (flow_suffix != NULL);
 
             size_t prefix_len = suffix - day_ent->d_name;
-            if (prefix_len >= sizeof(ctx->prefix)) continue;
+            if (prefix_len >= sizeof(ctx->prefix))
+                continue;
             memcpy(ctx->prefix, day_ent->d_name, prefix_len);
             ctx->prefix[prefix_len] = '\0';
 
             /* Leftover temp manifest from a crash mid-rename. */
-            snprintf(ctx->tmp_path, sizeof(ctx->tmp_path), "%s/%s_session.json.tmp",
-                     ctx->day_path, ctx->prefix);
+            snprintf(ctx->tmp_path,
+                     sizeof(ctx->tmp_path),
+                     "%s/%s_session.json.tmp",
+                     ctx->day_path,
+                     ctx->prefix);
             if (unlink(ctx->tmp_path) == 0) {
                 ESP_LOGW(TAG, "recover: removed stale temp manifest for %s", ctx->prefix);
             }
 
-            snprintf(ctx->json_path, sizeof(ctx->json_path), "%s/%s_session.json",
-                     ctx->day_path, ctx->prefix);
-            if (manifest_is_final(ctx->json_path)) continue;
+            snprintf(ctx->json_path,
+                     sizeof(ctx->json_path),
+                     "%s/%s_session.json",
+                     ctx->day_path,
+                     ctx->prefix);
+            if (manifest_is_final(ctx->json_path))
+                continue;
 
-            ESP_LOGW(TAG, "found interrupted session: %s/%s — recovering",
-                     ent->d_name, ctx->prefix);
+            ESP_LOGW(
+                TAG, "found interrupted session: %s/%s — recovering", ent->d_name, ctx->prefix);
 
             int64_t start_epoch_ms = 0;
             memset(&ctx->flow_s, 0, sizeof(ctx->flow_s));
@@ -3445,16 +3815,20 @@ void session_writer_recover(void)
             memset(&ctx->pld_s, 0, sizeof(ctx->pld_s));
 
             if (is_v2) {
-                snprintf(ctx->path, sizeof(ctx->path), "%s/%s_flow.snt", ctx->day_path, ctx->prefix);
+                snprintf(
+                    ctx->path, sizeof(ctx->path), "%s/%s_flow.snt", ctx->day_path, ctx->prefix);
                 ctx->flow_s = scan_and_repair_snt(ctx->path, 1, 250);
-                snprintf(ctx->path, sizeof(ctx->path), "%s/%s_press.snt", ctx->day_path, ctx->prefix);
+                snprintf(
+                    ctx->path, sizeof(ctx->path), "%s/%s_press.snt", ctx->day_path, ctx->prefix);
                 ctx->press_s = scan_and_repair_snt(ctx->path, 1, 250);
-                snprintf(ctx->path, sizeof(ctx->path), "%s/%s_flow_mm.snt", ctx->day_path, ctx->prefix);
+                snprintf(
+                    ctx->path, sizeof(ctx->path), "%s/%s_flow_mm.snt", ctx->day_path, ctx->prefix);
                 ctx->mm_s = scan_and_repair_snt(ctx->path, 2, 10);
             } else {
                 snprintf(ctx->path, sizeof(ctx->path), "%s/%s_brp.snt", ctx->day_path, ctx->prefix);
                 ctx->flow_s = scan_and_repair_snt(ctx->path, 0, 0);
-                snprintf(ctx->path, sizeof(ctx->path), "%s/%s_brp_mm.snt", ctx->day_path, ctx->prefix);
+                snprintf(
+                    ctx->path, sizeof(ctx->path), "%s/%s_brp_mm.snt", ctx->day_path, ctx->prefix);
                 ctx->mm_s = scan_and_repair_snt(ctx->path, 0, 0);
             }
             snprintf(ctx->path, sizeof(ctx->path), "%s/%s_sa2.snt", ctx->day_path, ctx->prefix);
@@ -3462,19 +3836,22 @@ void session_writer_recover(void)
             snprintf(ctx->path, sizeof(ctx->path), "%s/%s_pld.snt", ctx->day_path, ctx->prefix);
             ctx->pld_s = scan_and_repair_snt(ctx->path, 12, 5);
 
-            if (ctx->flow_s.valid) start_epoch_ms = ctx->flow_s.start_epoch_ms;
+            if (ctx->flow_s.valid)
+                start_epoch_ms = ctx->flow_s.start_epoch_ms;
 
             /* v2 pair: the exported lockstep length is the shorter of the
              * two, and a mismatch is worth saying out loud. */
             uint32_t brp_records = ctx->flow_s.records;
             if (is_v2 && ctx->press_s.valid) {
                 if (ctx->press_s.records != ctx->flow_s.records) {
-                    ESP_LOGW(TAG, "recover: flow/press count mismatch "
+                    ESP_LOGW(TAG,
+                             "recover: flow/press count mismatch "
                              "(%u vs %u) — using the smaller",
-                             (unsigned)ctx->flow_s.records, (unsigned)ctx->press_s.records);
+                             (unsigned)ctx->flow_s.records,
+                             (unsigned)ctx->press_s.records);
                 }
-                brp_records = ctx->flow_s.records < ctx->press_s.records
-                            ? ctx->flow_s.records : ctx->press_s.records;
+                brp_records = ctx->flow_s.records < ctx->press_s.records ? ctx->flow_s.records
+                                                                         : ctx->press_s.records;
             }
 
             /* Checkpoint: newest valid slot. */
@@ -3491,22 +3868,27 @@ void session_writer_recover(void)
             if (start_epoch_ms <= 0) {
                 struct tm tm_id = {0};
                 int y, mo, d, h, mi, sec;
-                if (sscanf(ctx->prefix, "%4d%2d%2d_%2d%2d%2d",
-                           &y, &mo, &d, &h, &mi, &sec) == 6) {
-                    tm_id.tm_year = y - 1900; tm_id.tm_mon = mo - 1;
-                    tm_id.tm_mday = d; tm_id.tm_hour = h;
-                    tm_id.tm_min = mi; tm_id.tm_sec = sec;
+                if (sscanf(ctx->prefix, "%4d%2d%2d_%2d%2d%2d", &y, &mo, &d, &h, &mi, &sec) == 6) {
+                    tm_id.tm_year = y - 1900;
+                    tm_id.tm_mon = mo - 1;
+                    tm_id.tm_mday = d;
+                    tm_id.tm_hour = h;
+                    tm_id.tm_min = mi;
+                    tm_id.tm_sec = sec;
                     tm_id.tm_isdst = -1;
                     time_t t_id = mktime(&tm_id);
-                    if (t_id > 0) start_epoch_ms = (int64_t)t_id * 1000;
+                    if (t_id > 0)
+                        start_epoch_ms = (int64_t)t_id * 1000;
                 }
                 if (start_epoch_ms <= 0) {
-                    ESP_LOGW(TAG, "skipping %s/%s — no valid header, no "
-                             "checkpoint, unparseable id", ent->d_name, ctx->prefix);
+                    ESP_LOGW(TAG,
+                             "skipping %s/%s — no valid header, no "
+                             "checkpoint, unparseable id",
+                             ent->d_name,
+                             ctx->prefix);
                     continue;
                 }
-                ESP_LOGW(TAG, "recover: start time reconstructed from id for %s",
-                         ctx->prefix);
+                ESP_LOGW(TAG, "recover: start time reconstructed from id for %s", ctx->prefix);
             }
 
             /* End time, with provenance. */
@@ -3522,8 +3904,10 @@ void session_writer_recover(void)
                     uint32_t extra = brp_records - ctx->ck.flow_count;
                     end_epoch_ms += (int64_t)extra * 1000 / 25;
                     end_source = "checkpoint_extrapolated";
-                    ESP_LOGW(TAG, "recover: %u records past checkpoint — "
-                             "end extrapolated", (unsigned)extra);
+                    ESP_LOGW(TAG,
+                             "recover: %u records past checkpoint — "
+                             "end extrapolated",
+                             (unsigned)extra);
                 }
             } else if (brp_records > 0) {
                 end_epoch_ms = start_epoch_ms + (int64_t)brp_records * 1000 / 25;
@@ -3538,8 +3922,7 @@ void session_writer_recover(void)
             if (drift_from_events(ctx->path, &drift_ms, &drift_at)) {
                 drift_source = "session_events";
                 drift_usable = true;
-                ESP_LOGI(TAG, "recover: drift %lld ms from session events",
-                         (long long)drift_ms);
+                ESP_LOGI(TAG, "recover: drift %lld ms from session events", (long long)drift_ms);
             } else {
                 time_drift_snapshot_t snap;
                 if (time_sync_get_drift_snapshot(&snap) && snap.available) {
@@ -3547,8 +3930,10 @@ void session_writer_recover(void)
                     drift_at = snap.measured_at_ms;
                     drift_source = snap.source;
                     drift_usable = true;
-                    ESP_LOGW(TAG, "recover: drift %lld ms estimated from %s",
-                             (long long)drift_ms, drift_source);
+                    ESP_LOGW(TAG,
+                             "recover: drift %lld ms estimated from %s",
+                             (long long)drift_ms,
+                             drift_source);
                 }
             }
 
@@ -3577,25 +3962,28 @@ void session_writer_recover(void)
                 strftime(ctx->iso_start, sizeof(ctx->iso_start), "%Y-%m-%dT%H:%M:%S", &tm);
             }
 
-            fprintf(f, "{\"id\":\"%s\",\"state\":\"interrupted\","
-                       "\"start_epoch_ms\":%lld",
-                    ctx->prefix, (long long)start_epoch_ms);
+            fprintf(f,
+                    "{\"id\":\"%s\",\"state\":\"interrupted\","
+                    "\"start_epoch_ms\":%lld",
+                    ctx->prefix,
+                    (long long)start_epoch_ms);
             if (end_epoch_ms > 0)
                 fprintf(f, ",\"end_epoch_ms\":%lld", (long long)end_epoch_ms);
             fprintf(f, ",\"end_source\":\"%s\"", end_source);
-            fprintf(f, ",\"clock_drift_ms\":%lld,\"clock_drift_valid\":false",
-                    (long long)drift_ms);
+            fprintf(f, ",\"clock_drift_ms\":%lld,\"clock_drift_valid\":false", (long long)drift_ms);
             fprintf(f, ",\"clock_drift_source\":\"%s\"", drift_source);
             fprintf(f, ",\"clock_drift_usable\":%s", drift_usable ? "true" : "false");
             if (drift_at > 0)
                 fprintf(f, ",\"clock_drift_measured_at_ms\":%lld", (long long)drift_at);
-            fprintf(f, ",\"brp_samples\":%u,\"brp_mm_samples\":%u,"
-                       "\"sa2_samples\":%u,\"pld_samples\":%u",
-                    (unsigned)brp_records, (unsigned)ctx->mm_s.records,
-                    (unsigned)ctx->sa2_s.records, (unsigned)ctx->pld_s.records);
+            fprintf(f,
+                    ",\"brp_samples\":%u,\"brp_mm_samples\":%u,"
+                    "\"sa2_samples\":%u,\"pld_samples\":%u",
+                    (unsigned)brp_records,
+                    (unsigned)ctx->mm_s.records,
+                    (unsigned)ctx->sa2_s.records,
+                    (unsigned)ctx->pld_s.records);
             if (is_v2)
-                fprintf(f, ",\"fmt\":2,\"press_samples\":%u",
-                        (unsigned)ctx->press_s.records);
+                fprintf(f, ",\"fmt\":2,\"press_samples\":%u", (unsigned)ctx->press_s.records);
             if (have_ckpt)
                 fprintf(f, ",\"checkpoint_seq\":%u", (unsigned)ctx->ck.seq);
             if (ctx->iso_start[0])
@@ -3607,7 +3995,8 @@ void session_writer_recover(void)
             fprintf(f, "}\n");
 
             bool ok = (fflush(f) == 0) && (fsync(fileno(f)) == 0);
-            if (fclose(f) != 0) ok = false;
+            if (fclose(f) != 0)
+                ok = false;
             if (ok) {
                 unlink(ctx->json_path);
                 ok = (rename(ctx->tmp, ctx->json_path) == 0);
@@ -3618,8 +4007,12 @@ void session_writer_recover(void)
                 continue;
             }
 
-            ESP_LOGI(TAG, "recovered %s: brp=%u end_source=%s drift=%s",
-                     ctx->prefix, (unsigned)brp_records, end_source, drift_source);
+            ESP_LOGI(TAG,
+                     "recovered %s: brp=%u end_source=%s drift=%s",
+                     ctx->prefix,
+                     (unsigned)brp_records,
+                     end_source,
+                     drift_source);
             recovered++;
         }
         closedir(day_dir);
@@ -3630,7 +4023,8 @@ void session_writer_recover(void)
 
     if (recovered > 0) {
         ESP_LOGI(TAG, "recovered %d interrupted session(s)", recovered);
-        ESP_LOGI(TAG, "their day(s) are queued for automatic export; the "
+        ESP_LOGI(TAG,
+                 "their day(s) are queued for automatic export; the "
                  "rebuild runs once recording is idle");
     }
 }

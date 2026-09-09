@@ -11,11 +11,25 @@ def function(name, s=s):
     while depth:
         depth+=(s[end]=='{')-(s[end]=='}');end+=1
     return s[match.start():end]+'\n'
-session=s[s.index('typedef struct {\n    char id[TOUCH_HISTORY_SESSION_ID_LEN];'):s.index('static esp_err_t history_collect_eligible_intervals_leased(')]
-vector=s[s.index('typedef struct {\n    touch_history_event_t *items;'):s.index('static bool history_',s.index('typedef struct {\n    touch_history_event_t *items;'))]
+session_start = re.search(
+    r'typedef\s+struct\s*\{\s*char\s+id\[TOUCH_HISTORY_SESSION_ID_LEN\]\s*;', s
+)
+assert session_start, 'history_session_info_t definition'
+session = s[
+    session_start.start():s.index('static esp_err_t history_collect_eligible_intervals_leased(')
+]
+vector_start = re.search(
+    r'typedef\s+struct\s*\{\s*touch_history_event_t\s*\*items\s*;', s
+)
+assert vector_start, 'history_event_vector_t definition'
+vector = s[
+    vector_start.start():s.index('static bool history_', vector_start.start())
+]
 # The vector definition ends before parser helpers; do not pull those helpers in.
 vector=vector[:vector.index('} history_event_vector_t;')+len('} history_event_vector_t;')]
-keys=s[s.index('enum { HISTORY_MEM_SESSIONS'):s.index('typedef struct {\n    char id[TOUCH_HISTORY_SESSION_ID_LEN];')]
+keys_start = re.search(r'enum\s*\{\s*HISTORY_MEM_SESSIONS\b', s)
+assert keys_start, 'history memory key enum'
+keys = s[keys_start.start():session_start.start()]
 pre=r'''
 #include <assert.h>
 #include <stdio.h>
@@ -161,8 +175,16 @@ with tempfile.TemporaryDirectory(prefix='somno-service-cache-') as temp:
 storage=(root/'main/sd_storage.c').read_text()
 for entry in ('sd_storage_init','sd_storage_deinit','sd_storage_recording_end'):
     assert re.search(r'\b'+entry+r'\(void\)\s*\{\s*sd_storage_content_changed\(\)',storage)
-assert 'if (role != SD_LEASE_UPLOAD) sd_storage_content_changed();' in storage
-assert 'void ftp_storage_changed(void) { sd_storage_content_changed(); }' in storage
+assert re.search(
+    r'if\s*\(\s*role\s*!=\s*SD_LEASE_UPLOAD\s*\)\s*'
+    r'sd_storage_content_changed\s*\(\s*\)\s*;',
+    storage,
+)
+assert re.search(
+    r'void\s+ftp_storage_changed\s*\(\s*void\s*\)\s*\{\s*'
+    r'sd_storage_content_changed\s*\(\s*\)\s*;\s*\}',
+    storage,
+)
 post=(root/'main/post_therapy.c').read_text()
 # Centralized post-therapy transactions replace scattered epoch notifications.
 # The production write/rewrite + release behavior runs in history_generation_test.

@@ -38,8 +38,8 @@
 /* Overridable so the scan logic can be exercised against a copy of a real
  * card on the host (see .ai test harness). */
 #ifndef SD_MOUNT_POINT
-#define SD_MOUNT_POINT       "/somnotrace"
+#define SD_MOUNT_POINT "/somnotrace"
 #endif
-#define SD_SDCARD_DIR        SD_MOUNT_POINT "/SDCARD"
-#define SD_SDCARD_DATALOG    SD_SDCARD_DIR "/DATALOG"
-#define SD_SDCARD_SETTINGS   SD_SDCARD_DIR "/SETTINGS"
+#define SD_SDCARD_DIR SD_MOUNT_POINT "/SDCARD"
+#define SD_SDCARD_DATALOG SD_SDCARD_DIR "/DATALOG"
+#define SD_SDCARD_SETTINGS SD_SDCARD_DIR "/SETTINGS"

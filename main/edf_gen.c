@@ -31,7 +31,8 @@
 
 static const char *TAG = "edf_gen";
 
-static void format_recording_id_from_ident(char *out, size_t out_len,
+static void format_recording_id_from_ident(char *out,
+                                           size_t out_len,
                                            int64_t epoch_ms,
                                            const cJSON *ident)
 {
@@ -43,27 +44,42 @@ static void format_recording_id_from_ident(char *out, size_t out_len,
     if (ident) {
         cJSON *j;
         j = cJSON_GetObjectItem(ident, "SerialNumber");
-        if (j && cJSON_IsString(j)) srn = j->valuestring;
+        if (j && cJSON_IsString(j))
+            srn = j->valuestring;
         j = cJSON_GetObjectItem(ident, "PlatformIdentifier");
         if (j) {
-            if (cJSON_IsString(j)) mid = j->valuestring;
-            else if (cJSON_IsNumber(j)) { snprintf(mid_buf, sizeof(mid_buf), "%d", j->valueint); mid = mid_buf; }
+            if (cJSON_IsString(j))
+                mid = j->valuestring;
+            else if (cJSON_IsNumber(j)) {
+                snprintf(mid_buf, sizeof(mid_buf), "%d", j->valueint);
+                mid = mid_buf;
+            }
         }
         j = cJSON_GetObjectItem(ident, "VariantIdentifier");
         if (j) {
-            if (cJSON_IsString(j)) vid = j->valuestring;
-            else if (cJSON_IsNumber(j)) { snprintf(vid_buf, sizeof(vid_buf), "%d", j->valueint); vid = vid_buf; }
+            if (cJSON_IsString(j))
+                vid = j->valuestring;
+            else if (cJSON_IsNumber(j)) {
+                snprintf(vid_buf, sizeof(vid_buf), "%d", j->valueint);
+                vid = vid_buf;
+            }
         }
     }
     as11_time_format_recording_id(out, out_len, epoch_ms, srn, mid, vid);
 }
 
-esp_err_t edf_gen_generate(const char *session_dir, const char *session_id,
-                           int64_t start_epoch_ms, int64_t end_epoch_ms,
+esp_err_t edf_gen_generate(const char *session_dir,
+                           const char *session_id,
+                           int64_t start_epoch_ms,
+                           int64_t end_epoch_ms,
                            int64_t clock_drift_ms)
 {
-    return edf_gen_generate_ex(SD_SDCARD_DIR, session_dir, session_id,
-                               start_epoch_ms, end_epoch_ms, clock_drift_ms,
+    return edf_gen_generate_ex(SD_SDCARD_DIR,
+                               session_dir,
+                               session_id,
+                               start_epoch_ms,
+                               end_epoch_ms,
+                               clock_drift_ms,
                                EDF_GEN_ALL);
 }
 
@@ -74,22 +90,28 @@ esp_err_t edf_gen_generate(const char *session_dir, const char *session_id,
  * candidate: session ids are timestamps, so the lexicographically largest is
  * the most recent, and therefore the closest description of the device state.
  * Returns false when the day has no other session to borrow from. */
-static bool day_metadata_fallback(const char *session_dir, const char *session_id,
-                                  const char *suffix, char *out_path,
+static bool day_metadata_fallback(const char *session_dir,
+                                  const char *session_id,
+                                  const char *suffix,
+                                  char *out_path,
                                   size_t out_len)
 {
-    if (!session_dir || !suffix || !out_path) return false;
+    if (!session_dir || !suffix || !out_path)
+        return false;
 
     DIR *d = opendir(session_dir);
-    if (!d) return false;
+    if (!d)
+        return false;
 
     char best[64] = {0};
     size_t suffix_len = strlen(suffix);
     struct dirent *ent;
     while ((ent = readdir(d)) != NULL) {
         size_t len = strlen(ent->d_name);
-        if (len <= suffix_len || len >= sizeof(best)) continue;
-        if (strcmp(ent->d_name + len - suffix_len, suffix) != 0) continue;
+        if (len <= suffix_len || len >= sizeof(best))
+            continue;
+        if (strcmp(ent->d_name + len - suffix_len, suffix) != 0)
+            continue;
         /* Skip the session's own (missing) file if it somehow appears. */
         if (session_id && strncmp(ent->d_name, session_id, strlen(session_id)) == 0)
             continue;
@@ -99,7 +121,8 @@ static bool day_metadata_fallback(const char *session_dir, const char *session_i
     }
     closedir(d);
 
-    if (!best[0]) return false;
+    if (!best[0])
+        return false;
     snprintf(out_path, out_len, "%s/%s", session_dir, best);
     return true;
 }
@@ -113,16 +136,20 @@ static esp_err_t validate_positioned_sources(const char *dir, const char *id)
     for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); ++i) {
         char path[400];
         int n = snprintf(path, sizeof(path), "%s/%s_%s.snt", dir, id, names[i]);
-        if (n < 0 || n >= (int)sizeof(path)) return ESP_ERR_INVALID_SIZE;
+        if (n < 0 || n >= (int)sizeof(path))
+            return ESP_ERR_INVALID_SIZE;
         FILE *f = fopen(path, "rb");
         if (!f) {
-            if (errno == ENOENT) continue;
+            if (errno == ENOENT)
+                continue;
             return ESP_FAIL;
         }
         snt_header_t hdr;
         esp_err_t ret = snt_read_header(f, &hdr) == 0 ? ESP_OK : ESP_FAIL;
-        if (fclose(f) != 0 && ret == ESP_OK) ret = ESP_FAIL;
-        if (ret != ESP_OK) return ret;
+        if (fclose(f) != 0 && ret == ESP_OK)
+            ret = ESP_FAIL;
+        if (ret != ESP_OK)
+            return ret;
         if (hdr.version >= 2 && (hdr.reserved & SNT_POSITION_GAP_FLAG))
             return EDF_GEN_ERR_POSITION_GAPS;
     }
@@ -130,11 +157,15 @@ static esp_err_t validate_positioned_sources(const char *dir, const char *id)
 }
 
 esp_err_t edf_gen_generate_ex(const char *out_root,
-                              const char *session_dir, const char *session_id,
-                              int64_t start_epoch_ms, int64_t end_epoch_ms,
-                              int64_t clock_drift_ms, uint32_t flags)
+                              const char *session_dir,
+                              const char *session_id,
+                              int64_t start_epoch_ms,
+                              int64_t end_epoch_ms,
+                              int64_t clock_drift_ms,
+                              uint32_t flags)
 {
-    if (!session_dir || !session_id || !out_root) return ESP_ERR_INVALID_ARG;
+    if (!session_dir || !session_id || !out_root)
+        return ESP_ERR_INVALID_ARG;
     if (!sd_storage_is_ready()) {
         ESP_LOGW(TAG, "SD not ready, skipping EDF generation");
         return ESP_ERR_INVALID_STATE;
@@ -149,9 +180,11 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
     }
     /* Reject sessions with invalid timestamps — these result from crash
      * recovery on 0-byte .snt files and would produce bogus 19691231 folders. */
-    if (start_epoch_ms < 946684800000LL) {  /* < 2000-01-01T00:00:00Z */
-        ESP_LOGW(TAG, "invalid start_epoch_ms=%lld, skipping EDF generation for %s",
-                 (long long)start_epoch_ms, session_id);
+    if (start_epoch_ms < 946684800000LL) { /* < 2000-01-01T00:00:00Z */
+        ESP_LOGW(TAG,
+                 "invalid start_epoch_ms=%lld, skipping EDF generation for %s",
+                 (long long)start_epoch_ms,
+                 session_id);
         sd_storage_lease_release(SD_LEASE_EXPORT);
         return ESP_ERR_INVALID_ARG;
     }
@@ -159,8 +192,10 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
     if (flags & EDF_GEN_PER_SESSION) {
         esp_err_t valid = validate_positioned_sources(session_dir, session_id);
         if (valid != ESP_OK) {
-            ESP_LOGE(TAG, "source preflight failed for %s (%s); retaining raw and prior export",
-                     session_id, valid == EDF_GEN_ERR_POSITION_GAPS
+            ESP_LOGE(TAG,
+                     "source preflight failed for %s (%s); retaining raw and prior export",
+                     session_id,
+                     valid == EDF_GEN_ERR_POSITION_GAPS
                          ? "positioned_gaps_require_discontinuous_export"
                          : esp_err_to_name(valid));
             (void)edf_source_error_end();
@@ -170,10 +205,12 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
     }
 
     ESP_LOGI(TAG, "=== EDF GENERATION START ===");
-    ESP_LOGI(TAG, "session=%s id=%s drift=%lldms",
-             session_dir, session_id, (long long)clock_drift_ms);
-    ESP_LOGI(TAG, "start_epoch_ms=%lld end_epoch_ms=%lld",
-             (long long)start_epoch_ms, (long long)end_epoch_ms);
+    ESP_LOGI(
+        TAG, "session=%s id=%s drift=%lldms", session_dir, session_id, (long long)clock_drift_ms);
+    ESP_LOGI(TAG,
+             "start_epoch_ms=%lld end_epoch_ms=%lld",
+             (long long)start_epoch_ms,
+             (long long)end_epoch_ms);
 
     /* ── Create SDCARD export directory structure ──
      * EDF files go to /somnotrace/SDCARD/DATALOG/YYYYMMDD/
@@ -221,12 +258,15 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
     char ident_path[330];
     snprintf(ident_path, sizeof(ident_path), "%s/%s_ident.json", session_dir, session_id);
     cJSON *ident = edf_read_json_file(ident_path);
-    if (!ident && day_metadata_fallback(session_dir, session_id, "_ident.json",
-                                        ident_path, sizeof(ident_path))) {
+    if (!ident && day_metadata_fallback(
+                      session_dir, session_id, "_ident.json", ident_path, sizeof(ident_path))) {
         ident = edf_read_json_file(ident_path);
         if (ident) {
-            ESP_LOGW(TAG, "session %s has no ident.json (recovered session?) — "
-                     "using %s from the same day", session_id, ident_path);
+            ESP_LOGW(TAG,
+                     "session %s has no ident.json (recovered session?) — "
+                     "using %s from the same day",
+                     session_id,
+                     ident_path);
         }
     }
 
@@ -234,16 +274,20 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
     char settings_path[330];
     snprintf(settings_path, sizeof(settings_path), "%s/%s_settings.json", session_dir, session_id);
     cJSON *settings = edf_read_json_file(settings_path);
-    if (!settings && day_metadata_fallback(session_dir, session_id, "_settings.json",
-                                           settings_path, sizeof(settings_path))) {
+    if (!settings &&
+        day_metadata_fallback(
+            session_dir, session_id, "_settings.json", settings_path, sizeof(settings_path))) {
         settings = edf_read_json_file(settings_path);
         if (settings) {
-            ESP_LOGW(TAG, "session %s has no settings.json (recovered session?) "
-                     "— using %s from the same day", session_id, settings_path);
+            ESP_LOGW(TAG,
+                     "session %s has no settings.json (recovered session?) "
+                     "— using %s from the same day",
+                     session_id,
+                     settings_path);
         }
     }
-    ESP_LOGI(TAG, "settings.json: path=%s %s", settings_path,
-             settings ? "loaded OK" : "FAILED to load");
+    ESP_LOGI(
+        TAG, "settings.json: path=%s %s", settings_path, settings ? "loaded OK" : "FAILED to load");
 
     /* Path to events.snt for EVE.edf / CSL.edf generation */
     char events_snt_path[330];
@@ -265,8 +309,8 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
     /* TherapyStart timestamp (for EVE/CSL, NTP clock domain). */
     int64_t edf_start_ms = start_epoch_ms;
     char start_date[16], start_time[16];
-    as11_time_format_edf_datetime(edf_start_ms, start_date, sizeof(start_date),
-                        start_time, sizeof(start_time));
+    as11_time_format_edf_datetime(
+        edf_start_ms, start_date, sizeof(start_date), start_time, sizeof(start_time));
 
     /* BRP/PLD/SA2 start timestamp (NTP clock domain).
      * Prefer _ZLE (Zero Leak Estimate) ValueChange — the AS11's actual
@@ -288,15 +332,19 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
             brp_skip = edf_ms_to_samples_25hz(skip_ms);
             sa2_skip = edf_ms_to_samples_1hz(skip_ms);
             pld_skip = edf_ms_to_samples_pld(skip_ms);
-            ESP_LOGI(TAG, "_ZLE: ntp=%lld skip_ms=%lld "
-                         "brp_skip=%u sa2_skip=%u pld_skip=%u",
-                     (long long)zle_ntp, (long long)skip_ms,
-                     (unsigned)brp_skip, (unsigned)sa2_skip,
+            ESP_LOGI(TAG,
+                     "_ZLE: ntp=%lld skip_ms=%lld "
+                     "brp_skip=%u sa2_skip=%u pld_skip=%u",
+                     (long long)zle_ntp,
+                     (long long)skip_ms,
+                     (unsigned)brp_skip,
+                     (unsigned)sa2_skip,
                      (unsigned)pld_skip);
         } else {
             if (zle_ntp > 0) {
-                ESP_LOGW(TAG, "_ZLE NTP time %lld out of session range "
-                             "[%lld, %lld], falling back to MaskOn",
+                ESP_LOGW(TAG,
+                         "_ZLE NTP time %lld out of session range "
+                         "[%lld, %lld], falling back to MaskOn",
                          (long long)zle_ntp,
                          (long long)start_epoch_ms,
                          (long long)end_epoch_ms);
@@ -314,22 +362,27 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
                     brp_skip = edf_ms_to_samples_25hz(skip_ms);
                     sa2_skip = edf_ms_to_samples_1hz(skip_ms);
                     pld_skip = edf_ms_to_samples_pld(skip_ms);
-                    ESP_LOGI(TAG, "MaskOn: as11=%lld ntp=%lld skip_ms=%lld "
-                                 "brp_skip=%u sa2_skip=%u pld_skip=%u",
-                             (long long)maskon_as11, (long long)maskon_ntp,
+                    ESP_LOGI(TAG,
+                             "MaskOn: as11=%lld ntp=%lld skip_ms=%lld "
+                             "brp_skip=%u sa2_skip=%u pld_skip=%u",
+                             (long long)maskon_as11,
+                             (long long)maskon_ntp,
                              (long long)skip_ms,
-                             (unsigned)brp_skip, (unsigned)sa2_skip,
+                             (unsigned)brp_skip,
+                             (unsigned)sa2_skip,
                              (unsigned)pld_skip);
                 } else {
-                    ESP_LOGW(TAG, "MaskOn NTP time %lld out of session range "
-                                 "[%lld, %lld], using TherapyStart",
+                    ESP_LOGW(TAG,
+                             "MaskOn NTP time %lld out of session range "
+                             "[%lld, %lld], using TherapyStart",
                              (long long)maskon_ntp,
                              (long long)start_epoch_ms,
                              (long long)end_epoch_ms);
                 }
             } else {
-                ESP_LOGI(TAG, "MaskOn not found in events.snt, using TherapyStart "
-                             "for BRP/PLD/SA2");
+                ESP_LOGI(TAG,
+                         "MaskOn not found in events.snt, using TherapyStart "
+                         "for BRP/PLD/SA2");
             }
         }
 
@@ -345,6 +398,7 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
          * and the file simply ended wherever the .snt capture stopped. */
         int64_t end_ntp = edf_find_zle_edge_time(events_snt_path, 0, clock_drift_ms);
         const char *end_src = "_ZLE-falling";
+        (void)end_src; /* Host tests compile logging out. */
         if (end_ntp <= 0) {
             int64_t maskoff_as11 = edf_find_mask_off_time(events_snt_path);
             if (maskoff_as11 > 0) {
@@ -358,21 +412,28 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
                 brp_max = edf_ms_to_samples_25hz(dur_ms);
                 sa2_max = edf_ms_to_samples_1hz(dur_ms);
                 pld_max = edf_ms_to_samples_pld(dur_ms);
-                ESP_LOGI(TAG, "end (%s): ntp=%lld dur_ms=%lld "
-                             "brp_max=%u sa2_max=%u pld_max=%u",
-                         end_src, (long long)end_ntp, (long long)dur_ms,
-                         (unsigned)brp_max, (unsigned)sa2_max,
+                ESP_LOGI(TAG,
+                         "end (%s): ntp=%lld dur_ms=%lld "
+                         "brp_max=%u sa2_max=%u pld_max=%u",
+                         end_src,
+                         (long long)end_ntp,
+                         (long long)dur_ms,
+                         (unsigned)brp_max,
+                         (unsigned)sa2_max,
                          (unsigned)pld_max);
             } else {
-                ESP_LOGW(TAG, "end (%s) NTP time %lld out of range "
-                             "(%lld, %lld], no end truncation",
-                         end_src, (long long)end_ntp,
+                ESP_LOGW(TAG,
+                         "end (%s) NTP time %lld out of range "
+                         "(%lld, %lld], no end truncation",
+                         end_src,
+                         (long long)end_ntp,
                          (long long)maskon_start_ms,
                          (long long)end_epoch_ms);
             }
         } else {
-            ESP_LOGI(TAG, "no _ZLE falling edge or MaskOff in events.snt, "
-                          "no end truncation");
+            ESP_LOGI(TAG,
+                     "no _ZLE falling edge or MaskOff in events.snt, "
+                     "no end truncation");
         }
     }
     /* ── Aborted session with no therapy: emit no per-session files ──
@@ -405,11 +466,13 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
                 brp_samples = bhdr.sample_count;
             fclose(bf);
         }
-        if (brp_samples < 1500) {       /* < one 60 s record at 25 Hz */
+        if (brp_samples < 1500) { /* < one 60 s record at 25 Hz */
             no_therapy = true;
-            ESP_LOGI(TAG, "session %s: no _ZLE/MaskOn and only %u BRP samples "
-                          "(<1500) — no therapy delivered, skipping all "
-                          "per-session EDF files", session_id,
+            ESP_LOGI(TAG,
+                     "session %s: no _ZLE/MaskOn and only %u BRP samples "
+                     "(<1500) — no therapy delivered, skipping all "
+                     "per-session EDF files",
+                     session_id,
                      (unsigned)brp_samples);
 
             /* The day folder was created before we knew there would be nothing
@@ -425,19 +488,17 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
     }
 
     char maskon_date[16], maskon_time[16];
-    as11_time_format_edf_datetime(maskon_start_ms, maskon_date, sizeof(maskon_date),
-                        maskon_time, sizeof(maskon_time));
+    as11_time_format_edf_datetime(
+        maskon_start_ms, maskon_date, sizeof(maskon_date), maskon_time, sizeof(maskon_time));
     char maskon_ts_prefix[32];
-    as11_time_format_session_prefix(maskon_start_ms, maskon_ts_prefix,
-                      sizeof(maskon_ts_prefix));
+    as11_time_format_session_prefix(maskon_start_ms, maskon_ts_prefix, sizeof(maskon_ts_prefix));
 
     /* Recording ID: TherapyStart for EVE/CSL, MaskOn for BRP/PLD/SA2. */
-    char recording_id[128];       /* TherapyStart-based (EVE/CSL) */
-    format_recording_id_from_ident(recording_id, sizeof(recording_id),
-                        edf_start_ms, ident);
+    char recording_id[128]; /* TherapyStart-based (EVE/CSL) */
+    format_recording_id_from_ident(recording_id, sizeof(recording_id), edf_start_ms, ident);
     char maskon_recording_id[128]; /* MaskOn-based (BRP/PLD/SA2) */
-    format_recording_id_from_ident(maskon_recording_id, sizeof(maskon_recording_id),
-                        maskon_start_ms, ident);
+    format_recording_id_from_ident(
+        maskon_recording_id, sizeof(maskon_recording_id), maskon_start_ms, ident);
 
     /* Patient ID has CRC filled in by edf_write_header.
      * Initial value is the "X X X X" prefix with placeholder zeros. */
@@ -456,14 +517,24 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
         snprintf(edf_path, sizeof(edf_path), "%s/%s_BRP.edf", day_dir, maskon_ts_prefix);
 
         edf_signal_def_t brp_sigs[] = {
-            { .label = "Flow.40ms", .transducer = "",
-              .unit = "L/s", .phys_min = -2.0, .phys_max = 3.0,
-              .dig_min = -1000, .dig_max = 1500,
-              .prefilter = "", .samples_per_record = 1500 },
-            { .label = "Press.40ms", .transducer = "",
-              .unit = "cmH2O", .phys_min = 0.0, .phys_max = 40.0,
-              .dig_min = 0, .dig_max = 2000,
-              .prefilter = "", .samples_per_record = 1500 },
+            {.label = "Flow.40ms",
+             .transducer = "",
+             .unit = "L/s",
+             .phys_min = -2.0,
+             .phys_max = 3.0,
+             .dig_min = -1000,
+             .dig_max = 1500,
+             .prefilter = "",
+             .samples_per_record = 1500},
+            {.label = "Press.40ms",
+             .transducer = "",
+             .unit = "cmH2O",
+             .phys_min = 0.0,
+             .phys_max = 40.0,
+             .dig_min = 0,
+             .dig_max = 2000,
+             .prefilter = "",
+             .samples_per_record = 1500},
         };
 
         /* Check if v2 flow.snt exists; if not, fall back to v1 brp.snt */
@@ -474,9 +545,19 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
             snprintf(snt_path, sizeof(snt_path), "%s/%s_brp.snt", session_dir, session_id);
             press_arg = NULL;
         }
-        if (edf_convert_snt_to_edf(snt_path, edf_path, patient_id, maskon_recording_id,
-                               maskon_date, maskon_time, brp_sigs, 2, "60.00",
-                               NULL, brp_skip, brp_max, press_arg) != ESP_OK) {
+        if (edf_convert_snt_to_edf(snt_path,
+                                   edf_path,
+                                   patient_id,
+                                   maskon_recording_id,
+                                   maskon_date,
+                                   maskon_time,
+                                   brp_sigs,
+                                   2,
+                                   "60.00",
+                                   NULL,
+                                   brp_skip,
+                                   brp_max,
+                                   press_arg) != ESP_OK) {
             errors++;
         }
     }
@@ -488,20 +569,40 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
         snprintf(edf_path, sizeof(edf_path), "%s/%s_SA2.edf", day_dir, maskon_ts_prefix);
 
         edf_signal_def_t sa2_sigs[] = {
-            { .label = "Pulse.1s", .transducer = "",
-              .unit = "bpm", .phys_min = 0.0, .phys_max = 300.0,
-              .dig_min = 0, .dig_max = 300,
-              .prefilter = "", .samples_per_record = 60,
-              .invalid_passthrough = true },
-            { .label = "SpO2.1s", .transducer = "",
-              .unit = "%", .phys_min = 0.0, .phys_max = 100.0,
-              .dig_min = 0, .dig_max = 100,
-              .prefilter = "", .samples_per_record = 60,
-              .invalid_passthrough = true },
+            {.label = "Pulse.1s",
+             .transducer = "",
+             .unit = "bpm",
+             .phys_min = 0.0,
+             .phys_max = 300.0,
+             .dig_min = 0,
+             .dig_max = 300,
+             .prefilter = "",
+             .samples_per_record = 60,
+             .invalid_passthrough = true},
+            {.label = "SpO2.1s",
+             .transducer = "",
+             .unit = "%",
+             .phys_min = 0.0,
+             .phys_max = 100.0,
+             .dig_min = 0,
+             .dig_max = 100,
+             .prefilter = "",
+             .samples_per_record = 60,
+             .invalid_passthrough = true},
         };
-        if (edf_convert_snt_to_edf(snt_path, edf_path, patient_id, maskon_recording_id,
-                               maskon_date, maskon_time, sa2_sigs, 2, "60.00",
-                               NULL, sa2_skip, sa2_max, NULL) != ESP_OK) {
+        if (edf_convert_snt_to_edf(snt_path,
+                                   edf_path,
+                                   patient_id,
+                                   maskon_recording_id,
+                                   maskon_date,
+                                   maskon_time,
+                                   sa2_sigs,
+                                   2,
+                                   "60.00",
+                                   NULL,
+                                   sa2_skip,
+                                   sa2_max,
+                                   NULL) != ESP_OK) {
             errors++;
         }
     }
@@ -530,43 +631,88 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
         snprintf(edf_path, sizeof(edf_path), "%s/%s_PLD.edf", day_dir, maskon_ts_prefix);
 
         edf_signal_def_t pld_sigs[] = {
-            { .label = "MaskPress.2s", .transducer = "",
-              .unit = "cmH2O", .phys_min = 0.0, .phys_max = 40.0,
-              .dig_min = 0, .dig_max = 2000,
-              .prefilter = "", .samples_per_record = 30 },
-            { .label = "Press.2s", .transducer = "",
-              .unit = "cmH2O", .phys_min = 0.0, .phys_max = 50.0,
-              .dig_min = 0, .dig_max = 2500,
-              .prefilter = "", .samples_per_record = 30 },
-            { .label = "EprPress.2s", .transducer = "",
-              .unit = "cmH2O", .phys_min = 0.0, .phys_max = 30.0,
-              .dig_min = 0, .dig_max = 1500,
-              .prefilter = "", .samples_per_record = 30 },
-            { .label = "Leak.2s", .transducer = "",
-              .unit = "L/s", .phys_min = 0.0, .phys_max = 2.0,
-              .dig_min = 0, .dig_max = 100,
-              .prefilter = "", .samples_per_record = 30 },
-            { .label = "RespRate.2s", .transducer = "",
-              .unit = "bpm", .phys_min = 0.0, .phys_max = 90.0,
-              .dig_min = 0, .dig_max = 450,
-              .prefilter = "", .samples_per_record = 30 },
-            { .label = "TidVol.2s", .transducer = "",
-              .unit = "L", .phys_min = 0.0, .phys_max = 4.0,
-              .dig_min = 0, .dig_max = 200,
-              .prefilter = "", .samples_per_record = 30 },
-            { .label = "MinVent.2s", .transducer = "",
-              .unit = "L/min", .phys_min = 0.0, .phys_max = 30.0,
-              .dig_min = 0, .dig_max = 240,
-              .prefilter = "", .samples_per_record = 30 },
-            { .label = "Snore.2s", .transducer = "",
-              .unit = "", .phys_min = 0.0, .phys_max = 5.0,
-              .dig_min = 0, .dig_max = 250,
-              .prefilter = "", .samples_per_record = 30 },
-            { .label = "FlowLim.2s", .transducer = "",
-              .unit = "", .phys_min = 0.0, .phys_max = 1.0,
-              .dig_min = 0, .dig_max = 100,
-              .prefilter = "", .samples_per_record = 30,
-              .invalid_passthrough = true },
+            {.label = "MaskPress.2s",
+             .transducer = "",
+             .unit = "cmH2O",
+             .phys_min = 0.0,
+             .phys_max = 40.0,
+             .dig_min = 0,
+             .dig_max = 2000,
+             .prefilter = "",
+             .samples_per_record = 30},
+            {.label = "Press.2s",
+             .transducer = "",
+             .unit = "cmH2O",
+             .phys_min = 0.0,
+             .phys_max = 50.0,
+             .dig_min = 0,
+             .dig_max = 2500,
+             .prefilter = "",
+             .samples_per_record = 30},
+            {.label = "EprPress.2s",
+             .transducer = "",
+             .unit = "cmH2O",
+             .phys_min = 0.0,
+             .phys_max = 30.0,
+             .dig_min = 0,
+             .dig_max = 1500,
+             .prefilter = "",
+             .samples_per_record = 30},
+            {.label = "Leak.2s",
+             .transducer = "",
+             .unit = "L/s",
+             .phys_min = 0.0,
+             .phys_max = 2.0,
+             .dig_min = 0,
+             .dig_max = 100,
+             .prefilter = "",
+             .samples_per_record = 30},
+            {.label = "RespRate.2s",
+             .transducer = "",
+             .unit = "bpm",
+             .phys_min = 0.0,
+             .phys_max = 90.0,
+             .dig_min = 0,
+             .dig_max = 450,
+             .prefilter = "",
+             .samples_per_record = 30},
+            {.label = "TidVol.2s",
+             .transducer = "",
+             .unit = "L",
+             .phys_min = 0.0,
+             .phys_max = 4.0,
+             .dig_min = 0,
+             .dig_max = 200,
+             .prefilter = "",
+             .samples_per_record = 30},
+            {.label = "MinVent.2s",
+             .transducer = "",
+             .unit = "L/min",
+             .phys_min = 0.0,
+             .phys_max = 30.0,
+             .dig_min = 0,
+             .dig_max = 240,
+             .prefilter = "",
+             .samples_per_record = 30},
+            {.label = "Snore.2s",
+             .transducer = "",
+             .unit = "",
+             .phys_min = 0.0,
+             .phys_max = 5.0,
+             .dig_min = 0,
+             .dig_max = 250,
+             .prefilter = "",
+             .samples_per_record = 30},
+            {.label = "FlowLim.2s",
+             .transducer = "",
+             .unit = "",
+             .phys_min = 0.0,
+             .phys_max = 1.0,
+             .dig_min = 0,
+             .dig_max = 100,
+             .prefilter = "",
+             .samples_per_record = 30,
+             .invalid_passthrough = true},
         };
         /* PLD .snt has 12 channels but AS11 EDF (VID=3) only has 9.
          * Channel order in .snt: 0=MaskPress, 1=Press, 2=EprPress, 3=Leak,
@@ -574,9 +720,19 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
          * 9=Snore, 10=FlowLim, 11=Ti
          * EDF drops TgtVent(7), IERatio(8), Ti(11). */
         static const int pld_ch_map[] = {0, 1, 2, 3, 4, 5, 6, 9, 10};
-        if (edf_convert_snt_to_edf(snt_path, edf_path, patient_id, maskon_recording_id,
-                               maskon_date, maskon_time, pld_sigs, 9, "60.00",
-                               pld_ch_map, pld_skip, pld_max, NULL) != ESP_OK) {
+        if (edf_convert_snt_to_edf(snt_path,
+                                   edf_path,
+                                   patient_id,
+                                   maskon_recording_id,
+                                   maskon_date,
+                                   maskon_time,
+                                   pld_sigs,
+                                   9,
+                                   "60.00",
+                                   pld_ch_map,
+                                   pld_skip,
+                                   pld_max,
+                                   NULL) != ESP_OK) {
             errors++;
         }
     }
@@ -584,11 +740,16 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
     /* ── Generate STR.edf from per-day summary spool files ──
      * STR.edf goes in the SDCARD root (not inside DATALOG/) — it is a
      * multi-day cumulative file with one record per day. */
-    if ((flags & EDF_GEN_SHARED) &&
-        edf_generate_str_edf(out_root, patient_id, recording_id,
-                         "", settings,
-                         session_dir, session_id,
-                         start_epoch_ms, end_epoch_ms, clock_drift_ms) != ESP_OK) {
+    if ((flags & EDF_GEN_SHARED) && edf_generate_str_edf(out_root,
+                                                         patient_id,
+                                                         recording_id,
+                                                         "",
+                                                         settings,
+                                                         session_dir,
+                                                         session_id,
+                                                         start_epoch_ms,
+                                                         end_epoch_ms,
+                                                         clock_drift_ms) != ESP_OK) {
         errors++;
     }
 
@@ -611,10 +772,14 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
     if ((flags & EDF_GEN_PER_SESSION) && !no_therapy) {
         char eve_path[350];
         snprintf(eve_path, sizeof(eve_path), "%s/%s_EVE.edf", day_dir, ts_prefix);
-        if (edf_generate_eve_edf(eve_path, events_snt_path,
-                                 start_epoch_ms, clock_drift_ms,
-                                 patient_id, recording_id,
-                                 start_date, start_time) != ESP_OK) {
+        if (edf_generate_eve_edf(eve_path,
+                                 events_snt_path,
+                                 start_epoch_ms,
+                                 clock_drift_ms,
+                                 patient_id,
+                                 recording_id,
+                                 start_date,
+                                 start_time) != ESP_OK) {
             errors++;
         }
 
@@ -624,10 +789,14 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
          * "Recording starts" marker record. */
         char csl_path[350];
         snprintf(csl_path, sizeof(csl_path), "%s/%s_CSL.edf", day_dir, ts_prefix);
-        if (edf_generate_csl_edf(csl_path, events_snt_path,
-                                 start_epoch_ms, clock_drift_ms,
-                                 patient_id, recording_id,
-                                 start_date, start_time) != ESP_OK) {
+        if (edf_generate_csl_edf(csl_path,
+                                 events_snt_path,
+                                 start_epoch_ms,
+                                 clock_drift_ms,
+                                 patient_id,
+                                 recording_id,
+                                 start_date,
+                                 start_time) != ESP_OK) {
             errors++;
         }
     }
@@ -652,17 +821,20 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
             cJSON_AddItemReferenceToObject(cs_root, "FlowGenerator", settings);
             settings_str = cJSON_PrintUnformatted(cs_root);
             cJSON_Delete(cs_root);
-            if (!settings_str) errors++;
+            if (!settings_str)
+                errors++;
         }
         if (settings_str) {
             /* cJSON drops ".0" for integer-valued doubles (e.g. 7.0 → 7),
              * but AS11 preserves it for pressure/temperature fields.
              * Post-process the string to add ".0" back for known float
              * fields so the output matches AS11 byte-for-byte. */
-            static const char *const float_fields[] = {
-                "StartPressure", "MaxPressure", "MinPressure",
-                "SetPressure", "HeatedTubeTemperature", NULL
-            };
+            static const char *const float_fields[] = {"StartPressure",
+                                                       "MaxPressure",
+                                                       "MinPressure",
+                                                       "SetPressure",
+                                                       "HeatedTubeTemperature",
+                                                       NULL};
             bool settings_encode_ok = true;
             for (int fi = 0; float_fields[fi] && settings_encode_ok; fi++) {
                 char pattern[64];
@@ -673,10 +845,12 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
                     char *val_start = p + plen;
                     /* Skip optional minus sign */
                     char *v = val_start;
-                    if (*v == '-') v++;
+                    if (*v == '-')
+                        v++;
                     /* Check if value is purely integer (all digits, no '.') */
                     char *scan = v;
-                    while (*scan >= '0' && *scan <= '9') scan++;
+                    while (*scan >= '0' && *scan <= '9')
+                        scan++;
                     if (scan > v && *scan != '.') {
                         /* Integer value — insert ".0" before the terminator */
                         size_t insert_pos = scan - settings_str;
@@ -686,8 +860,8 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
                         char *tmp = realloc(settings_str, old_len + 3);
                         if (tmp) {
                             settings_str = tmp;
-                            memmove(settings_str + insert_pos + 2,
-                                    settings_str + insert_pos, tail_len);
+                            memmove(
+                                settings_str + insert_pos + 2, settings_str + insert_pos, tail_len);
                             settings_str[insert_pos] = '.';
                             settings_str[insert_pos + 1] = '0';
                         } else {
@@ -768,16 +942,17 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
     }
 
     /* ── Cleanup ── */
-    if (ident) cJSON_Delete(ident);
-    if (settings) cJSON_Delete(settings);
+    if (ident)
+        cJSON_Delete(ident);
+    if (settings)
+        cJSON_Delete(settings);
     /* events_data no longer used */
 
     ESP_LOGI(TAG, "=== EDF GENERATION DONE (%d errors) ===", errors);
 
     esp_err_t source_result = edf_source_error_end();
     sd_storage_lease_release(SD_LEASE_EXPORT);
-    return source_result != ESP_OK ? source_result :
-           (errors > 0 ? ESP_FAIL : ESP_OK);
+    return source_result != ESP_OK ? source_result : (errors > 0 ? ESP_FAIL : ESP_OK);
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -796,35 +971,41 @@ esp_err_t edf_gen_generate_ex(const char *out_root,
  *  shared pass exactly once.
  * ════════════════════════════════════════════════════════════════════ */
 
-#define REBUILD_MAX_SESSIONS  64
-#define REBUILD_STAGING_DIR   SD_MOUNT_POINT "/SDCARD/.rebuild"
+#define REBUILD_MAX_SESSIONS 64
+#define REBUILD_STAGING_DIR SD_MOUNT_POINT "/SDCARD/.rebuild"
 
 /* Publish sentinel. All conversion completes in staging before this is
  * persisted. Same-volume directory publication plus several shared files is
  * not one atomic filesystem operation; retain this durable intent until all
  * installation steps succeed so a reset never reports an incomplete day done. */
-#define REBUILD_SENTINEL      SD_SDCARD_DIR "/.rebuilding"
+#define REBUILD_SENTINEL SD_SDCARD_DIR "/.rebuilding"
 
 typedef struct {
-    char    session_id[40];
+    char session_id[40];
     int64_t start_epoch_ms;
     int64_t end_epoch_ms;
     int64_t clock_drift_ms;
-    bool    interrupted;    /* reconstructed by crash recovery */
+    bool interrupted; /* reconstructed by crash recovery */
 } rebuild_session_t;
 
 /* Recursively delete a directory tree (staging cleanup / old day removal). */
 static void rebuild_rmtree(const char *path)
 {
     DIR *d = opendir(path);
-    if (!d) { unlink(path); return; }
+    if (!d) {
+        unlink(path);
+        return;
+    }
     struct dirent *ent;
     while ((ent = readdir(d)) != NULL) {
-        if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, "..")) continue;
+        if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, ".."))
+            continue;
         char child[400];
         snprintf(child, sizeof(child), "%s/%s", path, ent->d_name);
-        if (ent->d_type == DT_DIR) rebuild_rmtree(child);
-        else unlink(child);
+        if (ent->d_type == DT_DIR)
+            rebuild_rmtree(child);
+        else
+            unlink(child);
     }
     closedir(d);
     rmdir(path);
@@ -836,19 +1017,20 @@ static void rebuild_rmtree(const char *path)
 static esp_err_t rebuild_move_dir(const char *src, const char *dst)
 {
     DIR *d = opendir(src);
-    if (!d) return ESP_FAIL;
+    if (!d)
+        return ESP_FAIL;
     mkdir(dst, 0775);
 
     esp_err_t ret = ESP_OK;
     struct dirent *ent;
     while ((ent = readdir(d)) != NULL) {
-        if (ent->d_type != DT_REG) continue;
+        if (ent->d_type != DT_REG)
+            continue;
         char from[656], to[656];
         snprintf(from, sizeof(from), "%s/%s", src, ent->d_name);
         snprintf(to, sizeof(to), "%s/%s", dst, ent->d_name);
         if (edf_publish_atomic_path(from, to) != ESP_OK) {
-            ESP_LOGE(TAG, "rebuild: publish failed for %s: %s",
-                     ent->d_name, strerror(errno));
+            ESP_LOGE(TAG, "rebuild: publish failed for %s: %s", ent->d_name, strerror(errno));
             ret = ESP_FAIL;
             break;
         }
@@ -858,29 +1040,46 @@ static esp_err_t rebuild_move_dir(const char *src, const char *dst)
 }
 
 /* Read one session manifest into a rebuild descriptor. */
-static esp_err_t rebuild_read_manifest(const char *day_path, const char *fname,
-                                  rebuild_session_t *out)
+static esp_err_t rebuild_read_manifest(const char *day_path,
+                                       const char *fname,
+                                       rebuild_session_t *out)
 {
     const char *suffix = "_session.json";
     size_t slen = strlen(suffix), flen = strlen(fname);
-    if (flen <= slen || strcmp(fname + flen - slen, suffix) != 0) return ESP_FAIL;
+    if (flen <= slen || strcmp(fname + flen - slen, suffix) != 0)
+        return ESP_FAIL;
 
     size_t prefix_len = flen - slen;
-    if (prefix_len == 0 || prefix_len >= sizeof(out->session_id)) return ESP_FAIL;
+    if (prefix_len == 0 || prefix_len >= sizeof(out->session_id))
+        return ESP_FAIL;
 
     char json_path[656];
     snprintf(json_path, sizeof(json_path), "%s/%s", day_path, fname);
     FILE *f = fopen(json_path, "r");
-    if (!f) return ESP_FAIL;
+    if (!f)
+        return ESP_FAIL;
     long size = -1;
-    if (fseek(f, 0, SEEK_END) == 0) size = ftell(f);
-    if (fseek(f, 0, SEEK_SET) != 0) { fclose(f); return ESP_FAIL; }
-    if (size <= 0 || size > 16384) { fclose(f); return ESP_FAIL; }
+    if (fseek(f, 0, SEEK_END) == 0)
+        size = ftell(f);
+    if (fseek(f, 0, SEEK_SET) != 0) {
+        fclose(f);
+        return ESP_FAIL;
+    }
+    if (size <= 0 || size > 16384) {
+        fclose(f);
+        return ESP_FAIL;
+    }
     char *buf = malloc(size + 1);
-    if (!buf) { fclose(f); return ESP_ERR_NO_MEM; }
+    if (!buf) {
+        fclose(f);
+        return ESP_ERR_NO_MEM;
+    }
     size_t rd = fread(buf, 1, size, f);
     int close_ret = fclose(f);
-    if (rd != (size_t)size || close_ret != 0) { free(buf); return ESP_FAIL; }
+    if (rd != (size_t)size || close_ret != 0) {
+        free(buf);
+        return ESP_FAIL;
+    }
     buf[rd] = '\0';
 
     cJSON *j = cJSON_Parse(buf);
@@ -894,7 +1093,7 @@ static esp_err_t rebuild_read_manifest(const char *day_path, const char *fname,
     cJSON *js = cJSON_GetObjectItem(j, "start_epoch_ms");
     if (js && cJSON_IsNumber(js)) {
         int64_t start = (int64_t)js->valuedouble;
-        if (start >= 946684800000LL) {          /* >= 2000-01-01 */
+        if (start >= 946684800000LL) { /* >= 2000-01-01 */
             memcpy(out->session_id, fname, prefix_len);
             out->session_id[prefix_len] = '\0';
             out->start_epoch_ms = start;
@@ -907,21 +1106,24 @@ static esp_err_t rebuild_read_manifest(const char *day_path, const char *fname,
              * put every spool-sourced timestamp ~7-8 min out), but say so. */
             /* State does not classify I/O/OOM failures as damaged source. */
             cJSON *jst = cJSON_GetObjectItem(j, "state");
-            out->interrupted = (jst && cJSON_IsString(jst) &&
-                                strcmp(jst->valuestring, "interrupted") == 0);
+            out->interrupted =
+                (jst && cJSON_IsString(jst) && strcmp(jst->valuestring, "interrupted") == 0);
 
             cJSON *ju = cJSON_GetObjectItem(j, "clock_drift_usable");
             cJSON *jv = cJSON_GetObjectItem(j, "clock_drift_valid");
             bool measured = jv && cJSON_IsTrue(jv);
             bool usable = ju ? cJSON_IsTrue(ju) : measured;
+            (void)usable; /* Host tests compile logging out. */
             if (!measured) {
-                ESP_LOGW(TAG, "rebuild: %s drift is an estimate (usable=%d)",
-                         out->session_id, (int)usable);
+                ESP_LOGW(TAG,
+                         "rebuild: %s drift is an estimate (usable=%d)",
+                         out->session_id,
+                         (int)usable);
             }
             ok = true;
         } else {
-            ESP_LOGW(TAG, "rebuild: skipping %s (invalid start_epoch_ms=%lld)",
-                     fname, (long long)start);
+            ESP_LOGW(
+                TAG, "rebuild: skipping %s (invalid start_epoch_ms=%lld)", fname, (long long)start);
         }
     }
     cJSON_Delete(j);
@@ -930,8 +1132,10 @@ static esp_err_t rebuild_read_manifest(const char *day_path, const char *fname,
 
 esp_err_t edf_gen_rebuild_day(const char *day_folder)
 {
-    if (!day_folder || strlen(day_folder) != 8) return ESP_ERR_INVALID_ARG;
-    if (!sd_storage_is_ready()) return ESP_ERR_INVALID_STATE;
+    if (!day_folder || strlen(day_folder) != 8)
+        return ESP_ERR_INVALID_ARG;
+    if (!sd_storage_is_ready())
+        return ESP_ERR_INVALID_STATE;
 
     /* Hold the lease for the entire transaction: no other export, no upload
      * of this day, and no destructive action may interleave. */
@@ -945,8 +1149,7 @@ esp_err_t edf_gen_rebuild_day(const char *day_folder)
     char day_path[300];
     snprintf(day_path, sizeof(day_path), "%s/%s", SD_STREAMS_DIR, day_folder);
 
-    rebuild_session_t *sessions = calloc(REBUILD_MAX_SESSIONS,
-                                         sizeof(rebuild_session_t));
+    rebuild_session_t *sessions = calloc(REBUILD_MAX_SESSIONS, sizeof(rebuild_session_t));
     if (!sessions) {
         sd_storage_lease_release(SD_LEASE_EXPORT);
         return ESP_ERR_NO_MEM;
@@ -956,20 +1159,31 @@ esp_err_t edf_gen_rebuild_day(const char *day_folder)
     bool truncated = false;
     esp_err_t scan_error = ESP_OK;
     DIR *d = opendir(day_path);
-    if (!d) scan_error = errno == ENOENT ? ESP_ERR_NOT_FOUND : ESP_FAIL;
+    if (!d)
+        scan_error = errno == ENOENT ? ESP_ERR_NOT_FOUND : ESP_FAIL;
     else {
         while (1) {
             errno = 0;
             struct dirent *ent = readdir(d);
-            if (!ent) { if (errno) scan_error = ESP_FAIL; break; }
+            if (!ent) {
+                if (errno)
+                    scan_error = ESP_FAIL;
+                break;
+            }
             size_t len = strlen(ent->d_name);
-            if (len <= 13 || strcmp(ent->d_name + len - 13, "_session.json")) continue;
-            if (n >= REBUILD_MAX_SESSIONS) { truncated = true; break; }
+            if (len <= 13 || strcmp(ent->d_name + len - 13, "_session.json"))
+                continue;
+            if (n >= REBUILD_MAX_SESSIONS) {
+                truncated = true;
+                break;
+            }
             scan_error = rebuild_read_manifest(day_path, ent->d_name, &sessions[n]);
-            if (scan_error != ESP_OK) break;
+            if (scan_error != ESP_OK)
+                break;
             n++;
         }
-        if (closedir(d) != 0 && scan_error == ESP_OK) scan_error = ESP_FAIL;
+        if (closedir(d) != 0 && scan_error == ESP_OK)
+            scan_error = ESP_FAIL;
     }
     if (scan_error != ESP_OK) {
         free(sessions);
@@ -980,8 +1194,11 @@ esp_err_t edf_gen_rebuild_day(const char *day_folder)
     if (truncated) {
         /* Silently dropping sessions would produce a day that looks complete
          * but is not, so this is a hard error. */
-        ESP_LOGE(TAG, "rebuild %s: more than %d sessions — refusing to "
-                 "publish a partial day", day_folder, REBUILD_MAX_SESSIONS);
+        ESP_LOGE(TAG,
+                 "rebuild %s: more than %d sessions — refusing to "
+                 "publish a partial day",
+                 day_folder,
+                 REBUILD_MAX_SESSIONS);
         free(sessions);
         sd_storage_lease_release(SD_LEASE_EXPORT);
         return ESP_ERR_INVALID_SIZE;
@@ -1012,22 +1229,26 @@ esp_err_t edf_gen_rebuild_day(const char *day_folder)
 
     esp_err_t ret = ESP_OK;
     for (int i = 0; i < n; i++) {
-        ESP_LOGI(TAG, "rebuild %s: session %d/%d: %s",
-                 day_folder, i + 1, n, sessions[i].session_id);
-        esp_err_t r = edf_gen_generate_ex(REBUILD_STAGING_DIR, day_path,
-                                         sessions[i].session_id,
-                                         sessions[i].start_epoch_ms,
-                                         sessions[i].end_epoch_ms,
-                                         sessions[i].clock_drift_ms,
-                                         EDF_GEN_PER_SESSION);
+        ESP_LOGI(
+            TAG, "rebuild %s: session %d/%d: %s", day_folder, i + 1, n, sessions[i].session_id);
+        esp_err_t r = edf_gen_generate_ex(REBUILD_STAGING_DIR,
+                                          day_path,
+                                          sessions[i].session_id,
+                                          sessions[i].start_epoch_ms,
+                                          sessions[i].end_epoch_ms,
+                                          sessions[i].clock_drift_ms,
+                                          EDF_GEN_PER_SESSION);
         if (r != ESP_OK) {
             /* A terminal-state label is not evidence of source damage. Until
              * a validator identifies a specific irreparable source defect,
              * all conversion failures abort and discard the entire staging
              * tree, including any earlier outputs from this session. */
-            ESP_LOGE(TAG, "rebuild %s: session %s failed (%s) — aborting, "
-                     "existing export left untouched", day_folder,
-                     sessions[i].session_id, esp_err_to_name(r));
+            ESP_LOGE(TAG,
+                     "rebuild %s: session %s failed (%s) — aborting, "
+                     "existing export left untouched",
+                     day_folder,
+                     sessions[i].session_id,
+                     esp_err_to_name(r));
             ret = r;
             break;
         }
@@ -1037,9 +1258,13 @@ esp_err_t edf_gen_rebuild_day(const char *day_folder)
      * it in staging before changing any live day or shared artifact. */
     if (ret == ESP_OK) {
         const rebuild_session_t *newest = &sessions[n - 1];
-        ret = edf_gen_generate_ex(REBUILD_STAGING_DIR, day_path, newest->session_id,
-                                  newest->start_epoch_ms, newest->end_epoch_ms,
-                                  newest->clock_drift_ms, EDF_GEN_SHARED);
+        ret = edf_gen_generate_ex(REBUILD_STAGING_DIR,
+                                  day_path,
+                                  newest->session_id,
+                                  newest->start_epoch_ms,
+                                  newest->end_epoch_ms,
+                                  newest->clock_drift_ms,
+                                  EDF_GEN_SHARED);
     }
 
     if (ret != ESP_OK) {
@@ -1053,8 +1278,7 @@ esp_err_t edf_gen_rebuild_day(const char *day_folder)
      * Only now is the previous export replaced.  Up to this point a failure
      * costs nothing. */
     char staged_day[400], live_day[400];
-    snprintf(staged_day, sizeof(staged_day), "%s/DATALOG/%s",
-             REBUILD_STAGING_DIR, day_folder);
+    snprintf(staged_day, sizeof(staged_day), "%s/DATALOG/%s", REBUILD_STAGING_DIR, day_folder);
     snprintf(live_day, sizeof(live_day), "%s/%s", SD_SDCARD_DATALOG, day_folder);
 
     struct stat st;
@@ -1072,10 +1296,13 @@ esp_err_t edf_gen_rebuild_day(const char *day_folder)
     /* Durable publication intent is mandatory before changing live output. */
     char sentinel_tmp[400];
     FILE *sf = edf_open_atomic_file(REBUILD_SENTINEL, sentinel_tmp, sizeof(sentinel_tmp));
-    if (!sf) ret = ESP_FAIL;
+    if (!sf)
+        ret = ESP_FAIL;
     else if (fprintf(sf, "%s\n", day_folder) < 0) {
-        edf_discard_atomic_file(sf, sentinel_tmp); ret = ESP_FAIL;
-    } else ret = edf_finalize_atomic_file(sf, sentinel_tmp, REBUILD_SENTINEL);
+        edf_discard_atomic_file(sf, sentinel_tmp);
+        ret = ESP_FAIL;
+    } else
+        ret = edf_finalize_atomic_file(sf, sentinel_tmp, REBUILD_SENTINEL);
     if (ret != ESP_OK) {
         rebuild_rmtree(REBUILD_STAGING_DIR);
         free(sessions);
@@ -1088,30 +1315,39 @@ esp_err_t edf_gen_rebuild_day(const char *day_folder)
     char prior_day[420];
     snprintf(prior_day, sizeof(prior_day), "%s/.previous-%s", SD_SDCARD_DATALOG, day_folder);
     bool had_live = stat(live_day, &st) == 0;
-    if (!had_live && errno != ENOENT) ret = ESP_FAIL;
+    if (!had_live && errno != ENOENT)
+        ret = ESP_FAIL;
     if (ret == ESP_OK && !had_live) {
-        if (rename(prior_day, live_day) == 0) had_live = true;
-        else if (errno != ENOENT) ret = ESP_FAIL;
+        if (rename(prior_day, live_day) == 0)
+            had_live = true;
+        else if (errno != ENOENT)
+            ret = ESP_FAIL;
     }
     if (ret == ESP_OK && had_live) {
         rebuild_rmtree(prior_day);
-        if (rename(live_day, prior_day) != 0) ret = ESP_FAIL;
+        if (rename(live_day, prior_day) != 0)
+            ret = ESP_FAIL;
     }
     bool installed = false;
     if (ret == ESP_OK) {
-        if (rename(staged_day, live_day) != 0) ret = ESP_FAIL;
-        else installed = true;
+        if (rename(staged_day, live_day) != 0)
+            ret = ESP_FAIL;
+        else
+            installed = true;
     }
     if (ret == ESP_OK) {
         char staged_settings[400], live_settings[400];
         snprintf(staged_settings, sizeof(staged_settings), "%s/SETTINGS", REBUILD_STAGING_DIR);
         snprintf(live_settings, sizeof(live_settings), "%s/SETTINGS", SD_SDCARD_DIR);
         ret = rebuild_move_dir(staged_settings, live_settings);
-        if (ret == ESP_OK) ret = rebuild_move_dir(REBUILD_STAGING_DIR, SD_SDCARD_DIR);
+        if (ret == ESP_OK)
+            ret = rebuild_move_dir(REBUILD_STAGING_DIR, SD_SDCARD_DIR);
     }
     if (ret != ESP_OK) {
-        if (installed) rebuild_rmtree(live_day);
-        if (had_live) (void)rename(prior_day, live_day);
+        if (installed)
+            rebuild_rmtree(live_day);
+        if (had_live)
+            (void)rename(prior_day, live_day);
         /* Any earlier shared-file replacements remain individually complete;
          * the durable sentinel prevents declaring the mixed day complete. */
         rebuild_rmtree(REBUILD_STAGING_DIR);
@@ -1141,10 +1377,12 @@ esp_err_t edf_gen_rebuild_day(const char *day_folder)
 
 bool edf_gen_take_interrupted_rebuild(char *out_day, size_t out_len)
 {
-    if (!out_day || out_len < 9) return false;
+    if (!out_day || out_len < 9)
+        return false;
 
     FILE *f = fopen(REBUILD_SENTINEL, "r");
-    if (!f) return false;
+    if (!f)
+        return false;
 
     char buf[32] = {0};
     size_t rd = fread(buf, 1, sizeof(buf) - 1, f);
@@ -1153,12 +1391,16 @@ bool edf_gen_take_interrupted_rebuild(char *out_day, size_t out_len)
 
     /* Trim whitespace/newline. */
     for (char *p = buf; *p; p++) {
-        if (*p == '\r' || *p == '\n' || *p == ' ') { *p = '\0'; break; }
+        if (*p == '\r' || *p == '\n' || *p == ' ') {
+            *p = '\0';
+            break;
+        }
     }
 
     bool valid = (strlen(buf) == 8);
     for (int i = 0; valid && i < 8; i++) {
-        if (buf[i] < '0' || buf[i] > '9') valid = false;
+        if (buf[i] < '0' || buf[i] > '9')
+            valid = false;
     }
 
     /* Keep this durable intent until a complete rebuild succeeds. */

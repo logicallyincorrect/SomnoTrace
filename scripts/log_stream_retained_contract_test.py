@@ -150,7 +150,9 @@ for preserved in (
 # Save is a separate, chronological file in the existing log directory. The
 # export lease spans every FAT operation, partial files stay temporary, and
 # all post-acquire exits converge on release/error publication.
-assert 'RETAINED_SAVE_FILE         "touchscreen-visible.log"' in SOURCE
+assert re.search(
+    r'#define\s+RETAINED_SAVE_FILE\s+"touchscreen-visible\.log"', SOURCE
+)
 assert "LOG_FILE_PREFIX" not in save
 lease_at = save.find("sd_storage_lease_acquire(SD_LEASE_EXPORT")
 mkdir_at = save.find("mkdir(LOG_DIR")
@@ -166,7 +168,10 @@ assert "progress_fn(offset + 1, bounds.count, progress_ctx)" in save
 assert "progress_fn(bounds.count, bounds.count, progress_ctx)" in save
 assert "tmp_exists" in save and "remove(tmp_path)" in save
 assert "bool close_failed = fflush(file) != 0" in save
-assert "if (fclose(file) != 0) close_failed = true" in save
+assert re.search(
+    r"if\s*\(\s*fclose\(file\)\s*!=\s*0\s*\)\s*close_failed\s*=\s*true",
+    save,
+)
 assert "retained_set_last_error(error)" in save
 assert "remove(final_path)" not in save
 assert "rename(final_path, backup_path)" in publish

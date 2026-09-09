@@ -8,8 +8,13 @@
 #define ALERT_HISTORY_PAGE 8
 #define ALERT_HISTORY_DAYS 30
 
-typedef enum { ALERT_DELIVERY_PENDING, ALERT_DELIVERY_ACCEPTED,
-               ALERT_DELIVERY_FAILED, ALERT_DELIVERY_SCREEN, ALERT_DELIVERY_CANCELLED } alert_delivery_t;
+typedef enum {
+    ALERT_DELIVERY_PENDING,
+    ALERT_DELIVERY_ACCEPTED,
+    ALERT_DELIVERY_FAILED,
+    ALERT_DELIVERY_SCREEN,
+    ALERT_DELIVERY_CANCELLED
+} alert_delivery_t;
 typedef struct {
     uint32_t id, epoch, ack_epoch;
     uint8_t result, test, escalated, acknowledged;

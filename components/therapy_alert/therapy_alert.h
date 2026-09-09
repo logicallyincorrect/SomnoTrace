@@ -31,30 +31,31 @@
 /* ── Configuration ──────────────────────────────────────────────────── */
 
 typedef struct {
-    bool     enabled;          /* master enable (opt-in)             */
-    uint16_t win_start;        /* minutes from midnight (e.g. 1380 = 23:00) */
-    uint16_t win_end;          /* minutes from midnight (e.g. 360 = 06:00); end < start = wraps */
-    uint16_t delay1;           /* minutes after TherapyStop before push/buzzer */
-    bool     push_en;          /* enable ntfy push notification      */
-    char     ntfy_srv[64];     /* server base URL (e.g. "https://ntfy.sh") */
-    char     ntfy_topic[64];   /* topic name                          */
-    uint8_t  ntfy_prio;        /* ntfy priority (1-5, 5 = max)       */
-    uint16_t delay2;           /* minutes after push before buzzer   */
-    bool     buzz_en;          /* enable buzzer escalation           */
+    bool enabled;        /* master enable (opt-in)             */
+    uint16_t win_start;  /* minutes from midnight (e.g. 1380 = 23:00) */
+    uint16_t win_end;    /* minutes from midnight (e.g. 360 = 06:00); end < start = wraps */
+    uint16_t delay1;     /* minutes after TherapyStop before push/buzzer */
+    bool push_en;        /* enable ntfy push notification      */
+    char ntfy_srv[64];   /* server base URL (e.g. "https://ntfy.sh") */
+    char ntfy_topic[64]; /* topic name                          */
+    uint8_t ntfy_prio;   /* ntfy priority (1-5, 5 = max)       */
+    uint16_t delay2;     /* minutes after push before buzzer   */
+    bool buzz_en;        /* enable buzzer escalation           */
 } therapy_alert_config_t;
 
-#define ALERT_DEFAULTS { \
-    .enabled = false, \
-    .win_start = 1380, \
-    .win_end = 360, \
-    .delay1 = 5, \
-    .push_en = true, \
-    .ntfy_srv = "https://ntfy.sh", \
-    .ntfy_topic = "", \
-    .ntfy_prio = 5, \
-    .delay2 = 5, \
-    .buzz_en = true, \
-}
+#define ALERT_DEFAULTS                                                                             \
+    {                                                                                              \
+        .enabled = false,                                                                          \
+        .win_start = 1380,                                                                         \
+        .win_end = 360,                                                                            \
+        .delay1 = 5,                                                                               \
+        .push_en = true,                                                                           \
+        .ntfy_srv = "https://ntfy.sh",                                                             \
+        .ntfy_topic = "",                                                                          \
+        .ntfy_prio = 5,                                                                            \
+        .delay2 = 5,                                                                               \
+        .buzz_en = true,                                                                           \
+    }
 
 /* ── Alert state (for /api/status and LCD) ──────────────────────────── */
 

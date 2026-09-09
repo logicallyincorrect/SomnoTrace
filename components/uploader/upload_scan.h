@@ -46,27 +46,27 @@
  *  export, so they are fingerprinted by size+mtime.
  * ──────────────────────────────────────────────────────────────────── */
 
-#define UPLOAD_GROUP_MAX_FILES  6
-#define UPLOAD_FILENAME_LEN     40
+#define UPLOAD_GROUP_MAX_FILES 6
+#define UPLOAD_FILENAME_LEN 40
 #define UPLOAD_BUNDLE_MAX_FILES 8
 
 /* A group as it exists on the card, ready to hand to a backend. */
 typedef struct {
-    char     day[12];                  /* "20260807"                      */
-    char     prefix[20];               /* "20260807_134405"               */
+    char day[12];    /* "20260807"                      */
+    char prefix[20]; /* "20260807_134405"               */
     uint32_t prefix_sec;
-    uint8_t  kinds;                    /* UGK_* bitmask                   */
-    int      n_files;
-    char     files[UPLOAD_GROUP_MAX_FILES][UPLOAD_FILENAME_LEN];
+    uint8_t kinds; /* UGK_* bitmask                   */
+    int n_files;
+    char files[UPLOAD_GROUP_MAX_FILES][UPLOAD_FILENAME_LEN];
 } upload_group_ref_t;
 
 /* The root bundle as it exists on the card. */
 typedef struct {
-    int      n_files;
-    char     paths[UPLOAD_BUNDLE_MAX_FILES][80];   /* absolute local paths */
-    char     names[UPLOAD_BUNDLE_MAX_FILES][40];   /* remote basename      */
-    bool     in_settings[UPLOAD_BUNDLE_MAX_FILES]; /* lives in SETTINGS/   */
-    uint64_t fp;                                   /* size+mtime digest    */
+    int n_files;
+    char paths[UPLOAD_BUNDLE_MAX_FILES][80];   /* absolute local paths */
+    char names[UPLOAD_BUNDLE_MAX_FILES][40];   /* remote basename      */
+    bool in_settings[UPLOAD_BUNDLE_MAX_FILES]; /* lives in SETTINGS/   */
+    uint64_t fp;                               /* size+mtime digest    */
 } upload_bundle_ref_t;
 
 /* Enumerate DATALOG day folders, newest first.  Returns the count. */

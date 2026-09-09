@@ -57,15 +57,15 @@ static const char *TAG = "crash_diag";
  * they are safe to call from any task and cannot themselves become the
  * reason a crash goes unreported. */
 
-#define BREADCRUMB_MAGIC 0x536F6D31u   /* "Som1" */
+#define BREADCRUMB_MAGIC 0x536F6D31u /* "Som1" */
 
 typedef struct {
     uint32_t magic;
-    uint32_t crc;               /* CRC32 over everything after this field */
+    uint32_t crc; /* CRC32 over everything after this field */
     uint32_t boot_count;
-    int64_t  activity_us;       /* esp_timer time of the last activity note */
-    char     session_id[40];
-    char     activity[24];
+    int64_t activity_us; /* esp_timer time of the last activity note */
+    char session_id[40];
+    char activity[24];
 } crash_breadcrumb_t;
 
 static RTC_NOINIT_ATTR crash_breadcrumb_t s_bc;
@@ -133,19 +133,20 @@ static void breadcrumb_rotate(bool poweron)
 static void log_breadcrumb(void)
 {
     if (!s_bc_prev_valid) {
-        ESP_LOGW(TAG, "no crash breadcrumb from the previous boot "
-                      "(power-on, or firmware predates breadcrumbs)");
+        ESP_LOGW(TAG,
+                 "no crash breadcrumb from the previous boot "
+                 "(power-on, or firmware predates breadcrumbs)");
         return;
     }
 
     ESP_LOGW(TAG, "=== CRASH CONTEXT (breadcrumb from previous boot) ===");
     ESP_LOGW(TAG, "  Boot count   : %u", (unsigned)s_bc_prev.boot_count);
-    ESP_LOGW(TAG, "  Session      : %s",
+    ESP_LOGW(TAG,
+             "  Session      : %s",
              s_bc_prev.session_id[0] ? s_bc_prev.session_id : "(none active)");
-    ESP_LOGW(TAG, "  Last activity: %s",
-             s_bc_prev.activity[0] ? s_bc_prev.activity : "(none recorded)");
-    ESP_LOGW(TAG, "  Uptime at it : %lld ms",
-             (long long)(s_bc_prev.activity_us / 1000));
+    ESP_LOGW(
+        TAG, "  Last activity: %s", s_bc_prev.activity[0] ? s_bc_prev.activity : "(none recorded)");
+    ESP_LOGW(TAG, "  Uptime at it : %lld ms", (long long)(s_bc_prev.activity_us / 1000));
     ESP_LOGW(TAG, "=== END CRASH CONTEXT ===");
 }
 
@@ -154,18 +155,30 @@ static void log_breadcrumb(void)
 static const char *reset_reason_str(esp_reset_reason_t r)
 {
     switch (r) {
-    case ESP_RST_POWERON:   return "POWERON";
-    case ESP_RST_EXT:       return "EXT_PIN";
-    case ESP_RST_SW:        return "SOFTWARE";
-    case ESP_RST_PANIC:     return "PANIC";
-    case ESP_RST_INT_WDT:   return "INT_WDT";
-    case ESP_RST_TASK_WDT:  return "TASK_WDT";
-    case ESP_RST_WDT:       return "OTHER_WDT";
-    case ESP_RST_DEEPSLEEP: return "DEEPSLEEP";
-    case ESP_RST_BROWNOUT:  return "BROWNOUT";
-    case ESP_RST_SDIO:      return "SDIO";
-    case ESP_RST_USB:       return "USB";
-    default:                return "UNKNOWN";
+    case ESP_RST_POWERON:
+        return "POWERON";
+    case ESP_RST_EXT:
+        return "EXT_PIN";
+    case ESP_RST_SW:
+        return "SOFTWARE";
+    case ESP_RST_PANIC:
+        return "PANIC";
+    case ESP_RST_INT_WDT:
+        return "INT_WDT";
+    case ESP_RST_TASK_WDT:
+        return "TASK_WDT";
+    case ESP_RST_WDT:
+        return "OTHER_WDT";
+    case ESP_RST_DEEPSLEEP:
+        return "DEEPSLEEP";
+    case ESP_RST_BROWNOUT:
+        return "BROWNOUT";
+    case ESP_RST_SDIO:
+        return "SDIO";
+    case ESP_RST_USB:
+        return "USB";
+    default:
+        return "UNKNOWN";
     }
 }
 
@@ -191,13 +204,14 @@ static void log_coredump_summary(void)
          * because the panic handler faulted while writing one.  Blaming
          * CHECK_BOOT (which this build disables) sent the last investigation
          * down the wrong path. */
-        ESP_LOGW(TAG, "no valid core dump on flash (image check: %s)",
-                 esp_err_to_name(chk));
-        ESP_LOGW(TAG, "  most likely the panic handler faulted while writing "
-                      "it — check the console for 'Re-entered core dump!'; a "
-                      "damaged task stack makes the dump unwritable");
-        ESP_LOGW(TAG, "  the breadcrumb above is the primary evidence in that "
-                      "case");
+        ESP_LOGW(TAG, "no valid core dump on flash (image check: %s)", esp_err_to_name(chk));
+        ESP_LOGW(TAG,
+                 "  most likely the panic handler faulted while writing "
+                 "it — check the console for 'Re-entered core dump!'; a "
+                 "damaged task stack makes the dump unwritable");
+        ESP_LOGW(TAG,
+                 "  the breadcrumb above is the primary evidence in that "
+                 "case");
         return;
     }
 
@@ -205,15 +219,17 @@ static void log_coredump_summary(void)
     if (!summary) {
         /* Keep the image: it is the only copy of this crash.  It can be read
          * off the device with espcoredump.py and will be retried next boot. */
-        ESP_LOGW(TAG, "core dump present but summary allocation failed — "
-                      "image RETAINED for offline extraction");
+        ESP_LOGW(TAG,
+                 "core dump present but summary allocation failed — "
+                 "image RETAINED for offline extraction");
         return;
     }
 
     esp_err_t err = esp_core_dump_get_summary(summary);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "core dump present but get_summary failed: %s — "
-                      "image RETAINED for offline extraction",
+        ESP_LOGW(TAG,
+                 "core dump present but get_summary failed: %s — "
+                 "image RETAINED for offline extraction",
                  esp_err_to_name(err));
         free(summary);
         return;
@@ -232,11 +248,15 @@ static void log_coredump_summary(void)
          * Max depth is typically 16 frames × 11 chars ("0xABCDEF01 ") ≈ 176. */
         char bt_line[256];
         int pos = 0;
-        for (uint32_t i = 0; i < summary->exc_bt_info.depth && pos < (int)sizeof(bt_line) - 12; i++) {
-            pos += snprintf(bt_line + pos, sizeof(bt_line) - pos,
-                            "0x%08" PRIx32 " ", summary->exc_bt_info.bt[i]);
+        for (uint32_t i = 0; i < summary->exc_bt_info.depth && pos < (int)sizeof(bt_line) - 12;
+             i++) {
+            pos += snprintf(bt_line + pos,
+                            sizeof(bt_line) - pos,
+                            "0x%08" PRIx32 " ",
+                            summary->exc_bt_info.bt[i]);
         }
-        if (pos > 0 && bt_line[pos - 1] == ' ') bt_line[pos - 1] = '\0';
+        if (pos > 0 && bt_line[pos - 1] == ' ')
+            bt_line[pos - 1] = '\0';
         ESP_LOGW(TAG, "  Backtrace    : %s", bt_line);
         ESP_LOGW(TAG, "  BT depth     : %" PRIu32, summary->exc_bt_info.depth);
     } else {
@@ -265,10 +285,8 @@ void crash_diag_check(void)
 {
     /* ── Always log the reset reason ─────────────────────────────────── */
     esp_reset_reason_t reason = esp_reset_reason();
-    bool is_crash = (reason == ESP_RST_PANIC   ||
-                     reason == ESP_RST_INT_WDT  ||
-                     reason == ESP_RST_TASK_WDT ||
-                     reason == ESP_RST_WDT);
+    bool is_crash = (reason == ESP_RST_PANIC || reason == ESP_RST_INT_WDT ||
+                     reason == ESP_RST_TASK_WDT || reason == ESP_RST_WDT);
 
     /* Take the previous boot's breadcrumb and re-arm for this one.  Must
      * happen before any subsystem writes a new note.  A power-on reset
@@ -290,19 +308,18 @@ void crash_diag_check(void)
      * temporarily raised as a diagnostic probe rather than left at the
      * production value. */
 #if defined(CONFIG_ESP_INT_WDT)
-    ESP_LOGI(TAG, "watchdogs: INT_WDT enabled, timeout=%d ms",
-             (int)CONFIG_ESP_INT_WDT_TIMEOUT_MS);
+    ESP_LOGI(TAG, "watchdogs: INT_WDT enabled, timeout=%d ms", (int)CONFIG_ESP_INT_WDT_TIMEOUT_MS);
 #else
     ESP_LOGW(TAG, "watchdogs: INT_WDT DISABLED");
 #endif
 #if defined(CONFIG_ESP_TASK_WDT_EN)
-    ESP_LOGI(TAG, "watchdogs: TASK_WDT enabled, timeout=%d s",
-             (int)CONFIG_ESP_TASK_WDT_TIMEOUT_S);
+    ESP_LOGI(TAG, "watchdogs: TASK_WDT enabled, timeout=%d s", (int)CONFIG_ESP_TASK_WDT_TIMEOUT_S);
 #else
     ESP_LOGI(TAG, "watchdogs: TASK_WDT disabled");
 #endif
     if (reason == ESP_RST_INT_WDT) {
-        ESP_LOGW(TAG, "INT_WDT: interrupts were disabled > %d ms — most often a "
+        ESP_LOGW(TAG,
+                 "INT_WDT: interrupts were disabled > %d ms — most often a "
                  "spin on a corrupted lock (a stack overflow into an adjacent "
                  "heap object will do this) or a long driver critical section; "
                  "check the backtrace and storage latency report below",
@@ -311,11 +328,12 @@ void crash_diag_check(void)
 #else
                  0
 #endif
-                 );
+        );
     }
 
     /* ── Log boot-time heap stats ────────────────────────────────────── */
-    ESP_LOGI(TAG, "[heap] boot: internal free=%u, PSRAM free=%u",
+    ESP_LOGI(TAG,
+             "[heap] boot: internal free=%u, PSRAM free=%u",
              (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
              (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 

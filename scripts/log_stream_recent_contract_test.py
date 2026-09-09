@@ -40,8 +40,13 @@ assert "pos += (size_t)suffix_len" in handler
 # quote is written, so truncation can never leave malformed JSON.
 size_at = handler.find("size_t escaped_len")
 fit_at = handler.find("needed + LOGS_RECENT_SUFFIX_RESERVE")
-comma_at = handler.find("if (chunks_sent > 0) buf[pos++] = ','")
-quote_at = handler.find("buf[pos++] = '\"'")
+comma_match = re.search(
+    r"if\s*\(\s*chunks_sent\s*>\s*0\s*\)\s*buf\[pos\+\+\]\s*=\s*','",
+    handler,
+)
+quote_match = re.search(r"buf\[pos\+\+\]\s*=\s*'\"'", handler)
+comma_at = comma_match.start() if comma_match else -1
+quote_at = quote_match.start() if quote_match else -1
 assert -1 not in (size_at, fit_at, comma_at, quote_at)
 assert size_at < fit_at < comma_at < quote_at
 assert "goto buf_full" not in handler

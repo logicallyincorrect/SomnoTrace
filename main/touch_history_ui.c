@@ -15,24 +15,24 @@
 
 #define HISTORY_UI_EM_DASH "\xE2\x80\x94"
 
-#define HISTORY_UI_COLOR_BASE       0x05070e
-#define HISTORY_UI_COLOR_PANEL      0x181c29
-#define HISTORY_UI_COLOR_CARD       0x101421
-#define HISTORY_UI_COLOR_ROW        0x151a28
+#define HISTORY_UI_COLOR_BASE 0x05070e
+#define HISTORY_UI_COLOR_PANEL 0x181c29
+#define HISTORY_UI_COLOR_CARD 0x101421
+#define HISTORY_UI_COLOR_ROW 0x151a28
 #define HISTORY_UI_COLOR_ROW_ACTIVE 0x293142
-#define HISTORY_UI_COLOR_CONTROL    0x2d333f
-#define HISTORY_UI_COLOR_TEXT       0xf0f2f6
-#define HISTORY_UI_COLOR_SECONDARY  0xa0a5af
-#define HISTORY_UI_COLOR_TERTIARY   0x818691
-#define HISTORY_UI_COLOR_DISABLED   0x5e636e
-#define HISTORY_UI_COLOR_LIVE       0x00e1e2
-#define HISTORY_UI_COLOR_LIVE_DIM   0x387a82
-#define HISTORY_UI_COLOR_O2         0xdd70e8
-#define HISTORY_UI_COLOR_EPR        0x54a5a9
-#define HISTORY_UI_COLOR_AMBER      0xf8bd40
-#define HISTORY_UI_COLOR_FAULT      0xf45249
-#define HISTORY_UI_COLOR_BORDER     0x2b3241
-#define HISTORY_UI_COLOR_GRID       0x272d39
+#define HISTORY_UI_COLOR_CONTROL 0x2d333f
+#define HISTORY_UI_COLOR_TEXT 0xf0f2f6
+#define HISTORY_UI_COLOR_SECONDARY 0xa0a5af
+#define HISTORY_UI_COLOR_TERTIARY 0x818691
+#define HISTORY_UI_COLOR_DISABLED 0x5e636e
+#define HISTORY_UI_COLOR_LIVE 0x00e1e2
+#define HISTORY_UI_COLOR_LIVE_DIM 0x387a82
+#define HISTORY_UI_COLOR_O2 0xdd70e8
+#define HISTORY_UI_COLOR_EPR 0x54a5a9
+#define HISTORY_UI_COLOR_AMBER 0xf8bd40
+#define HISTORY_UI_COLOR_FAULT 0xf45249
+#define HISTORY_UI_COLOR_BORDER 0x2b3241
+#define HISTORY_UI_COLOR_GRID 0x272d39
 
 #define HISTORY_UI_RADIUS 12
 #define HISTORY_UI_HIT 44
@@ -199,12 +199,25 @@ struct touch_history_ui {
 };
 
 static const char *const s_signal_names[TOUCH_HISTORY_SIGNAL_COUNT] = {
-    "Breathing / Flow", "Pressure", "Leak", "Flow limit",
-    "Snore", "SpO₂", "Pulse", "Motion",
+    "Breathing / Flow",
+    "Pressure",
+    "Leak",
+    "Flow limit",
+    "Snore",
+    "SpO₂",
+    "Pulse",
+    "Motion",
 };
 
 static const char *const s_signal_units[TOUCH_HISTORY_SIGNAL_COUNT] = {
-    "L/s", "cmH₂O", "L/min", "index", "index", "%", "bpm", "index",
+    "L/s",
+    "cmH₂O",
+    "L/min",
+    "index",
+    "index",
+    "%",
+    "bpm",
+    "index",
 };
 
 static lv_color_t history_ui_color(uint32_t rgb)
@@ -212,8 +225,7 @@ static lv_color_t history_ui_color(uint32_t rgb)
     return lv_color_hex(rgb);
 }
 
-static void history_ui_copy_text(char *destination, size_t capacity,
-                                 const char *source)
+static void history_ui_copy_text(char *destination, size_t capacity, const char *source)
 {
     if (!destination || capacity == 0)
         return;
@@ -222,9 +234,12 @@ static void history_ui_copy_text(char *destination, size_t capacity,
     snprintf(destination, capacity, "%s", source);
 }
 
-static lv_obj_t *history_ui_container(lv_obj_t *parent, lv_coord_t x,
-                                      lv_coord_t y, lv_coord_t width,
-                                      lv_coord_t height, uint32_t background,
+static lv_obj_t *history_ui_container(lv_obj_t *parent,
+                                      lv_coord_t x,
+                                      lv_coord_t y,
+                                      lv_coord_t width,
+                                      lv_coord_t height,
+                                      uint32_t background,
                                       uint32_t border)
 {
     lv_obj_t *object = lv_obj_create(parent);
@@ -243,10 +258,14 @@ static lv_obj_t *history_ui_container(lv_obj_t *parent, lv_coord_t x,
     return object;
 }
 
-static lv_obj_t *history_ui_label(lv_obj_t *parent, const char *text,
-                                  const lv_font_t *font, uint32_t color,
-                                  lv_coord_t x, lv_coord_t y,
-                                  lv_coord_t width, lv_coord_t height)
+static lv_obj_t *history_ui_label(lv_obj_t *parent,
+                                  const char *text,
+                                  const lv_font_t *font,
+                                  uint32_t color,
+                                  lv_coord_t x,
+                                  lv_coord_t y,
+                                  lv_coord_t width,
+                                  lv_coord_t height)
 {
     lv_obj_t *label = lv_label_create(parent);
     if (!label)
@@ -261,9 +280,12 @@ static lv_obj_t *history_ui_label(lv_obj_t *parent, const char *text,
     return label;
 }
 
-static lv_obj_t *history_ui_button(lv_obj_t *parent, lv_coord_t x,
-                                   lv_coord_t y, lv_coord_t width,
-                                   lv_coord_t height, uint32_t background)
+static lv_obj_t *history_ui_button(lv_obj_t *parent,
+                                   lv_coord_t x,
+                                   lv_coord_t y,
+                                   lv_coord_t width,
+                                   lv_coord_t height,
+                                   uint32_t background)
 {
     lv_obj_t *button = lv_btn_create(parent);
     if (!button)
@@ -272,9 +294,8 @@ static lv_obj_t *history_ui_button(lv_obj_t *parent, lv_coord_t x,
     lv_obj_set_size(button, width, height);
     lv_obj_set_style_radius(button, 10, 0);
     lv_obj_set_style_bg_color(button, history_ui_color(background), 0);
-    lv_obj_set_style_bg_color(button,
-                              history_ui_color(HISTORY_UI_COLOR_ROW_ACTIVE),
-                              LV_STATE_PRESSED);
+    lv_obj_set_style_bg_color(
+        button, history_ui_color(HISTORY_UI_COLOR_ROW_ACTIVE), LV_STATE_PRESSED);
     lv_obj_set_style_shadow_width(button, 0, 0);
     lv_obj_set_style_border_width(button, 0, 0);
     lv_obj_set_style_pad_all(button, 0, 0);
@@ -282,7 +303,8 @@ static lv_obj_t *history_ui_button(lv_obj_t *parent, lv_coord_t x,
     return button;
 }
 
-static lv_obj_t *history_ui_button_label(lv_obj_t *button, const char *text,
+static lv_obj_t *history_ui_button_label(lv_obj_t *button,
+                                         const char *text,
                                          const lv_font_t *font,
                                          uint32_t color)
 {
@@ -312,8 +334,7 @@ static void history_ui_set_enabled(lv_obj_t *object, bool enabled)
 {
     if (!object)
         return;
-    bool currently_enabled =
-        !lv_obj_has_state(object, LV_STATE_DISABLED);
+    bool currently_enabled = !lv_obj_has_state(object, LV_STATE_DISABLED);
     if (currently_enabled == enabled)
         return;
     if (enabled) {
@@ -325,8 +346,7 @@ static void history_ui_set_enabled(lv_obj_t *object, bool enabled)
     }
 }
 
-static void history_ui_set_label_text_if_changed(lv_obj_t *label,
-                                                 const char *text)
+static void history_ui_set_label_text_if_changed(lv_obj_t *label, const char *text)
 {
     if (!label)
         return;
@@ -338,7 +358,8 @@ static void history_ui_set_label_text_if_changed(lv_obj_t *label,
 
 static void history_ui_emit(touch_history_ui_t *ui,
                             touch_history_ui_intent_type_t type,
-                            int64_t relative, int64_t timestamp_ms,
+                            int64_t relative,
+                            int64_t timestamp_ms,
                             size_t row_index,
                             touch_history_signal_t signal,
                             const char *day)
@@ -358,15 +379,12 @@ static void history_ui_emit(touch_history_ui_t *ui,
 
 static int history_ui_first_weekday(unsigned year, unsigned month);
 
-static bool history_ui_parse_day(const char day[9], unsigned *year,
-                                 unsigned *month, unsigned *date)
+static bool history_ui_parse_day(const char day[9], unsigned *year, unsigned *month, unsigned *date)
 {
     unsigned parsed_year = 0, parsed_month = 0, parsed_date = 0;
     if (!day || strlen(day) != 8 ||
-        sscanf(day, "%4u%2u%2u",
-               &parsed_year, &parsed_month, &parsed_date) != 3 ||
-        parsed_month < 1 || parsed_month > 12 ||
-        parsed_date < 1 || parsed_date > 31)
+        sscanf(day, "%4u%2u%2u", &parsed_year, &parsed_month, &parsed_date) != 3 ||
+        parsed_month < 1 || parsed_month > 12 || parsed_date < 1 || parsed_date > 31)
         return false;
     if (year)
         *year = parsed_year;
@@ -377,72 +395,112 @@ static bool history_ui_parse_day(const char day[9], unsigned *year,
     return true;
 }
 
-static void history_ui_format_day(const char day[9], char *output,
-                                  size_t capacity)
+static void history_ui_format_day(const char day[9], char *output, size_t capacity)
 {
     static const char *const months[] = {
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
     };
     static const char *const weekdays[] = {
-        "Sunday", "Monday", "Tuesday", "Wednesday",
-        "Thursday", "Friday", "Saturday",
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
     };
     unsigned year = 0, month = 0, date = 0;
     if (!history_ui_parse_day(day, &year, &month, &date)) {
         history_ui_copy_text(output, capacity, HISTORY_UI_EM_DASH);
         return;
     }
-    unsigned weekday =
-        ((unsigned)history_ui_first_weekday(year, month) + date - 1U) % 7U;
-    snprintf(output, capacity, "%s %u %s %u",
-             weekdays[weekday], date, months[month - 1], year);
+    unsigned weekday = ((unsigned)history_ui_first_weekday(year, month) + date - 1U) % 7U;
+    snprintf(output, capacity, "%s %u %s %u", weekdays[weekday], date, months[month - 1], year);
 }
 
-static void history_ui_format_day_short(const char day[9], char *output,
-                                        size_t capacity)
+static void history_ui_format_day_short(const char day[9], char *output, size_t capacity)
 {
     static const char *const months[] = {
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
     };
     static const char *const weekdays[] = {
-        "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat",
+        "Sun",
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri",
+        "Sat",
     };
     unsigned year = 0, month = 0, date = 0;
     if (!history_ui_parse_day(day, &year, &month, &date)) {
         history_ui_copy_text(output, capacity, HISTORY_UI_EM_DASH);
         return;
     }
-    unsigned weekday =
-        ((unsigned)history_ui_first_weekday(year, month) + date - 1U) % 7U;
-    snprintf(output, capacity, "%s %u %s",
-             weekdays[weekday], date, months[month - 1]);
+    unsigned weekday = ((unsigned)history_ui_first_weekday(year, month) + date - 1U) % 7U;
+    snprintf(output, capacity, "%s %u %s", weekdays[weekday], date, months[month - 1]);
 }
 
-static void history_ui_format_day_compact(const char day[9], char *output,
-                                          size_t capacity)
+static void history_ui_format_day_compact(const char day[9], char *output, size_t capacity)
 {
     static const char *const months[] = {
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
     };
     static const char *const weekdays[] = {
-        "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat",
+        "Sun",
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri",
+        "Sat",
     };
     unsigned year = 0, month = 0, date = 0;
     if (!history_ui_parse_day(day, &year, &month, &date)) {
         history_ui_copy_text(output, capacity, HISTORY_UI_EM_DASH);
         return;
     }
-    unsigned weekday =
-        ((unsigned)history_ui_first_weekday(year, month) + date - 1U) % 7U;
-    snprintf(output, capacity, "%s %u %s %u",
-             weekdays[weekday], date, months[month - 1], year);
+    unsigned weekday = ((unsigned)history_ui_first_weekday(year, month) + date - 1U) % 7U;
+    snprintf(output, capacity, "%s %u %s %u", weekdays[weekday], date, months[month - 1], year);
 }
 
-static void history_ui_format_clock_minutes(int minutes, bool available,
-                                            char *output, size_t capacity)
+static void history_ui_format_clock_minutes(int minutes,
+                                            bool available,
+                                            char *output,
+                                            size_t capacity)
 {
     if (!available || minutes < 0) {
         history_ui_copy_text(output, capacity, HISTORY_UI_EM_DASH);
@@ -451,8 +509,10 @@ static void history_ui_format_clock_minutes(int minutes, bool available,
     snprintf(output, capacity, "%d:%02d", minutes / 60, minutes % 60);
 }
 
-static void history_ui_format_x100(int32_t value_x100, bool available,
-                                   char *output, size_t capacity)
+static void history_ui_format_x100(int32_t value_x100,
+                                   bool available,
+                                   char *output,
+                                   size_t capacity)
 {
     if (!available) {
         history_ui_copy_text(output, capacity, HISTORY_UI_EM_DASH);
@@ -464,12 +524,10 @@ static void history_ui_format_x100(int32_t value_x100, bool available,
         sign = "-";
         magnitude = -magnitude;
     }
-    snprintf(output, capacity, "%s%" PRId64 ".%02" PRId64,
-             sign, magnitude / 100, magnitude % 100);
+    snprintf(output, capacity, "%s%" PRId64 ".%02" PRId64, sign, magnitude / 100, magnitude % 100);
 }
 
-static const touch_history_day_t *history_ui_selected_day(
-    const touch_history_ui_t *ui)
+static const touch_history_day_t *history_ui_selected_day(const touch_history_ui_t *ui)
 {
     if (!ui || ui->selected_row >= ui->day_count)
         return NULL;
@@ -482,17 +540,24 @@ static void history_ui_row_pressed(lv_event_t *event)
     if (!binding || !binding->ui || binding->index >= binding->ui->day_count)
         return;
     const touch_history_day_t *day = &binding->ui->days[binding->index];
-    history_ui_emit(binding->ui, TOUCH_HISTORY_UI_INTENT_SELECT_DAY, 0, 0,
-                    binding->index, binding->ui->signal, day->day);
+    history_ui_emit(binding->ui,
+                    TOUCH_HISTORY_UI_INTENT_SELECT_DAY,
+                    0,
+                    0,
+                    binding->index,
+                    binding->ui->signal,
+                    day->day);
 }
 
 static void history_ui_channel_pressed(lv_event_t *event)
 {
     history_ui_binding_t *binding = lv_event_get_user_data(event);
-    if (!binding || !binding->ui ||
-        binding->index >= TOUCH_HISTORY_SIGNAL_COUNT)
+    if (!binding || !binding->ui || binding->index >= TOUCH_HISTORY_SIGNAL_COUNT)
         return;
-    history_ui_emit(binding->ui, TOUCH_HISTORY_UI_INTENT_SELECT_CHANNEL, 0, 0,
+    history_ui_emit(binding->ui,
+                    TOUCH_HISTORY_UI_INTENT_SELECT_CHANNEL,
+                    0,
+                    0,
                     binding->ui->selected_row,
                     (touch_history_signal_t)binding->index,
                     binding->ui->has_night ? binding->ui->night.day : NULL);
@@ -504,49 +569,70 @@ static void history_ui_list_scroll_end(lv_event_t *event)
     if (!ui || !ui->list_viewport)
         return;
     int64_t direction = 0;
-    if (lv_obj_get_scroll_bottom(ui->list_viewport) <= 2 &&
-        ui->page.has_more)
+    if (lv_obj_get_scroll_bottom(ui->list_viewport) <= 2 && ui->page.has_more)
         direction = 1;
-    else if (lv_obj_get_scroll_y(ui->list_viewport) <= 2 &&
-             ui->page.offset > 0)
+    else if (lv_obj_get_scroll_y(ui->list_viewport) <= 2 && ui->page.offset > 0)
         direction = -1;
     if (direction)
-        history_ui_emit(ui, TOUCH_HISTORY_UI_INTENT_PAGE_RELATIVE,
-                        direction, 0, SIZE_MAX, ui->signal, NULL);
+        history_ui_emit(
+            ui, TOUCH_HISTORY_UI_INTENT_PAGE_RELATIVE, direction, 0, SIZE_MAX, ui->signal, NULL);
 }
 
 static void history_ui_open_calendar_pressed(lv_event_t *event)
 {
     touch_history_ui_t *ui = lv_event_get_user_data(event);
-    history_ui_emit(ui, TOUCH_HISTORY_UI_INTENT_OPEN_CALENDAR, 0, 0,
-                    SIZE_MAX, ui ? ui->signal : TOUCH_HISTORY_SIGNAL_FLOW, NULL);
+    history_ui_emit(ui,
+                    TOUCH_HISTORY_UI_INTENT_OPEN_CALENDAR,
+                    0,
+                    0,
+                    SIZE_MAX,
+                    ui ? ui->signal : TOUCH_HISTORY_SIGNAL_FLOW,
+                    NULL);
 }
 
 static void history_ui_close_calendar_pressed(lv_event_t *event)
 {
     touch_history_ui_t *ui = lv_event_get_user_data(event);
-    history_ui_emit(ui, TOUCH_HISTORY_UI_INTENT_CLOSE_CALENDAR, 0, 0,
-                    SIZE_MAX, ui ? ui->signal : TOUCH_HISTORY_SIGNAL_FLOW, NULL);
+    history_ui_emit(ui,
+                    TOUCH_HISTORY_UI_INTENT_CLOSE_CALENDAR,
+                    0,
+                    0,
+                    SIZE_MAX,
+                    ui ? ui->signal : TOUCH_HISTORY_SIGNAL_FLOW,
+                    NULL);
 }
 
 static void history_ui_month_previous_pressed(lv_event_t *event)
 {
     touch_history_ui_t *ui = lv_event_get_user_data(event);
-    history_ui_emit(ui, TOUCH_HISTORY_UI_INTENT_MONTH_RELATIVE, -1, 0,
-                    SIZE_MAX, ui ? ui->signal : TOUCH_HISTORY_SIGNAL_FLOW, NULL);
+    history_ui_emit(ui,
+                    TOUCH_HISTORY_UI_INTENT_MONTH_RELATIVE,
+                    -1,
+                    0,
+                    SIZE_MAX,
+                    ui ? ui->signal : TOUCH_HISTORY_SIGNAL_FLOW,
+                    NULL);
 }
 
 static void history_ui_month_next_pressed(lv_event_t *event)
 {
     touch_history_ui_t *ui = lv_event_get_user_data(event);
-    history_ui_emit(ui, TOUCH_HISTORY_UI_INTENT_MONTH_RELATIVE, 1, 0,
-                    SIZE_MAX, ui ? ui->signal : TOUCH_HISTORY_SIGNAL_FLOW, NULL);
+    history_ui_emit(ui,
+                    TOUCH_HISTORY_UI_INTENT_MONTH_RELATIVE,
+                    1,
+                    0,
+                    SIZE_MAX,
+                    ui ? ui->signal : TOUCH_HISTORY_SIGNAL_FLOW,
+                    NULL);
 }
 
 static void history_ui_previous_night_pressed(lv_event_t *event)
 {
     touch_history_ui_t *ui = lv_event_get_user_data(event);
-    history_ui_emit(ui, TOUCH_HISTORY_UI_INTENT_PREVIOUS_NIGHT, -1, 0,
+    history_ui_emit(ui,
+                    TOUCH_HISTORY_UI_INTENT_PREVIOUS_NIGHT,
+                    -1,
+                    0,
                     ui ? ui->selected_row : SIZE_MAX,
                     ui ? ui->signal : TOUCH_HISTORY_SIGNAL_FLOW,
                     ui && ui->has_night ? ui->night.day : NULL);
@@ -555,7 +641,10 @@ static void history_ui_previous_night_pressed(lv_event_t *event)
 static void history_ui_next_night_pressed(lv_event_t *event)
 {
     touch_history_ui_t *ui = lv_event_get_user_data(event);
-    history_ui_emit(ui, TOUCH_HISTORY_UI_INTENT_NEXT_NIGHT, 1, 0,
+    history_ui_emit(ui,
+                    TOUCH_HISTORY_UI_INTENT_NEXT_NIGHT,
+                    1,
+                    0,
                     ui ? ui->selected_row : SIZE_MAX,
                     ui ? ui->signal : TOUCH_HISTORY_SIGNAL_FLOW,
                     ui && ui->has_night ? ui->night.day : NULL);
@@ -564,7 +653,10 @@ static void history_ui_next_night_pressed(lv_event_t *event)
 static void history_ui_fit_pressed(lv_event_t *event)
 {
     touch_history_ui_t *ui = lv_event_get_user_data(event);
-    history_ui_emit(ui, TOUCH_HISTORY_UI_INTENT_FIT_NIGHT, 0, 0,
+    history_ui_emit(ui,
+                    TOUCH_HISTORY_UI_INTENT_FIT_NIGHT,
+                    0,
+                    0,
                     ui ? ui->selected_row : SIZE_MAX,
                     ui ? ui->signal : TOUCH_HISTORY_SIGNAL_FLOW,
                     ui && ui->has_night ? ui->night.day : NULL);
@@ -573,7 +665,10 @@ static void history_ui_fit_pressed(lv_event_t *event)
 static void history_ui_zoom_out_pressed(lv_event_t *event)
 {
     touch_history_ui_t *ui = lv_event_get_user_data(event);
-    history_ui_emit(ui, TOUCH_HISTORY_UI_INTENT_ZOOM_RELATIVE, -1, 0,
+    history_ui_emit(ui,
+                    TOUCH_HISTORY_UI_INTENT_ZOOM_RELATIVE,
+                    -1,
+                    0,
                     ui ? ui->selected_row : SIZE_MAX,
                     ui ? ui->signal : TOUCH_HISTORY_SIGNAL_FLOW,
                     ui && ui->has_night ? ui->night.day : NULL);
@@ -582,7 +677,10 @@ static void history_ui_zoom_out_pressed(lv_event_t *event)
 static void history_ui_zoom_in_pressed(lv_event_t *event)
 {
     touch_history_ui_t *ui = lv_event_get_user_data(event);
-    history_ui_emit(ui, TOUCH_HISTORY_UI_INTENT_ZOOM_RELATIVE, 1, 0,
+    history_ui_emit(ui,
+                    TOUCH_HISTORY_UI_INTENT_ZOOM_RELATIVE,
+                    1,
+                    0,
                     ui ? ui->selected_row : SIZE_MAX,
                     ui ? ui->signal : TOUCH_HISTORY_SIGNAL_FLOW,
                     ui && ui->has_night ? ui->night.day : NULL);
@@ -591,8 +689,10 @@ static void history_ui_zoom_in_pressed(lv_event_t *event)
 static void history_ui_therapy_only_pressed(lv_event_t *event)
 {
     touch_history_ui_t *ui = lv_event_get_user_data(event);
-    history_ui_emit(ui, TOUCH_HISTORY_UI_INTENT_TOGGLE_THERAPY_ONLY,
-                    ui && ui->therapy_only ? 0 : 1, 0,
+    history_ui_emit(ui,
+                    TOUCH_HISTORY_UI_INTENT_TOGGLE_THERAPY_ONLY,
+                    ui && ui->therapy_only ? 0 : 1,
+                    0,
                     ui ? ui->selected_row : SIZE_MAX,
                     ui ? ui->signal : TOUCH_HISTORY_SIGNAL_SPO2,
                     ui && ui->has_night ? ui->night.day : NULL);
@@ -603,15 +703,22 @@ static void history_ui_cancel_pressed(lv_event_t *event)
     touch_history_ui_t *ui = lv_event_get_user_data(event);
     if (!ui || ui->state != TOUCH_HISTORY_UI_STATE_AUTO_LOADING)
         return;
-    history_ui_emit(ui, TOUCH_HISTORY_UI_INTENT_CANCEL_AUTO_LOAD, 0, 0,
-                    ui->selected_row, ui->signal,
+    history_ui_emit(ui,
+                    TOUCH_HISTORY_UI_INTENT_CANCEL_AUTO_LOAD,
+                    0,
+                    0,
+                    ui->selected_row,
+                    ui->signal,
                     ui->has_night ? ui->night.day : NULL);
 }
 
 static void history_ui_retry_pressed(lv_event_t *event)
 {
     touch_history_ui_t *ui = lv_event_get_user_data(event);
-    history_ui_emit(ui, TOUCH_HISTORY_UI_INTENT_RETRY_READ, 0, 0,
+    history_ui_emit(ui,
+                    TOUCH_HISTORY_UI_INTENT_RETRY_READ,
+                    0,
+                    0,
                     ui ? ui->selected_row : SIZE_MAX,
                     ui ? ui->signal : TOUCH_HISTORY_SIGNAL_FLOW,
                     ui && ui->has_night ? ui->night.day : NULL);
@@ -620,7 +727,10 @@ static void history_ui_retry_pressed(lv_event_t *event)
 static void history_ui_open_card_pressed(lv_event_t *event)
 {
     touch_history_ui_t *ui = lv_event_get_user_data(event);
-    history_ui_emit(ui, TOUCH_HISTORY_UI_INTENT_OPEN_CARD, 0, 0,
+    history_ui_emit(ui,
+                    TOUCH_HISTORY_UI_INTENT_OPEN_CARD,
+                    0,
+                    0,
                     ui ? ui->selected_row : SIZE_MAX,
                     ui ? ui->signal : TOUCH_HISTORY_SIGNAL_FLOW,
                     ui && ui->has_night ? ui->night.day : NULL);
@@ -629,13 +739,23 @@ static void history_ui_open_card_pressed(lv_event_t *event)
 static int history_ui_days_in_month(unsigned year, unsigned month)
 {
     static const uint8_t days[] = {
-        31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31,
+        31,
+        28,
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
     };
     if (month < 1 || month > 12)
         return 0;
     int result = days[month - 1];
-    bool leap = (year % 4U == 0U && year % 100U != 0U) ||
-                (year % 400U == 0U);
+    bool leap = (year % 4U == 0U && year % 100U != 0U) || (year % 400U == 0U);
     if (month == 2 && leap)
         result++;
     return result;
@@ -645,12 +765,24 @@ static int history_ui_days_in_month(unsigned year, unsigned month)
 static int history_ui_first_weekday(unsigned year, unsigned month)
 {
     static const int offsets[] = {
-        0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4,
+        0,
+        3,
+        2,
+        5,
+        0,
+        3,
+        5,
+        1,
+        4,
+        6,
+        2,
+        4,
     };
     if (month < 3)
         year--;
-    return (int)((year + year / 4U - year / 100U + year / 400U +
-                  (unsigned)offsets[month - 1] + 1U) % 7U);
+    return (
+        int)((year + year / 4U - year / 100U + year / 400U + (unsigned)offsets[month - 1] + 1U) %
+             7U);
 }
 
 /* The general date formatter above uses Sunday=0. The History handoff's
@@ -660,8 +792,7 @@ static int history_ui_calendar_first_column(unsigned year, unsigned month)
     return (history_ui_first_weekday(year, month) + 6) % 7;
 }
 
-static int history_ui_calendar_day_at(const touch_history_ui_t *ui,
-                                      lv_coord_t x, lv_coord_t y)
+static int history_ui_calendar_day_at(const touch_history_ui_t *ui, lv_coord_t x, lv_coord_t y)
 {
     if (!ui || !ui->has_month || !ui->calendar_grid)
         return 0;
@@ -675,9 +806,7 @@ static int history_ui_calendar_day_at(const touch_history_ui_t *ui,
     int row = (y - 30) / 44;
     if (col < 0 || col > 6 || row < 0 || row > 5)
         return 0;
-    int day = row * 7 + col -
-              history_ui_calendar_first_column(
-                  ui->month.year, ui->month.month) + 1;
+    int day = row * 7 + col - history_ui_calendar_first_column(ui->month.year, ui->month.month) + 1;
     int count = history_ui_days_in_month(ui->month.year, ui->month.month);
     return day >= 1 && day <= count ? day : 0;
 }
@@ -712,12 +841,11 @@ static void history_ui_calendar_grid_pressed(lv_event_t *event)
         (char)('0' + number % 10U),
         '\0',
     };
-    history_ui_emit(ui, TOUCH_HISTORY_UI_INTENT_SELECT_CALENDAR_DAY, 0, 0,
-                    SIZE_MAX, ui->signal, day);
+    history_ui_emit(
+        ui, TOUCH_HISTORY_UI_INTENT_SELECT_CALENDAR_DAY, 0, 0, SIZE_MAX, ui->signal, day);
 }
 
-static int64_t history_ui_graph_time_at_x(const touch_history_ui_t *ui,
-                                          lv_coord_t absolute_x)
+static int64_t history_ui_graph_time_at_x(const touch_history_ui_t *ui, lv_coord_t absolute_x)
 {
     if (!ui || !ui->has_overview)
         return 0;
@@ -732,8 +860,7 @@ static int64_t history_ui_graph_time_at_x(const touch_history_ui_t *ui,
     if (absolute_x > right)
         absolute_x = right;
     int64_t duration = ui->overview.axis_end_ms - ui->overview.axis_start_ms;
-    return ui->overview.axis_start_ms +
-           (duration * (absolute_x - left)) / (right - left);
+    return ui->overview.axis_start_ms + (duration * (absolute_x - left)) / (right - left);
 }
 
 static void history_ui_finish_graph_pan(touch_history_ui_t *ui)
@@ -749,8 +876,7 @@ static void history_ui_finish_graph_pan(touch_history_ui_t *ui)
 
     lv_area_t area;
     lv_obj_get_content_coords(ui->graph, &area);
-    lv_coord_t width = lv_area_get_width(&area) -
-                       HISTORY_UI_GRAPH_PAD_L - HISTORY_UI_GRAPH_PAD_R;
+    lv_coord_t width = lv_area_get_width(&area) - HISTORY_UI_GRAPH_PAD_L - HISTORY_UI_GRAPH_PAD_R;
     int64_t duration = ui->overview.axis_end_ms - ui->overview.axis_start_ms;
     if (width <= 0 || duration <= 0)
         return;
@@ -758,8 +884,12 @@ static void history_ui_finish_graph_pan(touch_history_ui_t *ui)
     int64_t delta_ms = -((int64_t)delta_x * duration) / width;
     if (delta_ms == 0)
         return;
-    history_ui_emit(ui, TOUCH_HISTORY_UI_INTENT_PAN_RELATIVE, delta_ms,
-                    ui->cursor_ms, ui->selected_row, ui->signal,
+    history_ui_emit(ui,
+                    TOUCH_HISTORY_UI_INTENT_PAN_RELATIVE,
+                    delta_ms,
+                    ui->cursor_ms,
+                    ui->selected_row,
+                    ui->signal,
                     ui->has_night ? ui->night.day : NULL);
 }
 
@@ -796,31 +926,39 @@ static void history_ui_graph_touch(lv_event_t *event)
             return;
         }
         bool clear_cursor = false;
-        if (ui->cursor_valid &&
-            ui->overview.axis_end_ms > ui->overview.axis_start_ms) {
+        if (ui->cursor_valid && ui->overview.axis_end_ms > ui->overview.axis_start_ms) {
             lv_area_t area;
             lv_obj_get_content_coords(ui->graph, &area);
             lv_coord_t left = area.x1 + HISTORY_UI_GRAPH_PAD_L;
             lv_coord_t right = area.x2 - HISTORY_UI_GRAPH_PAD_R;
-            lv_coord_t cursor_x = left + (lv_coord_t)(
-                ((ui->cursor_ms - ui->overview.axis_start_ms) *
-                 (right - left)) /
-                (ui->overview.axis_end_ms - ui->overview.axis_start_ms));
+            lv_coord_t cursor_x =
+                left +
+                (lv_coord_t)(((ui->cursor_ms - ui->overview.axis_start_ms) * (right - left)) /
+                             (ui->overview.axis_end_ms - ui->overview.axis_start_ms));
             lv_coord_t distance = point.x - cursor_x;
-            if (distance < 0) distance = -distance;
+            if (distance < 0)
+                distance = -distance;
             clear_cursor = distance <= 18;
         }
         if (clear_cursor) {
             ui->cursor_valid = false;
             ui->cursor_ms = 0;
-            history_ui_emit(ui, TOUCH_HISTORY_UI_INTENT_CLEAR_CURSOR, 0, 0,
-                            ui->selected_row, ui->signal,
+            history_ui_emit(ui,
+                            TOUCH_HISTORY_UI_INTENT_CLEAR_CURSOR,
+                            0,
+                            0,
+                            ui->selected_row,
+                            ui->signal,
                             ui->has_night ? ui->night.day : NULL);
         } else {
             ui->cursor_ms = history_ui_graph_time_at_x(ui, point.x);
             ui->cursor_valid = true;
-            history_ui_emit(ui, TOUCH_HISTORY_UI_INTENT_SET_CURSOR, 0,
-                            ui->cursor_ms, ui->selected_row, ui->signal,
+            history_ui_emit(ui,
+                            TOUCH_HISTORY_UI_INTENT_SET_CURSOR,
+                            0,
+                            ui->cursor_ms,
+                            ui->selected_row,
+                            ui->signal,
                             ui->has_night ? ui->night.day : NULL);
         }
         lv_obj_invalidate(ui->graph);
@@ -833,10 +971,14 @@ static void history_ui_graph_touch(lv_event_t *event)
         ui->graph_dragged = true;
 }
 
-static void history_ui_draw_line(lv_draw_ctx_t *draw_ctx, uint32_t color,
-                                 lv_opa_t opacity, lv_coord_t width,
-                                 lv_coord_t x1, lv_coord_t y1,
-                                 lv_coord_t x2, lv_coord_t y2)
+static void history_ui_draw_line(lv_draw_ctx_t *draw_ctx,
+                                 uint32_t color,
+                                 lv_opa_t opacity,
+                                 lv_coord_t width,
+                                 lv_coord_t x1,
+                                 lv_coord_t y1,
+                                 lv_coord_t x2,
+                                 lv_coord_t y2)
 {
     lv_draw_line_dsc_t descriptor;
     lv_draw_line_dsc_init(&descriptor);
@@ -849,9 +991,12 @@ static void history_ui_draw_line(lv_draw_ctx_t *draw_ctx, uint32_t color,
     lv_draw_line(draw_ctx, &descriptor, &points[0], &points[1]);
 }
 
-static void history_ui_draw_rect(lv_draw_ctx_t *draw_ctx, const lv_area_t *area,
-                                 uint32_t color, lv_opa_t opacity,
-                                 lv_coord_t radius, uint32_t border_color,
+static void history_ui_draw_rect(lv_draw_ctx_t *draw_ctx,
+                                 const lv_area_t *area,
+                                 uint32_t color,
+                                 lv_opa_t opacity,
+                                 lv_coord_t radius,
+                                 uint32_t border_color,
                                  lv_coord_t border_width)
 {
     lv_draw_rect_dsc_t descriptor;
@@ -865,9 +1010,12 @@ static void history_ui_draw_rect(lv_draw_ctx_t *draw_ctx, const lv_area_t *area,
     lv_draw_rect(draw_ctx, &descriptor, area);
 }
 
-static void history_ui_draw_text(lv_draw_ctx_t *draw_ctx, const lv_area_t *area,
-                                 const char *text, const lv_font_t *font,
-                                 uint32_t color, lv_text_align_t alignment)
+static void history_ui_draw_text(lv_draw_ctx_t *draw_ctx,
+                                 const lv_area_t *area,
+                                 const char *text,
+                                 const lv_font_t *font,
+                                 uint32_t color,
+                                 lv_text_align_t alignment)
 {
     lv_draw_label_dsc_t descriptor;
     lv_draw_label_dsc_init(&descriptor);
@@ -878,7 +1026,8 @@ static void history_ui_draw_text(lv_draw_ctx_t *draw_ctx, const lv_area_t *area,
 }
 
 static lv_coord_t history_ui_plot_x(const touch_history_overview_t *overview,
-                                    size_t index, lv_coord_t left,
+                                    size_t index,
+                                    lv_coord_t left,
                                     lv_coord_t right)
 {
     if (!overview || right <= left)
@@ -886,17 +1035,16 @@ static lv_coord_t history_ui_plot_x(const touch_history_overview_t *overview,
     int64_t timestamp = overview->timestamp_ms[index];
     int64_t duration = overview->axis_end_ms - overview->axis_start_ms;
     if (duration > 0 && timestamp >= overview->axis_start_ms)
-        return left + (lv_coord_t)(((timestamp - overview->axis_start_ms) *
-                                    (right - left)) / duration);
+        return left +
+               (lv_coord_t)(((timestamp - overview->axis_start_ms) * (right - left)) / duration);
     size_t count = overview->point_count ? overview->point_count : 1;
     if (count < 2)
         return left;
     return left + (lv_coord_t)((index * (size_t)(right - left)) / (count - 1));
 }
 
-static lv_coord_t history_ui_plot_y(int32_t value_x100, int32_t minimum,
-                                    int32_t maximum, lv_coord_t top,
-                                    lv_coord_t bottom)
+static lv_coord_t history_ui_plot_y(
+    int32_t value_x100, int32_t minimum, int32_t maximum, lv_coord_t top, lv_coord_t bottom)
 {
     if (maximum <= minimum || bottom <= top)
         return top + (bottom - top) / 2;
@@ -904,8 +1052,7 @@ static lv_coord_t history_ui_plot_y(int32_t value_x100, int32_t minimum,
     return top + (lv_coord_t)(numerator / (maximum - minimum));
 }
 
-static bool history_ui_point_visible(const touch_history_ui_t *ui,
-                                     size_t index)
+static bool history_ui_point_visible(const touch_history_ui_t *ui, size_t index)
 {
     if (!ui || index >= ui->overview.point_count ||
         !(ui->overview.flags[index] & TOUCH_HISTORY_POINT_VALID))
@@ -916,8 +1063,10 @@ static bool history_ui_point_visible(const touch_history_ui_t *ui,
     return true;
 }
 
-static void history_ui_format_clock(int64_t timestamp_ms, bool seconds,
-                                    char *output, size_t capacity)
+static void history_ui_format_clock(int64_t timestamp_ms,
+                                    bool seconds,
+                                    char *output,
+                                    size_t capacity)
 {
     time_t timestamp = (time_t)(timestamp_ms / 1000);
     struct tm local = {0};
@@ -926,8 +1075,7 @@ static void history_ui_format_clock(int64_t timestamp_ms, bool seconds,
         return;
     }
     if (seconds)
-        snprintf(output, capacity, "%02d:%02d:%02d",
-                 local.tm_hour, local.tm_min, local.tm_sec);
+        snprintf(output, capacity, "%02d:%02d:%02d", local.tm_hour, local.tm_min, local.tm_sec);
     else
         snprintf(output, capacity, "%02d:%02d", local.tm_hour, local.tm_min);
 }
@@ -970,21 +1118,20 @@ static uint32_t history_ui_event_color(touch_history_event_type_t type)
 
 static void history_ui_draw_event_lane(const touch_history_ui_t *ui,
                                        lv_draw_ctx_t *draw_ctx,
-                                       lv_coord_t left, lv_coord_t right,
+                                       lv_coord_t left,
+                                       lv_coord_t right,
                                        lv_coord_t lane_y)
 {
-    history_ui_draw_line(draw_ctx, HISTORY_UI_COLOR_GRID, LV_OPA_70, 1,
-                         left, lane_y, right, lane_y);
-    if (!ui || ui->event_state == TOUCH_HISTORY_UI_EVENT_STATE_UNAVAILABLE ||
-        !ui->has_overview ||
+    history_ui_draw_line(
+        draw_ctx, HISTORY_UI_COLOR_GRID, LV_OPA_70, 1, left, lane_y, right, lane_y);
+    if (!ui || ui->event_state == TOUCH_HISTORY_UI_EVENT_STATE_UNAVAILABLE || !ui->has_overview ||
         ui->overview.axis_end_ms <= ui->overview.axis_start_ms)
         return;
 
     const lv_coord_t half = HISTORY_UI_EVENT_MARKER_SIZE / 2;
     for (size_t i = 0; i < ui->event_count; ++i) {
         const touch_history_event_t *marker = &ui->events[i];
-        if ((int)marker->type < 0 ||
-            marker->type >= TOUCH_HISTORY_EVENT_TYPE_COUNT ||
+        if ((int)marker->type < 0 || marker->type >= TOUCH_HISTORY_EVENT_TYPE_COUNT ||
             marker->end_ms < ui->overview.axis_start_ms ||
             marker->end_ms >= ui->overview.axis_end_ms)
             continue;
@@ -992,32 +1139,31 @@ static void history_ui_draw_event_lane(const touch_history_ui_t *ui,
         /* The source notification is an event-end report, so its end time is
          * the actual lane timestamp. A filled square survives the lower
          * contrast and viewing distance of the physical bedside panel. */
-        lv_coord_t x = left + (lv_coord_t)(
-            ((marker->end_ms - ui->overview.axis_start_ms) *
-             (right - left)) /
-            (ui->overview.axis_end_ms - ui->overview.axis_start_ms));
+        lv_coord_t x =
+            left + (lv_coord_t)(((marker->end_ms - ui->overview.axis_start_ms) * (right - left)) /
+                                (ui->overview.axis_end_ms - ui->overview.axis_start_ms));
         if (x < left + half)
             x = left + half;
         if (x > right - half)
             x = right - half;
         lv_area_t marker_area = {
-            x - half, lane_y - half, x + half, lane_y + half,
+            x - half,
+            lane_y - half,
+            x + half,
+            lane_y + half,
         };
         uint32_t color = history_ui_event_color(marker->type);
-        history_ui_draw_rect(draw_ctx, &marker_area, color, LV_OPA_COVER,
-                             2, color, 0);
+        history_ui_draw_rect(draw_ctx, &marker_area, color, LV_OPA_COVER, 2, color, 0);
     }
 }
 
-static const touch_history_event_t *history_ui_cursor_event(
-    const touch_history_ui_t *ui)
+static const touch_history_event_t *history_ui_cursor_event(const touch_history_ui_t *ui)
 {
     if (!ui || !ui->cursor_valid)
         return NULL;
     for (size_t i = 0; i < ui->event_count; ++i) {
         const touch_history_event_t *event = &ui->events[i];
-        if (ui->cursor_ms >= event->start_ms &&
-            ui->cursor_ms <= event->end_ms)
+        if (ui->cursor_ms >= event->start_ms && ui->cursor_ms <= event->end_ms)
             return event;
     }
     /* Do not attach a merely nearby event to the cursor. That would imply an
@@ -1027,23 +1173,23 @@ static const touch_history_event_t *history_ui_cursor_event(
 
 static void history_ui_draw_unreadable_spans(touch_history_ui_t *ui,
                                              lv_draw_ctx_t *draw_ctx,
-                                             lv_coord_t left, lv_coord_t right,
-                                             lv_coord_t top, lv_coord_t bottom)
+                                             lv_coord_t left,
+                                             lv_coord_t right,
+                                             lv_coord_t top,
+                                             lv_coord_t bottom)
 {
     if (!ui || ui->state != TOUCH_HISTORY_UI_STATE_DEGRADED_UNKNOWN)
         return;
     size_t count = ui->overview.point_count;
     for (size_t begin = 0; begin < count;) {
-        bool unreadable =
-            !(ui->overview.flags[begin] & TOUCH_HISTORY_POINT_VALID) &&
-            (ui->overview.flags[begin] & TOUCH_HISTORY_POINT_THERAPY);
+        bool unreadable = !(ui->overview.flags[begin] & TOUCH_HISTORY_POINT_VALID) &&
+                          (ui->overview.flags[begin] & TOUCH_HISTORY_POINT_THERAPY);
         if (!unreadable) {
             begin++;
             continue;
         }
         size_t end = begin + 1;
-        while (end < count &&
-               !(ui->overview.flags[end] & TOUCH_HISTORY_POINT_VALID) &&
+        while (end < count && !(ui->overview.flags[end] & TOUCH_HISTORY_POINT_VALID) &&
                (ui->overview.flags[end] & TOUCH_HISTORY_POINT_THERAPY))
             end++;
         lv_coord_t x1 = history_ui_plot_x(&ui->overview, begin, left, right);
@@ -1051,8 +1197,13 @@ static void history_ui_draw_unreadable_spans(touch_history_ui_t *ui,
         if (x2 <= x1)
             x2 = x1 + 2;
         lv_area_t region = {x1, top, x2, bottom};
-        history_ui_draw_rect(draw_ctx, &region, HISTORY_UI_COLOR_DISABLED,
-                             LV_OPA_20, 0, HISTORY_UI_COLOR_DISABLED, 0);
+        history_ui_draw_rect(draw_ctx,
+                             &region,
+                             HISTORY_UI_COLOR_DISABLED,
+                             LV_OPA_20,
+                             0,
+                             HISTORY_UI_COLOR_DISABLED,
+                             0);
         lv_coord_t height = bottom - top;
         for (lv_coord_t base = x1 - height; base < x2; base += 10) {
             lv_coord_t start = base < x1 ? x1 - base : 0;
@@ -1060,10 +1211,14 @@ static void history_ui_draw_unreadable_spans(touch_history_ui_t *ui,
             if (base + finish > x2)
                 finish = x2 - base;
             if (finish > start)
-                history_ui_draw_line(
-                    draw_ctx, HISTORY_UI_COLOR_DISABLED, LV_OPA_40, 1,
-                    base + start, bottom - start,
-                    base + finish, bottom - finish);
+                history_ui_draw_line(draw_ctx,
+                                     HISTORY_UI_COLOR_DISABLED,
+                                     LV_OPA_40,
+                                     1,
+                                     base + start,
+                                     bottom - start,
+                                     base + finish,
+                                     bottom - finish);
         }
         begin = end;
     }
@@ -1082,20 +1237,17 @@ static void history_ui_graph_draw(lv_event_t *event)
     lv_coord_t left = area.x1 + HISTORY_UI_GRAPH_PAD_L;
     lv_coord_t right = area.x2 - HISTORY_UI_GRAPH_PAD_R;
     lv_coord_t top = area.y1 + HISTORY_UI_GRAPH_PAD_T;
-    lv_coord_t bottom = area.y2 - HISTORY_UI_GRAPH_PAD_B -
-                        HISTORY_UI_EVENT_LANE_H;
+    lv_coord_t bottom = area.y2 - HISTORY_UI_GRAPH_PAD_B - HISTORY_UI_EVENT_LANE_H;
     if (right <= left || bottom <= top)
         return;
 
     for (unsigned i = 0; i <= 4; ++i) {
         lv_coord_t y = top + (lv_coord_t)((bottom - top) * i / 4U);
-        history_ui_draw_line(draw_ctx, HISTORY_UI_COLOR_GRID, LV_OPA_60, 1,
-                             left, y, right, y);
+        history_ui_draw_line(draw_ctx, HISTORY_UI_COLOR_GRID, LV_OPA_60, 1, left, y, right, y);
     }
     for (unsigned i = 0; i <= 4; ++i) {
         lv_coord_t x = left + (lv_coord_t)((right - left) * i / 4U);
-        history_ui_draw_line(draw_ctx, HISTORY_UI_COLOR_GRID, LV_OPA_40, 1,
-                             x, top, x, bottom);
+        history_ui_draw_line(draw_ctx, HISTORY_UI_COLOR_GRID, LV_OPA_40, 1, x, top, x, bottom);
     }
 
     /* The event lane is independent of the selected signal. Keep it visible
@@ -1103,13 +1255,16 @@ static void history_ui_graph_draw(lv_event_t *event)
     lv_coord_t lane_y = top - 7;
     history_ui_draw_event_lane(ui, draw_ctx, left, right, lane_y);
 
-    if (!ui->has_overview || !ui->overview.loaded ||
-        !ui->overview.has_data || ui->overview.point_count == 0) {
+    if (!ui->has_overview || !ui->overview.loaded || !ui->overview.has_data ||
+        ui->overview.point_count == 0) {
         lv_area_t message_area = {
-            left, top + (bottom - top) / 2 - 10,
-            right, top + (bottom - top) / 2 + 16,
+            left,
+            top + (bottom - top) / 2 - 10,
+            right,
+            top + (bottom - top) / 2 + 16,
         };
-        history_ui_draw_text(draw_ctx, &message_area,
+        history_ui_draw_text(draw_ctx,
+                             &message_area,
                              "No recorded samples for this channel",
                              &somnotrace_space_grotesk_medium_15,
                              HISTORY_UI_COLOR_SECONDARY,
@@ -1140,13 +1295,15 @@ static void history_ui_graph_draw(lv_event_t *event)
     }
     if (minimum == INT32_MAX || maximum == INT32_MIN) {
         lv_area_t message_area = {
-            left, top + (bottom - top) / 2 - 10,
-            right, top + (bottom - top) / 2 + 16,
+            left,
+            top + (bottom - top) / 2 - 10,
+            right,
+            top + (bottom - top) / 2 + 16,
         };
-        history_ui_draw_text(draw_ctx, &message_area,
-                             ui->therapy_only
-                                 ? "No SpO₂ samples during therapy"
-                                 : "No valid samples in this window",
+        history_ui_draw_text(draw_ctx,
+                             &message_area,
+                             ui->therapy_only ? "No SpO₂ samples during therapy"
+                                              : "No valid samples in this window",
                              &somnotrace_space_grotesk_medium_15,
                              HISTORY_UI_COLOR_SECONDARY,
                              LV_TEXT_ALIGN_CENTER);
@@ -1165,8 +1322,7 @@ static void history_ui_graph_draw(lv_event_t *event)
         minimum -= padding;
         maximum += padding;
     }
-    if (ui->signal == TOUCH_HISTORY_SIGNAL_FLOW &&
-        minimum < 0 && maximum > 0) {
+    if (ui->signal == TOUCH_HISTORY_SIGNAL_FLOW && minimum < 0 && maximum > 0) {
         int32_t magnitude = -minimum > maximum ? -minimum : maximum;
         minimum = -magnitude;
         maximum = magnitude;
@@ -1174,14 +1330,18 @@ static void history_ui_graph_draw(lv_event_t *event)
 
     char scale[24];
     for (unsigned tick = 0; tick <= 4; ++tick) {
-        int32_t value = maximum -
-                        (int32_t)(((int64_t)(maximum - minimum) * tick) / 4);
+        int32_t value = maximum - (int32_t)(((int64_t)(maximum - minimum) * tick) / 4);
         history_ui_format_x100(value, true, scale, sizeof(scale));
         lv_coord_t y = top + (lv_coord_t)((bottom - top) * tick / 4U);
         lv_area_t scale_area = {
-            area.x1 + 2, y - 8, left - 5, y + 10,
+            area.x1 + 2,
+            y - 8,
+            left - 5,
+            y + 10,
         };
-        history_ui_draw_text(draw_ctx, &scale_area, scale,
+        history_ui_draw_text(draw_ctx,
+                             &scale_area,
+                             scale,
                              &somnotrace_ibm_plex_mono_medium_11,
                              HISTORY_UI_COLOR_TERTIARY,
                              LV_TEXT_ALIGN_RIGHT);
@@ -1189,62 +1349,67 @@ static void history_ui_graph_draw(lv_event_t *event)
 
     history_ui_draw_unreadable_spans(ui, draw_ctx, left, right, top, bottom);
 
-    const bool envelope =
-        ui->signal == TOUCH_HISTORY_SIGNAL_FLOW &&
-        ui->overview.aggregation == TOUCH_HISTORY_AGGREGATION_ENVELOPE;
+    const bool envelope = ui->signal == TOUCH_HISTORY_SIGNAL_FLOW &&
+                          ui->overview.aggregation == TOUCH_HISTORY_AGGREGATION_ENVELOPE;
     size_t previous = SIZE_MAX;
     size_t previous_companion = SIZE_MAX;
     for (size_t i = 0; i < ui->overview.point_count; ++i) {
         lv_coord_t x = history_ui_plot_x(&ui->overview, i, left, right);
         if (history_ui_point_visible(ui, i)) {
-            lv_coord_t y = history_ui_plot_y(ui->overview.value_x100[i],
-                                             minimum, maximum, top, bottom);
-            if (envelope &&
-                (ui->overview.flags[i] & TOUCH_HISTORY_POINT_UPPER_VALID)) {
-                lv_coord_t upper = history_ui_plot_y(
-                    ui->overview.upper_x100[i], minimum, maximum, top, bottom);
-                history_ui_draw_line(draw_ctx, HISTORY_UI_COLOR_LIVE,
-                                     LV_OPA_60, 2, x, upper, x, y);
+            lv_coord_t y =
+                history_ui_plot_y(ui->overview.value_x100[i], minimum, maximum, top, bottom);
+            if (envelope && (ui->overview.flags[i] & TOUCH_HISTORY_POINT_UPPER_VALID)) {
+                lv_coord_t upper =
+                    history_ui_plot_y(ui->overview.upper_x100[i], minimum, maximum, top, bottom);
+                history_ui_draw_line(draw_ctx, HISTORY_UI_COLOR_LIVE, LV_OPA_60, 2, x, upper, x, y);
                 if (previous != SIZE_MAX &&
-                    (ui->overview.flags[previous] &
-                     TOUCH_HISTORY_POINT_UPPER_VALID)) {
+                    (ui->overview.flags[previous] & TOUCH_HISTORY_POINT_UPPER_VALID)) {
                     bool adjacent =
                         ui->overview.bin_width_ms == 0 ||
-                        ui->overview.timestamp_ms[i] -
-                                ui->overview.timestamp_ms[previous] <=
+                        ui->overview.timestamp_ms[i] - ui->overview.timestamp_ms[previous] <=
                             (int64_t)ui->overview.bin_width_ms * 2;
                     if (adjacent) {
-                        lv_coord_t previous_x = history_ui_plot_x(
-                            &ui->overview, previous, left, right);
+                        lv_coord_t previous_x =
+                            history_ui_plot_x(&ui->overview, previous, left, right);
                         lv_coord_t previous_low = history_ui_plot_y(
-                            ui->overview.value_x100[previous],
-                            minimum, maximum, top, bottom);
+                            ui->overview.value_x100[previous], minimum, maximum, top, bottom);
                         lv_coord_t previous_upper = history_ui_plot_y(
-                            ui->overview.upper_x100[previous],
-                            minimum, maximum, top, bottom);
-                        history_ui_draw_line(
-                            draw_ctx, HISTORY_UI_COLOR_LIVE, LV_OPA_80, 1,
-                            previous_x, previous_low, x, y);
-                        history_ui_draw_line(
-                            draw_ctx, HISTORY_UI_COLOR_LIVE, LV_OPA_80, 1,
-                            previous_x, previous_upper, x, upper);
+                            ui->overview.upper_x100[previous], minimum, maximum, top, bottom);
+                        history_ui_draw_line(draw_ctx,
+                                             HISTORY_UI_COLOR_LIVE,
+                                             LV_OPA_80,
+                                             1,
+                                             previous_x,
+                                             previous_low,
+                                             x,
+                                             y);
+                        history_ui_draw_line(draw_ctx,
+                                             HISTORY_UI_COLOR_LIVE,
+                                             LV_OPA_80,
+                                             1,
+                                             previous_x,
+                                             previous_upper,
+                                             x,
+                                             upper);
                     }
                 }
             } else if (previous != SIZE_MAX) {
                 bool adjacent =
                     ui->overview.bin_width_ms == 0 ||
-                    ui->overview.timestamp_ms[i] -
-                            ui->overview.timestamp_ms[previous] <=
+                    ui->overview.timestamp_ms[i] - ui->overview.timestamp_ms[previous] <=
                         (int64_t)ui->overview.bin_width_ms * 2;
                 if (adjacent) {
-                    lv_coord_t previous_x = history_ui_plot_x(
-                        &ui->overview, previous, left, right);
+                    lv_coord_t previous_x = history_ui_plot_x(&ui->overview, previous, left, right);
                     lv_coord_t previous_y = history_ui_plot_y(
-                        ui->overview.value_x100[previous], minimum, maximum,
-                        top, bottom);
-                    history_ui_draw_line(draw_ctx, HISTORY_UI_COLOR_LIVE,
-                                         LV_OPA_COVER, 2, previous_x,
-                                         previous_y, x, y);
+                        ui->overview.value_x100[previous], minimum, maximum, top, bottom);
+                    history_ui_draw_line(draw_ctx,
+                                         HISTORY_UI_COLOR_LIVE,
+                                         LV_OPA_COVER,
+                                         2,
+                                         previous_x,
+                                         previous_y,
+                                         x,
+                                         y);
                 }
             }
             previous = i;
@@ -1254,27 +1419,32 @@ static void history_ui_graph_draw(lv_event_t *event)
 
         if (ui->signal == TOUCH_HISTORY_SIGNAL_PRESSURE &&
             (ui->overview.flags[i] &
-             (TOUCH_HISTORY_POINT_VALID |
-              TOUCH_HISTORY_POINT_COMPANION_VALID)) ==
-                (TOUCH_HISTORY_POINT_VALID |
-                 TOUCH_HISTORY_POINT_COMPANION_VALID)) {
-            lv_coord_t companion_y = history_ui_plot_y(
-                ui->overview.companion_x100[i], minimum, maximum, top, bottom);
+             (TOUCH_HISTORY_POINT_VALID | TOUCH_HISTORY_POINT_COMPANION_VALID)) ==
+                (TOUCH_HISTORY_POINT_VALID | TOUCH_HISTORY_POINT_COMPANION_VALID)) {
+            lv_coord_t companion_y =
+                history_ui_plot_y(ui->overview.companion_x100[i], minimum, maximum, top, bottom);
             if (previous_companion != SIZE_MAX) {
                 bool adjacent =
                     ui->overview.bin_width_ms == 0 ||
-                    ui->overview.timestamp_ms[i] -
-                            ui->overview.timestamp_ms[previous_companion] <=
+                    ui->overview.timestamp_ms[i] - ui->overview.timestamp_ms[previous_companion] <=
                         (int64_t)ui->overview.bin_width_ms * 2;
                 if (adjacent) {
-                    lv_coord_t previous_x = history_ui_plot_x(
-                        &ui->overview, previous_companion, left, right);
-                    lv_coord_t previous_y = history_ui_plot_y(
-                        ui->overview.companion_x100[previous_companion],
-                        minimum, maximum, top, bottom);
-                    history_ui_draw_line(draw_ctx, HISTORY_UI_COLOR_EPR,
-                                         LV_OPA_70, 2, previous_x, previous_y,
-                                         x, companion_y);
+                    lv_coord_t previous_x =
+                        history_ui_plot_x(&ui->overview, previous_companion, left, right);
+                    lv_coord_t previous_y =
+                        history_ui_plot_y(ui->overview.companion_x100[previous_companion],
+                                          minimum,
+                                          maximum,
+                                          top,
+                                          bottom);
+                    history_ui_draw_line(draw_ctx,
+                                         HISTORY_UI_COLOR_EPR,
+                                         LV_OPA_70,
+                                         2,
+                                         previous_x,
+                                         previous_y,
+                                         x,
+                                         companion_y);
                 }
             }
             previous_companion = i;
@@ -1285,69 +1455,84 @@ static void history_ui_graph_draw(lv_event_t *event)
 
     for (size_t i = 0; i < ui->session_count; ++i) {
         int64_t boundaries[2] = {
-            ui->sessions[i].start_ms, ui->sessions[i].end_ms,
+            ui->sessions[i].start_ms,
+            ui->sessions[i].end_ms,
         };
         for (size_t boundary = 0; boundary < 2; ++boundary) {
             int64_t timestamp = boundaries[boundary];
-            if (timestamp <= ui->overview.axis_start_ms ||
-                timestamp >= ui->overview.axis_end_ms)
+            if (timestamp <= ui->overview.axis_start_ms || timestamp >= ui->overview.axis_end_ms)
                 continue;
-            lv_coord_t x = left + (lv_coord_t)(
-                ((timestamp - ui->overview.axis_start_ms) * (right - left)) /
-                (ui->overview.axis_end_ms - ui->overview.axis_start_ms));
-            history_ui_draw_line(draw_ctx, HISTORY_UI_COLOR_SECONDARY,
-                                 LV_OPA_30, 1, x, top, x, bottom);
+            lv_coord_t x =
+                left + (lv_coord_t)(((timestamp - ui->overview.axis_start_ms) * (right - left)) /
+                                    (ui->overview.axis_end_ms - ui->overview.axis_start_ms));
+            history_ui_draw_line(
+                draw_ctx, HISTORY_UI_COLOR_SECONDARY, LV_OPA_30, 1, x, top, x, bottom);
         }
     }
 
-    if (ui->signal == TOUCH_HISTORY_SIGNAL_SPO2 ||
-        ui->signal == TOUCH_HISTORY_SIGNAL_PULSE) {
+    if (ui->signal == TOUCH_HISTORY_SIGNAL_SPO2 || ui->signal == TOUCH_HISTORY_SIGNAL_PULSE) {
         lv_coord_t availability_y = bottom + 3;
-        history_ui_draw_line(draw_ctx, HISTORY_UI_COLOR_DISABLED,
-                             LV_OPA_50, 3, left, availability_y,
-                             right, availability_y);
+        history_ui_draw_line(draw_ctx,
+                             HISTORY_UI_COLOR_DISABLED,
+                             LV_OPA_50,
+                             3,
+                             left,
+                             availability_y,
+                             right,
+                             availability_y);
         for (size_t i = 0; i < ui->overview.point_count; ++i) {
             if (!history_ui_point_visible(ui, i))
                 continue;
-            lv_coord_t x1 = history_ui_plot_x(
-                &ui->overview, i, left, right);
+            lv_coord_t x1 = history_ui_plot_x(&ui->overview, i, left, right);
             lv_coord_t x2 = i + 1 < ui->overview.point_count
-                                ? history_ui_plot_x(
-                                      &ui->overview, i + 1, left, right)
+                                ? history_ui_plot_x(&ui->overview, i + 1, left, right)
                                 : x1 + 1;
-            history_ui_draw_line(draw_ctx, HISTORY_UI_COLOR_O2,
-                                 LV_OPA_COVER, 3, x1, availability_y,
-                                 x2, availability_y);
+            history_ui_draw_line(draw_ctx,
+                                 HISTORY_UI_COLOR_O2,
+                                 LV_OPA_COVER,
+                                 3,
+                                 x1,
+                                 availability_y,
+                                 x2,
+                                 availability_y);
         }
     }
 
     for (size_t i = 0; i < ui->session_count; ++i) {
         int64_t start = ui->sessions[i].start_ms;
         int64_t end = ui->sessions[i].end_ms;
-        if (end <= ui->overview.axis_start_ms ||
-            start >= ui->overview.axis_end_ms)
+        if (end <= ui->overview.axis_start_ms || start >= ui->overview.axis_end_ms)
             continue;
         if (start < ui->overview.axis_start_ms)
             start = ui->overview.axis_start_ms;
         if (end > ui->overview.axis_end_ms)
             end = ui->overview.axis_end_ms;
-        lv_coord_t x1 = left + (lv_coord_t)(
-            ((start - ui->overview.axis_start_ms) * (right - left)) /
-            (ui->overview.axis_end_ms - ui->overview.axis_start_ms));
-        lv_coord_t x2 = left + (lv_coord_t)(
-            ((end - ui->overview.axis_start_ms) * (right - left)) /
-            (ui->overview.axis_end_ms - ui->overview.axis_start_ms));
+        lv_coord_t x1 =
+            left + (lv_coord_t)(((start - ui->overview.axis_start_ms) * (right - left)) /
+                                (ui->overview.axis_end_ms - ui->overview.axis_start_ms));
+        lv_coord_t x2 =
+            left + (lv_coord_t)(((end - ui->overview.axis_start_ms) * (right - left)) /
+                                (ui->overview.axis_end_ms - ui->overview.axis_start_ms));
         if (x2 - x1 < 72)
             continue;
         char start_time[12], end_time[12], caption[64];
         history_ui_format_clock(start, false, start_time, sizeof(start_time));
         history_ui_format_clock(end, false, end_time, sizeof(end_time));
-        snprintf(caption, sizeof(caption), "SESSION %u · %s–%s",
-                 (unsigned)(i + 1), start_time, end_time);
+        snprintf(caption,
+                 sizeof(caption),
+                 "SESSION %u · %s–%s",
+                 (unsigned)(i + 1),
+                 start_time,
+                 end_time);
         lv_area_t caption_area = {
-            x1 + 3, bottom + 7, x2 - 3, bottom + 23,
+            x1 + 3,
+            bottom + 7,
+            x2 - 3,
+            bottom + 23,
         };
-        history_ui_draw_text(draw_ctx, &caption_area, caption,
+        history_ui_draw_text(draw_ctx,
+                             &caption_area,
+                             caption,
                              &somnotrace_ibm_plex_mono_semibold_11,
                              HISTORY_UI_COLOR_TERTIARY,
                              LV_TEXT_ALIGN_LEFT);
@@ -1355,34 +1540,37 @@ static void history_ui_graph_draw(lv_event_t *event)
 
     for (unsigned tick = 0; tick <= 4; ++tick) {
         int64_t timestamp = ui->overview.axis_start_ms +
-                            ((ui->overview.axis_end_ms -
-                              ui->overview.axis_start_ms) * tick) / 4;
+                            ((ui->overview.axis_end_ms - ui->overview.axis_start_ms) * tick) / 4;
         char clock[12];
         history_ui_format_clock(timestamp, false, clock, sizeof(clock));
         lv_coord_t x = left + (lv_coord_t)((right - left) * tick / 4U);
         lv_area_t clock_area = {
-            x - 36, area.y2 - 18, x + 36, area.y2 - 1,
+            x - 36,
+            area.y2 - 18,
+            x + 36,
+            area.y2 - 1,
         };
         if (clock_area.x1 < left)
             clock_area.x1 = left;
         if (clock_area.x2 > right)
             clock_area.x2 = right;
-        history_ui_draw_text(draw_ctx, &clock_area, clock,
+        history_ui_draw_text(draw_ctx,
+                             &clock_area,
+                             clock,
                              &somnotrace_ibm_plex_mono_medium_11,
                              HISTORY_UI_COLOR_TERTIARY,
                              tick == 0 ? LV_TEXT_ALIGN_LEFT
-                                       : (tick == 4 ? LV_TEXT_ALIGN_RIGHT
-                                                    : LV_TEXT_ALIGN_CENTER));
+                                       : (tick == 4 ? LV_TEXT_ALIGN_RIGHT : LV_TEXT_ALIGN_CENTER));
     }
 
     if (!ui->cursor_valid || ui->cursor_ms < ui->overview.axis_start_ms ||
         ui->cursor_ms > ui->overview.axis_end_ms)
         return;
-    lv_coord_t cursor_x = left + (lv_coord_t)(
-        ((ui->cursor_ms - ui->overview.axis_start_ms) * (right - left)) /
-        (ui->overview.axis_end_ms - ui->overview.axis_start_ms));
-    history_ui_draw_line(draw_ctx, HISTORY_UI_COLOR_TEXT, LV_OPA_80, 1,
-                         cursor_x, lane_y - 5, cursor_x, bottom);
+    lv_coord_t cursor_x =
+        left + (lv_coord_t)(((ui->cursor_ms - ui->overview.axis_start_ms) * (right - left)) /
+                            (ui->overview.axis_end_ms - ui->overview.axis_start_ms));
+    history_ui_draw_line(
+        draw_ctx, HISTORY_UI_COLOR_TEXT, LV_OPA_80, 1, cursor_x, lane_y - 5, cursor_x, bottom);
 
     size_t nearest = 0;
     uint64_t nearest_distance = UINT64_MAX;
@@ -1397,18 +1585,18 @@ static void history_ui_graph_draw(lv_event_t *event)
     char clock[16], value[24], upper[24], summary[64], tooltip[128];
     history_ui_format_clock(ui->cursor_ms, true, clock, sizeof(clock));
     bool value_available = history_ui_point_visible(ui, nearest);
-    history_ui_format_x100(ui->overview.value_x100[nearest], value_available,
-                           value, sizeof(value));
+    history_ui_format_x100(ui->overview.value_x100[nearest], value_available, value, sizeof(value));
     bool cursor_envelope = value_available &&
-                           ui->overview.aggregation ==
-                               TOUCH_HISTORY_AGGREGATION_ENVELOPE &&
-                           (ui->overview.flags[nearest] &
-                            TOUCH_HISTORY_POINT_UPPER_VALID);
+                           ui->overview.aggregation == TOUCH_HISTORY_AGGREGATION_ENVELOPE &&
+                           (ui->overview.flags[nearest] & TOUCH_HISTORY_POINT_UPPER_VALID);
     if (cursor_envelope) {
-        history_ui_format_x100(ui->overview.upper_x100[nearest], true,
-                               upper, sizeof(upper));
-        snprintf(summary, sizeof(summary), "Bin min/max %s/%s %s",
-                 value, upper, s_signal_units[ui->signal]);
+        history_ui_format_x100(ui->overview.upper_x100[nearest], true, upper, sizeof(upper));
+        snprintf(summary,
+                 sizeof(summary),
+                 "Bin min/max %s/%s %s",
+                 value,
+                 upper,
+                 s_signal_units[ui->signal]);
     } else {
         const char *summary_label = "Bin mean";
         if (ui->overview.aggregation == TOUCH_HISTORY_AGGREGATION_MINIMUM)
@@ -1417,12 +1605,16 @@ static void history_ui_graph_draw(lv_event_t *event)
             summary_label = "Bin max";
         else if (ui->overview.aggregation == TOUCH_HISTORY_AGGREGATION_ENVELOPE)
             summary_label = "Bin min/max";
-        snprintf(summary, sizeof(summary), "%s %s %s",
-                 summary_label, value, s_signal_units[ui->signal]);
+        snprintf(
+            summary, sizeof(summary), "%s %s %s", summary_label, value, s_signal_units[ui->signal]);
     }
     const touch_history_event_t *cursor_event = history_ui_cursor_event(ui);
-    snprintf(tooltip, sizeof(tooltip), "%s  %s%s%s%s",
-             clock, ui->overview.preview ? "Preview " : "", summary,
+    snprintf(tooltip,
+             sizeof(tooltip),
+             "%s  %s%s%s%s",
+             clock,
+             ui->overview.preview ? "Preview " : "",
+             summary,
              cursor_event ? "  Event " : "",
              cursor_event ? history_ui_event_code(cursor_event->type) : "");
     lv_coord_t tooltip_width = 360;
@@ -1432,17 +1624,30 @@ static void history_ui_graph_draw(lv_event_t *event)
     if (tooltip_x < left)
         tooltip_x = left;
     lv_area_t tooltip_area = {
-        tooltip_x, top + 5, tooltip_x + tooltip_width, top + 38,
+        tooltip_x,
+        top + 5,
+        tooltip_x + tooltip_width,
+        top + 38,
     };
-    history_ui_draw_rect(draw_ctx, &tooltip_area, HISTORY_UI_COLOR_PANEL,
-                         LV_OPA_COVER, 7, HISTORY_UI_COLOR_BORDER, 1);
+    history_ui_draw_rect(draw_ctx,
+                         &tooltip_area,
+                         HISTORY_UI_COLOR_PANEL,
+                         LV_OPA_COVER,
+                         7,
+                         HISTORY_UI_COLOR_BORDER,
+                         1);
     lv_area_t tooltip_text_area = {
-        tooltip_area.x1 + 8, tooltip_area.y1 + 7,
-        tooltip_area.x2 - 8, tooltip_area.y2 - 4,
+        tooltip_area.x1 + 8,
+        tooltip_area.y1 + 7,
+        tooltip_area.x2 - 8,
+        tooltip_area.y2 - 4,
     };
-    history_ui_draw_text(draw_ctx, &tooltip_text_area, tooltip,
+    history_ui_draw_text(draw_ctx,
+                         &tooltip_text_area,
+                         tooltip,
                          &somnotrace_ibm_plex_mono_medium_11,
-                         HISTORY_UI_COLOR_TEXT, LV_TEXT_ALIGN_LEFT);
+                         HISTORY_UI_COLOR_TEXT,
+                         LV_TEXT_ALIGN_LEFT);
 }
 
 static void history_ui_calendar_draw(lv_event_t *event)
@@ -1460,21 +1665,26 @@ static void history_ui_calendar_draw(lv_event_t *event)
     lv_coord_t cell_width = width / 7;
     for (unsigned col = 0; col < 7; ++col) {
         lv_area_t label_area = {
-            area.x1 + (lv_coord_t)(col * cell_width), area.y1 + 4,
-            area.x1 + (lv_coord_t)((col + 1) * cell_width) - 1, area.y1 + 25,
+            area.x1 + (lv_coord_t)(col * cell_width),
+            area.y1 + 4,
+            area.x1 + (lv_coord_t)((col + 1) * cell_width) - 1,
+            area.y1 + 25,
         };
-        history_ui_draw_text(draw_ctx, &label_area, weekday[col],
+        history_ui_draw_text(draw_ctx,
+                             &label_area,
+                             weekday[col],
                              &somnotrace_space_grotesk_semibold_13,
-                             HISTORY_UI_COLOR_TERTIARY, LV_TEXT_ALIGN_CENTER);
+                             HISTORY_UI_COLOR_TERTIARY,
+                             LV_TEXT_ALIGN_CENTER);
     }
 
     unsigned selected_year = 0;
     unsigned selected_month = 0;
     unsigned selected_day = 0;
-    bool selected_date_valid = ui->has_night && history_ui_parse_day(
-        ui->night.day, &selected_year, &selected_month, &selected_day);
-    int first = history_ui_calendar_first_column(
-        ui->month.year, ui->month.month);
+    bool selected_date_valid =
+        ui->has_night &&
+        history_ui_parse_day(ui->night.day, &selected_year, &selected_month, &selected_day);
+    int first = history_ui_calendar_first_column(ui->month.year, ui->month.month);
     int days = history_ui_days_in_month(ui->month.year, ui->month.month);
     for (int day = 1; day <= days; ++day) {
         int slot = first + day - 1;
@@ -1487,40 +1697,53 @@ static void history_ui_calendar_draw(lv_event_t *event)
         bool therapy = (ui->month.therapy_days & bit) != 0;
         bool oximetry = (ui->month.oximetry_days & bit) != 0;
         bool has_data = therapy || oximetry;
-        bool selected = selected_date_valid &&
-                        selected_year == ui->month.year &&
-                        selected_month == ui->month.month &&
-                        selected_day == (unsigned)day;
-        history_ui_draw_rect(draw_ctx, &cell,
-                             selected ? 0xe9edf3
-                                      : has_data ? HISTORY_UI_COLOR_ROW
-                                      : HISTORY_UI_COLOR_BASE,
+        bool selected = selected_date_valid && selected_year == ui->month.year &&
+                        selected_month == ui->month.month && selected_day == (unsigned)day;
+        history_ui_draw_rect(draw_ctx,
+                             &cell,
+                             selected   ? 0xe9edf3
+                             : has_data ? HISTORY_UI_COLOR_ROW
+                                        : HISTORY_UI_COLOR_BASE,
                              selected || has_data ? LV_OPA_COVER : LV_OPA_50,
-                             8, HISTORY_UI_COLOR_BORDER,
+                             8,
+                             HISTORY_UI_COLOR_BORDER,
                              selected ? 0 : (has_data ? 1 : 0));
         char number[4];
         snprintf(number, sizeof(number), "%d", day);
         lv_area_t number_area = {
-            cell.x1, cell.y1 + 7, cell.x2, cell.y2 - 7,
+            cell.x1,
+            cell.y1 + 7,
+            cell.x2,
+            cell.y2 - 7,
         };
-        history_ui_draw_text(draw_ctx, &number_area, number,
+        history_ui_draw_text(draw_ctx,
+                             &number_area,
+                             number,
                              &somnotrace_space_grotesk_medium_15,
-                             selected ? HISTORY_UI_COLOR_CARD
-                                      : has_data ? HISTORY_UI_COLOR_TEXT
-                                      : HISTORY_UI_COLOR_DISABLED,
+                             selected   ? HISTORY_UI_COLOR_CARD
+                             : has_data ? HISTORY_UI_COLOR_TEXT
+                                        : HISTORY_UI_COLOR_DISABLED,
                              LV_TEXT_ALIGN_CENTER);
         lv_coord_t dot_y = cell.y2 - 5;
         lv_coord_t dot_x = cell.x1 + (cell.x2 - cell.x1) / 2;
         if (therapy)
-            history_ui_draw_line(draw_ctx, HISTORY_UI_COLOR_LIVE,
-                                 LV_OPA_COVER, 4,
-                                 dot_x - (oximetry ? 4 : 0), dot_y,
-                                 dot_x - (oximetry ? 4 : 0), dot_y);
+            history_ui_draw_line(draw_ctx,
+                                 HISTORY_UI_COLOR_LIVE,
+                                 LV_OPA_COVER,
+                                 4,
+                                 dot_x - (oximetry ? 4 : 0),
+                                 dot_y,
+                                 dot_x - (oximetry ? 4 : 0),
+                                 dot_y);
         if (oximetry)
-            history_ui_draw_line(draw_ctx, HISTORY_UI_COLOR_O2,
-                                 LV_OPA_COVER, 4,
-                                 dot_x + (therapy ? 4 : 0), dot_y,
-                                 dot_x + (therapy ? 4 : 0), dot_y);
+            history_ui_draw_line(draw_ctx,
+                                 HISTORY_UI_COLOR_O2,
+                                 LV_OPA_COVER,
+                                 4,
+                                 dot_x + (therapy ? 4 : 0),
+                                 dot_y,
+                                 dot_x + (therapy ? 4 : 0),
+                                 dot_y);
     }
 }
 
@@ -1542,8 +1765,7 @@ static void history_ui_state_secondary_pressed(lv_event_t *event)
         history_ui_open_card_pressed(event);
 }
 
-static lv_obj_t *history_ui_dot(lv_obj_t *parent, lv_coord_t x, lv_coord_t y,
-                                uint32_t color)
+static lv_obj_t *history_ui_dot(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, uint32_t color)
 {
     lv_obj_t *dot = lv_obj_create(parent);
     if (!dot)
@@ -1580,80 +1802,97 @@ static esp_err_t history_ui_ensure_calendar(touch_history_ui_t *ui)
     if (ui->calendar_overlay)
         return ESP_OK;
 
-    ui->calendar_overlay = history_ui_container(
-        ui->left, 0, HISTORY_UI_CALENDAR_Y, TOUCH_HISTORY_UI_LIST_WIDTH,
-        HISTORY_UI_CALENDAR_H, HISTORY_UI_COLOR_PANEL, 0);
+    ui->calendar_overlay = history_ui_container(ui->left,
+                                                0,
+                                                HISTORY_UI_CALENDAR_Y,
+                                                TOUCH_HISTORY_UI_LIST_WIDTH,
+                                                HISTORY_UI_CALENDAR_H,
+                                                HISTORY_UI_COLOR_PANEL,
+                                                0);
     if (!ui->calendar_overlay)
         return ESP_ERR_NO_MEM;
 
-    ui->calendar_title = history_ui_label(
-        ui->calendar_overlay, "Recorded nights",
-        &somnotrace_space_grotesk_semibold_15, HISTORY_UI_COLOR_TEXT,
-        HISTORY_UI_HIT, 10,
-        TOUCH_HISTORY_UI_LIST_WIDTH - 2 * HISTORY_UI_HIT, 24);
+    ui->calendar_title = history_ui_label(ui->calendar_overlay,
+                                          "Recorded nights",
+                                          &somnotrace_space_grotesk_semibold_15,
+                                          HISTORY_UI_COLOR_TEXT,
+                                          HISTORY_UI_HIT,
+                                          10,
+                                          TOUCH_HISTORY_UI_LIST_WIDTH - 2 * HISTORY_UI_HIT,
+                                          24);
     if (!ui->calendar_title)
         goto no_memory;
     lv_obj_set_style_text_align(ui->calendar_title, LV_TEXT_ALIGN_CENTER, 0);
 
     ui->calendar_previous = history_ui_button(
-        ui->calendar_overlay, 0, 0, HISTORY_UI_HIT, HISTORY_UI_HIT,
-        HISTORY_UI_COLOR_CONTROL);
+        ui->calendar_overlay, 0, 0, HISTORY_UI_HIT, HISTORY_UI_HIT, HISTORY_UI_COLOR_CONTROL);
     if (!ui->calendar_previous)
         goto no_memory;
     lv_obj_set_style_radius(ui->calendar_previous, LV_RADIUS_CIRCLE, 0);
     lv_obj_t *previous_label = history_ui_button_label(
-        ui->calendar_previous, "<", &somnotrace_space_grotesk_semibold_19,
-        HISTORY_UI_COLOR_TEXT);
+        ui->calendar_previous, "<", &somnotrace_space_grotesk_semibold_19, HISTORY_UI_COLOR_TEXT);
     if (!previous_label)
         goto no_memory;
-    lv_obj_add_event_cb(ui->calendar_previous,
-                        history_ui_month_previous_pressed,
-                        LV_EVENT_PRESSED, ui);
+    lv_obj_add_event_cb(
+        ui->calendar_previous, history_ui_month_previous_pressed, LV_EVENT_PRESSED, ui);
 
-    ui->calendar_next = history_ui_button(
-        ui->calendar_overlay, TOUCH_HISTORY_UI_LIST_WIDTH - HISTORY_UI_HIT,
-        0, HISTORY_UI_HIT, HISTORY_UI_HIT,
-        HISTORY_UI_COLOR_CONTROL);
+    ui->calendar_next = history_ui_button(ui->calendar_overlay,
+                                          TOUCH_HISTORY_UI_LIST_WIDTH - HISTORY_UI_HIT,
+                                          0,
+                                          HISTORY_UI_HIT,
+                                          HISTORY_UI_HIT,
+                                          HISTORY_UI_COLOR_CONTROL);
     if (!ui->calendar_next)
         goto no_memory;
     lv_obj_set_style_radius(ui->calendar_next, LV_RADIUS_CIRCLE, 0);
     lv_obj_t *next_label = history_ui_button_label(
-        ui->calendar_next, ">", &somnotrace_space_grotesk_semibold_19,
-        HISTORY_UI_COLOR_TEXT);
+        ui->calendar_next, ">", &somnotrace_space_grotesk_semibold_19, HISTORY_UI_COLOR_TEXT);
     if (!next_label)
         goto no_memory;
-    lv_obj_add_event_cb(ui->calendar_next, history_ui_month_next_pressed,
-                        LV_EVENT_PRESSED, ui);
+    lv_obj_add_event_cb(ui->calendar_next, history_ui_month_next_pressed, LV_EVENT_PRESSED, ui);
 
     /* One touch/draw grid keeps 42 calendar cells from becoming 42 objects. */
-    ui->calendar_grid = history_ui_container(
-        ui->calendar_overlay, 0, HISTORY_UI_CALENDAR_GRID_Y,
-        TOUCH_HISTORY_UI_LIST_WIDTH, HISTORY_UI_CALENDAR_GRID_H,
-        HISTORY_UI_COLOR_CARD, 0);
+    ui->calendar_grid = history_ui_container(ui->calendar_overlay,
+                                             0,
+                                             HISTORY_UI_CALENDAR_GRID_Y,
+                                             TOUCH_HISTORY_UI_LIST_WIDTH,
+                                             HISTORY_UI_CALENDAR_GRID_H,
+                                             HISTORY_UI_COLOR_CARD,
+                                             0);
     if (!ui->calendar_grid)
         goto no_memory;
     lv_obj_add_flag(ui->calendar_grid, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(ui->calendar_grid, history_ui_calendar_draw,
-                        LV_EVENT_DRAW_MAIN, ui);
-    lv_obj_add_event_cb(ui->calendar_grid, history_ui_calendar_grid_pressed,
-                        LV_EVENT_PRESSED, ui);
+    lv_obj_add_event_cb(ui->calendar_grid, history_ui_calendar_draw, LV_EVENT_DRAW_MAIN, ui);
+    lv_obj_add_event_cb(ui->calendar_grid, history_ui_calendar_grid_pressed, LV_EVENT_PRESSED, ui);
 
-    lv_obj_t *therapy_dot = history_ui_dot(
-        ui->calendar_overlay, 16, 365, HISTORY_UI_COLOR_LIVE);
-    lv_obj_t *therapy_label = history_ui_label(
-        ui->calendar_overlay, "AirSense", &somnotrace_space_grotesk_medium_13,
-        HISTORY_UI_COLOR_SECONDARY, 30, 358, 96, 22);
-    lv_obj_t *oximetry_dot = history_ui_dot(
-        ui->calendar_overlay, 150, 365, HISTORY_UI_COLOR_O2);
-    lv_obj_t *oximetry_label = history_ui_label(
-        ui->calendar_overlay, "O₂ Ring", &somnotrace_space_grotesk_medium_13,
-        HISTORY_UI_COLOR_SECONDARY, 164, 358, 104, 22);
+    lv_obj_t *therapy_dot = history_ui_dot(ui->calendar_overlay, 16, 365, HISTORY_UI_COLOR_LIVE);
+    lv_obj_t *therapy_label = history_ui_label(ui->calendar_overlay,
+                                               "AirSense",
+                                               &somnotrace_space_grotesk_medium_13,
+                                               HISTORY_UI_COLOR_SECONDARY,
+                                               30,
+                                               358,
+                                               96,
+                                               22);
+    lv_obj_t *oximetry_dot = history_ui_dot(ui->calendar_overlay, 150, 365, HISTORY_UI_COLOR_O2);
+    lv_obj_t *oximetry_label = history_ui_label(ui->calendar_overlay,
+                                                "O₂ Ring",
+                                                &somnotrace_space_grotesk_medium_13,
+                                                HISTORY_UI_COLOR_SECONDARY,
+                                                164,
+                                                358,
+                                                104,
+                                                22);
     if (!therapy_dot || !therapy_label || !oximetry_dot || !oximetry_label)
         goto no_memory;
-    ui->calendar_status = history_ui_label(
-        ui->calendar_overlay, "Could not read this month",
-        &somnotrace_ibm_plex_mono_semibold_11, HISTORY_UI_COLOR_FAULT,
-        10, 384, TOUCH_HISTORY_UI_LIST_WIDTH - 20, 18);
+    ui->calendar_status = history_ui_label(ui->calendar_overlay,
+                                           "Could not read this month",
+                                           &somnotrace_ibm_plex_mono_semibold_11,
+                                           HISTORY_UI_COLOR_FAULT,
+                                           10,
+                                           384,
+                                           TOUCH_HISTORY_UI_LIST_WIDTH - 20,
+                                           18);
     if (!ui->calendar_status)
         goto no_memory;
     lv_obj_set_style_text_align(ui->calendar_status, LV_TEXT_ALIGN_CENTER, 0);
@@ -1666,345 +1905,430 @@ no_memory:
     return ESP_ERR_NO_MEM;
 }
 
-static esp_err_t history_ui_build_objects(touch_history_ui_t *ui,
-                                          lv_obj_t *parent)
+static esp_err_t history_ui_build_objects(touch_history_ui_t *ui, lv_obj_t *parent)
 {
     ui->root = history_ui_container(
-        parent, 0, 0, TOUCH_HISTORY_UI_WIDTH, TOUCH_HISTORY_UI_HEIGHT,
-        HISTORY_UI_COLOR_BASE, 0);
+        parent, 0, 0, TOUCH_HISTORY_UI_WIDTH, TOUCH_HISTORY_UI_HEIGHT, HISTORY_UI_COLOR_BASE, 0);
     if (!ui->root)
         return ESP_ERR_NO_MEM;
 
-    ui->left = history_ui_container(
-        ui->root, 0, 0, TOUCH_HISTORY_UI_LIST_WIDTH, TOUCH_HISTORY_UI_HEIGHT,
-        HISTORY_UI_COLOR_PANEL, HISTORY_UI_COLOR_BORDER);
-    ui->detail = history_ui_container(
-        ui->root, TOUCH_HISTORY_UI_DETAIL_X, 0,
-        TOUCH_HISTORY_UI_DETAIL_WIDTH, TOUCH_HISTORY_UI_HEIGHT,
-        HISTORY_UI_COLOR_BASE, 0);
+    ui->left = history_ui_container(ui->root,
+                                    0,
+                                    0,
+                                    TOUCH_HISTORY_UI_LIST_WIDTH,
+                                    TOUCH_HISTORY_UI_HEIGHT,
+                                    HISTORY_UI_COLOR_PANEL,
+                                    HISTORY_UI_COLOR_BORDER);
+    ui->detail = history_ui_container(ui->root,
+                                      TOUCH_HISTORY_UI_DETAIL_X,
+                                      0,
+                                      TOUCH_HISTORY_UI_DETAIL_WIDTH,
+                                      TOUCH_HISTORY_UI_HEIGHT,
+                                      HISTORY_UI_COLOR_BASE,
+                                      0);
 
-    ui->list_segment = history_ui_container(
-        ui->left, 0, 0, TOUCH_HISTORY_UI_LIST_WIDTH, HISTORY_UI_HIT,
-        HISTORY_UI_COLOR_CARD, HISTORY_UI_COLOR_BORDER);
-    ui->list_segment_button = history_ui_button(
-        ui->list_segment, 0, 0, TOUCH_HISTORY_UI_LIST_WIDTH / 2,
-        HISTORY_UI_HIT, HISTORY_UI_COLOR_ROW_ACTIVE);
-    ui->list_segment_label = history_ui_button_label(
-        ui->list_segment_button, "List",
-        &somnotrace_space_grotesk_semibold_13, HISTORY_UI_COLOR_CARD);
-    lv_obj_add_event_cb(ui->list_segment_button,
-                        history_ui_close_calendar_pressed,
-                        LV_EVENT_PRESSED, ui);
-    ui->calendar_button = history_ui_button(
-        ui->list_segment, TOUCH_HISTORY_UI_LIST_WIDTH / 2, 0,
-        TOUCH_HISTORY_UI_LIST_WIDTH / 2, HISTORY_UI_HIT,
-        HISTORY_UI_COLOR_CARD);
-    ui->calendar_button_label = history_ui_button_label(
-        ui->calendar_button, "Calendar",
-        &somnotrace_space_grotesk_semibold_13, HISTORY_UI_COLOR_SECONDARY);
-    lv_obj_add_event_cb(ui->calendar_button,
-                        history_ui_open_calendar_pressed,
-                        LV_EVENT_PRESSED, ui);
+    ui->list_segment = history_ui_container(ui->left,
+                                            0,
+                                            0,
+                                            TOUCH_HISTORY_UI_LIST_WIDTH,
+                                            HISTORY_UI_HIT,
+                                            HISTORY_UI_COLOR_CARD,
+                                            HISTORY_UI_COLOR_BORDER);
+    ui->list_segment_button = history_ui_button(ui->list_segment,
+                                                0,
+                                                0,
+                                                TOUCH_HISTORY_UI_LIST_WIDTH / 2,
+                                                HISTORY_UI_HIT,
+                                                HISTORY_UI_COLOR_ROW_ACTIVE);
+    ui->list_segment_label = history_ui_button_label(ui->list_segment_button,
+                                                     "List",
+                                                     &somnotrace_space_grotesk_semibold_13,
+                                                     HISTORY_UI_COLOR_CARD);
+    lv_obj_add_event_cb(
+        ui->list_segment_button, history_ui_close_calendar_pressed, LV_EVENT_PRESSED, ui);
+    ui->calendar_button = history_ui_button(ui->list_segment,
+                                            TOUCH_HISTORY_UI_LIST_WIDTH / 2,
+                                            0,
+                                            TOUCH_HISTORY_UI_LIST_WIDTH / 2,
+                                            HISTORY_UI_HIT,
+                                            HISTORY_UI_COLOR_CARD);
+    ui->calendar_button_label = history_ui_button_label(ui->calendar_button,
+                                                        "Calendar",
+                                                        &somnotrace_space_grotesk_semibold_13,
+                                                        HISTORY_UI_COLOR_SECONDARY);
+    lv_obj_add_event_cb(
+        ui->calendar_button, history_ui_open_calendar_pressed, LV_EVENT_PRESSED, ui);
 
-    ui->list_title = history_ui_label(
-        ui->left, "ALL RECORDED NIGHTS",
-        &somnotrace_ibm_plex_mono_semibold_11,
-        HISTORY_UI_COLOR_SECONDARY, 10, 53, 150, 34);
+    ui->list_title = history_ui_label(ui->left,
+                                      "ALL RECORDED NIGHTS",
+                                      &somnotrace_ibm_plex_mono_semibold_11,
+                                      HISTORY_UI_COLOR_SECONDARY,
+                                      10,
+                                      53,
+                                      150,
+                                      34);
     lv_label_set_long_mode(ui->list_title, LV_LABEL_LONG_WRAP);
-    ui->jump_to_date = history_ui_button(
-        ui->left, 160, 44, 128, HISTORY_UI_HIT, HISTORY_UI_COLOR_PANEL);
-    history_ui_button_label(ui->jump_to_date, "Jump to date",
+    ui->jump_to_date =
+        history_ui_button(ui->left, 160, 44, 128, HISTORY_UI_HIT, HISTORY_UI_COLOR_PANEL);
+    history_ui_button_label(ui->jump_to_date,
+                            "Jump to date",
                             &somnotrace_space_grotesk_semibold_13,
                             HISTORY_UI_COLOR_LIVE);
-    lv_obj_add_event_cb(ui->jump_to_date,
-                        history_ui_open_calendar_pressed,
-                        LV_EVENT_PRESSED, ui);
+    lv_obj_add_event_cb(ui->jump_to_date, history_ui_open_calendar_pressed, LV_EVENT_PRESSED, ui);
 
-    ui->list_viewport = history_ui_container(
-        ui->left, 0, HISTORY_UI_LIST_VIEWPORT_Y,
-        TOUCH_HISTORY_UI_LIST_WIDTH, HISTORY_UI_LIST_VIEWPORT_H,
-        HISTORY_UI_COLOR_PANEL, 0);
+    ui->list_viewport = history_ui_container(ui->left,
+                                             0,
+                                             HISTORY_UI_LIST_VIEWPORT_Y,
+                                             TOUCH_HISTORY_UI_LIST_WIDTH,
+                                             HISTORY_UI_LIST_VIEWPORT_H,
+                                             HISTORY_UI_COLOR_PANEL,
+                                             0);
     lv_obj_add_flag(ui->list_viewport, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_scroll_dir(ui->list_viewport, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(ui->list_viewport, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_add_event_cb(ui->list_viewport, history_ui_list_scroll_end,
-                        LV_EVENT_SCROLL_END, ui);
+    lv_obj_add_event_cb(ui->list_viewport, history_ui_list_scroll_end, LV_EVENT_SCROLL_END, ui);
 
     for (size_t i = 0; i < TOUCH_HISTORY_UI_LIST_ROWS; ++i) {
         history_ui_row_t *row = &ui->rows[i];
-        lv_coord_t y = (lv_coord_t)i *
-                       (HISTORY_UI_LIST_ROW_H + HISTORY_UI_ROW_GAP);
-        row->button = history_ui_button(
-            ui->list_viewport, 0, y, TOUCH_HISTORY_UI_LIST_WIDTH,
-            HISTORY_UI_LIST_ROW_H,
-            HISTORY_UI_COLOR_ROW);
-        row->date = history_ui_label(
-            row->button, HISTORY_UI_EM_DASH,
-            &somnotrace_space_grotesk_semibold_15,
-            HISTORY_UI_COLOR_TEXT, 13, 8, 205, 20);
-        row->meta = history_ui_label(
-            row->button, HISTORY_UI_EM_DASH,
-            &somnotrace_ibm_plex_mono_medium_11,
-            HISTORY_UI_COLOR_SECONDARY, 48, 35, 162, 16);
-        row->usage = history_ui_label(
-            row->button, HISTORY_UI_EM_DASH,
-            &somnotrace_ibm_plex_mono_semibold_15,
-            HISTORY_UI_COLOR_SECONDARY, 216, 17, 60, 22);
+        lv_coord_t y = (lv_coord_t)i * (HISTORY_UI_LIST_ROW_H + HISTORY_UI_ROW_GAP);
+        row->button = history_ui_button(ui->list_viewport,
+                                        0,
+                                        y,
+                                        TOUCH_HISTORY_UI_LIST_WIDTH,
+                                        HISTORY_UI_LIST_ROW_H,
+                                        HISTORY_UI_COLOR_ROW);
+        row->date = history_ui_label(row->button,
+                                     HISTORY_UI_EM_DASH,
+                                     &somnotrace_space_grotesk_semibold_15,
+                                     HISTORY_UI_COLOR_TEXT,
+                                     13,
+                                     8,
+                                     205,
+                                     20);
+        row->meta = history_ui_label(row->button,
+                                     HISTORY_UI_EM_DASH,
+                                     &somnotrace_ibm_plex_mono_medium_11,
+                                     HISTORY_UI_COLOR_SECONDARY,
+                                     48,
+                                     35,
+                                     162,
+                                     16);
+        row->usage = history_ui_label(row->button,
+                                      HISTORY_UI_EM_DASH,
+                                      &somnotrace_ibm_plex_mono_semibold_15,
+                                      HISTORY_UI_COLOR_SECONDARY,
+                                      216,
+                                      17,
+                                      60,
+                                      22);
         lv_obj_set_style_text_align(row->usage, LV_TEXT_ALIGN_RIGHT, 0);
-        row->therapy_dot = history_ui_dot(
-            row->button, 20, 39, HISTORY_UI_COLOR_LIVE);
-        row->o2_dot = history_ui_dot(
-            row->button, 34, 39, HISTORY_UI_COLOR_O2);
+        row->therapy_dot = history_ui_dot(row->button, 20, 39, HISTORY_UI_COLOR_LIVE);
+        row->o2_dot = history_ui_dot(row->button, 34, 39, HISTORY_UI_COLOR_O2);
         ui->row_bindings[i].ui = ui;
         ui->row_bindings[i].index = (uint8_t)i;
-        lv_obj_add_event_cb(row->button, history_ui_row_pressed,
-                            LV_EVENT_SHORT_CLICKED, &ui->row_bindings[i]);
+        lv_obj_add_event_cb(
+            row->button, history_ui_row_pressed, LV_EVENT_SHORT_CLICKED, &ui->row_bindings[i]);
     }
 
-    ui->night_title = history_ui_label(
-        ui->detail, "Select a recorded night",
-        &somnotrace_space_grotesk_semibold_19, HISTORY_UI_COLOR_TEXT,
-        58, 2, 244, 26);
+    ui->night_title = history_ui_label(ui->detail,
+                                       "Select a recorded night",
+                                       &somnotrace_space_grotesk_semibold_19,
+                                       HISTORY_UI_COLOR_TEXT,
+                                       58,
+                                       2,
+                                       244,
+                                       26);
     lv_label_set_long_mode(ui->night_title, LV_LABEL_LONG_CLIP);
-    ui->night_subtitle = history_ui_label(
-        ui->detail, "Newest completed night opens automatically",
-        &somnotrace_ibm_plex_mono_medium_11, HISTORY_UI_COLOR_TERTIARY,
-        58, 28, 244, 16);
-    ui->target_badge = history_ui_container(
-        ui->detail, 310, 4, 282, 36, 0x12393c, HISTORY_UI_COLOR_LIVE_DIM);
-    ui->target_badge_label = history_ui_label(
-        ui->target_badge, HISTORY_UI_EM_DASH,
-        &somnotrace_space_grotesk_semibold_13, HISTORY_UI_COLOR_LIVE,
-        10, 8, 262, 20);
-    lv_obj_set_style_text_align(ui->target_badge_label,
-                                LV_TEXT_ALIGN_CENTER, 0);
+    ui->night_subtitle = history_ui_label(ui->detail,
+                                          "Newest completed night opens automatically",
+                                          &somnotrace_ibm_plex_mono_medium_11,
+                                          HISTORY_UI_COLOR_TERTIARY,
+                                          58,
+                                          28,
+                                          244,
+                                          16);
+    ui->target_badge =
+        history_ui_container(ui->detail, 310, 4, 282, 36, 0x12393c, HISTORY_UI_COLOR_LIVE_DIM);
+    ui->target_badge_label = history_ui_label(ui->target_badge,
+                                              HISTORY_UI_EM_DASH,
+                                              &somnotrace_space_grotesk_semibold_13,
+                                              HISTORY_UI_COLOR_LIVE,
+                                              10,
+                                              8,
+                                              262,
+                                              20);
+    lv_obj_set_style_text_align(ui->target_badge_label, LV_TEXT_ALIGN_CENTER, 0);
     ui->night_previous = history_ui_button(
-        ui->detail, 0, 0,
-        HISTORY_UI_HIT, HISTORY_UI_HIT, HISTORY_UI_COLOR_CONTROL);
-    history_ui_button_label(ui->night_previous, "<",
-                            &somnotrace_space_grotesk_semibold_19,
-                            HISTORY_UI_COLOR_TEXT);
-    lv_obj_add_event_cb(ui->night_previous,
-                        history_ui_previous_night_pressed,
-                        LV_EVENT_PRESSED, ui);
-    ui->night_next = history_ui_button(
-        ui->detail, TOUCH_HISTORY_UI_DETAIL_WIDTH - HISTORY_UI_HIT, 0,
-        HISTORY_UI_HIT, HISTORY_UI_HIT, HISTORY_UI_COLOR_CONTROL);
-    history_ui_button_label(ui->night_next, ">",
-                            &somnotrace_space_grotesk_semibold_19,
-                            HISTORY_UI_COLOR_TEXT);
-    lv_obj_add_event_cb(ui->night_next, history_ui_next_night_pressed,
-                        LV_EVENT_PRESSED, ui);
+        ui->detail, 0, 0, HISTORY_UI_HIT, HISTORY_UI_HIT, HISTORY_UI_COLOR_CONTROL);
+    history_ui_button_label(
+        ui->night_previous, "<", &somnotrace_space_grotesk_semibold_19, HISTORY_UI_COLOR_TEXT);
+    lv_obj_add_event_cb(
+        ui->night_previous, history_ui_previous_night_pressed, LV_EVENT_PRESSED, ui);
+    ui->night_next = history_ui_button(ui->detail,
+                                       TOUCH_HISTORY_UI_DETAIL_WIDTH - HISTORY_UI_HIT,
+                                       0,
+                                       HISTORY_UI_HIT,
+                                       HISTORY_UI_HIT,
+                                       HISTORY_UI_COLOR_CONTROL);
+    history_ui_button_label(
+        ui->night_next, ">", &somnotrace_space_grotesk_semibold_19, HISTORY_UI_COLOR_TEXT);
+    lv_obj_add_event_cb(ui->night_next, history_ui_next_night_pressed, LV_EVENT_PRESSED, ui);
 
-    ui->summary = history_ui_container(
-        ui->detail, 0, HISTORY_UI_SUMMARY_Y,
-        TOUCH_HISTORY_UI_DETAIL_WIDTH, HISTORY_UI_SUMMARY_H,
-        HISTORY_UI_COLOR_CARD, HISTORY_UI_COLOR_BORDER);
+    ui->summary = history_ui_container(ui->detail,
+                                       0,
+                                       HISTORY_UI_SUMMARY_Y,
+                                       TOUCH_HISTORY_UI_DETAIL_WIDTH,
+                                       HISTORY_UI_SUMMARY_H,
+                                       HISTORY_UI_COLOR_CARD,
+                                       HISTORY_UI_COLOR_BORDER);
     static const char *const summary_names[] = {
-        "Usage", "ST AHI", "Device AHI", "Recorded", "O₂ coverage",
+        "Usage",
+        "ST AHI",
+        "Device AHI",
+        "Recorded",
+        "O₂ coverage",
     };
     for (size_t i = 0; i < 5; ++i) {
         lv_coord_t x = (lv_coord_t)(i * 138);
-        ui->summary_labels[i] = history_ui_label(
-            ui->summary, summary_names[i],
-            &somnotrace_ibm_plex_mono_semibold_11,
-            i == 2 ? HISTORY_UI_COLOR_TERTIARY
-                   : HISTORY_UI_COLOR_SECONDARY,
-            x + 10, 4, 124, 15);
-        ui->summary_values[i] = history_ui_label(
-            ui->summary, HISTORY_UI_EM_DASH,
-            &somnotrace_ibm_plex_mono_semibold_15,
-            i == 2 ? HISTORY_UI_COLOR_TERTIARY : HISTORY_UI_COLOR_TEXT,
-            x + 10, 21, 124, 19);
+        ui->summary_labels[i] =
+            history_ui_label(ui->summary,
+                             summary_names[i],
+                             &somnotrace_ibm_plex_mono_semibold_11,
+                             i == 2 ? HISTORY_UI_COLOR_TERTIARY : HISTORY_UI_COLOR_SECONDARY,
+                             x + 10,
+                             4,
+                             124,
+                             15);
+        ui->summary_values[i] =
+            history_ui_label(ui->summary,
+                             HISTORY_UI_EM_DASH,
+                             &somnotrace_ibm_plex_mono_semibold_15,
+                             i == 2 ? HISTORY_UI_COLOR_TERTIARY : HISTORY_UI_COLOR_TEXT,
+                             x + 10,
+                             21,
+                             124,
+                             19);
     }
 
-    const lv_coord_t channel_width =
-        (TOUCH_HISTORY_UI_DETAIL_WIDTH - 12) / 4;
+    const lv_coord_t channel_width = (TOUCH_HISTORY_UI_DETAIL_WIDTH - 12) / 4;
     for (size_t i = 0; i < TOUCH_HISTORY_UI_CHANNEL_CONTROLS; ++i) {
         lv_coord_t col = (lv_coord_t)(i % 4);
         lv_coord_t row = (lv_coord_t)(i / 4);
         lv_coord_t x = col * (channel_width + 4);
-        lv_coord_t y = HISTORY_UI_CHANNEL_Y +
-                       row * (HISTORY_UI_CHANNEL_H +
-                              HISTORY_UI_CHANNEL_ROW_GAP);
+        lv_coord_t y =
+            HISTORY_UI_CHANNEL_Y + row * (HISTORY_UI_CHANNEL_H + HISTORY_UI_CHANNEL_ROW_GAP);
         ui->channels[i].button = history_ui_button(
-            ui->detail, x, y, channel_width, HISTORY_UI_CHANNEL_H,
-            HISTORY_UI_COLOR_BASE);
-        lv_obj_set_style_bg_opa(ui->channels[i].button,
-                                LV_OPA_TRANSP, 0);
+            ui->detail, x, y, channel_width, HISTORY_UI_CHANNEL_H, HISTORY_UI_COLOR_BASE);
+        lv_obj_set_style_bg_opa(ui->channels[i].button, LV_OPA_TRANSP, 0);
         ui->channels[i].pill = history_ui_container(
-            ui->channels[i].button, 4, 6, channel_width - 8, 31,
-            HISTORY_UI_COLOR_ROW, 0);
-        lv_obj_set_style_radius(ui->channels[i].pill,
-                                LV_RADIUS_CIRCLE, 0);
+            ui->channels[i].button, 4, 6, channel_width - 8, 31, HISTORY_UI_COLOR_ROW, 0);
+        lv_obj_set_style_radius(ui->channels[i].pill, LV_RADIUS_CIRCLE, 0);
         lv_obj_clear_flag(ui->channels[i].pill, LV_OBJ_FLAG_CLICKABLE);
-        ui->channels[i].label = history_ui_button_label(
-            ui->channels[i].pill, s_signal_names[i],
-            &somnotrace_space_grotesk_semibold_13,
-            HISTORY_UI_COLOR_SECONDARY);
+        ui->channels[i].label = history_ui_button_label(ui->channels[i].pill,
+                                                        s_signal_names[i],
+                                                        &somnotrace_space_grotesk_semibold_13,
+                                                        HISTORY_UI_COLOR_SECONDARY);
         ui->channel_bindings[i].ui = ui;
         ui->channel_bindings[i].index = (uint8_t)i;
         lv_obj_add_event_cb(ui->channels[i].button,
-                            history_ui_channel_pressed, LV_EVENT_PRESSED,
+                            history_ui_channel_pressed,
+                            LV_EVENT_PRESSED,
                             &ui->channel_bindings[i]);
     }
 
-    ui->graph = history_ui_container(
-        ui->detail, 0, HISTORY_UI_GRAPH_Y,
-        TOUCH_HISTORY_UI_DETAIL_WIDTH, HISTORY_UI_GRAPH_H,
-        HISTORY_UI_COLOR_CARD, HISTORY_UI_COLOR_BORDER);
+    ui->graph = history_ui_container(ui->detail,
+                                     0,
+                                     HISTORY_UI_GRAPH_Y,
+                                     TOUCH_HISTORY_UI_DETAIL_WIDTH,
+                                     HISTORY_UI_GRAPH_H,
+                                     HISTORY_UI_COLOR_CARD,
+                                     HISTORY_UI_COLOR_BORDER);
     lv_obj_add_flag(ui->graph, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(ui->graph, history_ui_graph_draw,
-                        LV_EVENT_DRAW_MAIN, ui);
-    lv_obj_add_event_cb(ui->graph, history_ui_graph_touch,
-                        LV_EVENT_PRESSED, ui);
-    lv_obj_add_event_cb(ui->graph, history_ui_graph_touch,
-                        LV_EVENT_PRESSING, ui);
-    lv_obj_add_event_cb(ui->graph, history_ui_graph_touch,
-                        LV_EVENT_SHORT_CLICKED, ui);
-    lv_obj_add_event_cb(ui->graph, history_ui_graph_touch,
-                        LV_EVENT_RELEASED, ui);
-    lv_obj_add_event_cb(ui->graph, history_ui_graph_touch,
-                        LV_EVENT_PRESS_LOST, ui);
-    ui->graph_title = history_ui_label(
-        ui->graph, "Breathing / Flow · L/s",
-        &somnotrace_space_grotesk_semibold_15, HISTORY_UI_COLOR_TEXT,
-        12, 7, 132, 20);
-    ui->graph_source = history_ui_label(
-        ui->graph, "Full night · min/max envelope",
-        &somnotrace_ibm_plex_mono_medium_11, HISTORY_UI_COLOR_TERTIARY,
-        12, 29, 132, 16);
+    lv_obj_add_event_cb(ui->graph, history_ui_graph_draw, LV_EVENT_DRAW_MAIN, ui);
+    lv_obj_add_event_cb(ui->graph, history_ui_graph_touch, LV_EVENT_PRESSED, ui);
+    lv_obj_add_event_cb(ui->graph, history_ui_graph_touch, LV_EVENT_PRESSING, ui);
+    lv_obj_add_event_cb(ui->graph, history_ui_graph_touch, LV_EVENT_SHORT_CLICKED, ui);
+    lv_obj_add_event_cb(ui->graph, history_ui_graph_touch, LV_EVENT_RELEASED, ui);
+    lv_obj_add_event_cb(ui->graph, history_ui_graph_touch, LV_EVENT_PRESS_LOST, ui);
+    ui->graph_title = history_ui_label(ui->graph,
+                                       "Breathing / Flow · L/s",
+                                       &somnotrace_space_grotesk_semibold_15,
+                                       HISTORY_UI_COLOR_TEXT,
+                                       12,
+                                       7,
+                                       132,
+                                       20);
+    ui->graph_source = history_ui_label(ui->graph,
+                                        "Full night · min/max envelope",
+                                        &somnotrace_ibm_plex_mono_medium_11,
+                                        HISTORY_UI_COLOR_TERTIARY,
+                                        12,
+                                        29,
+                                        132,
+                                        16);
 
     for (size_t i = 0; i < TOUCH_HISTORY_UI_STAT_COUNT; ++i) {
         lv_coord_t x = 150 + (lv_coord_t)i * 68;
-        ui->stat_labels[i] = history_ui_label(
-            ui->graph, HISTORY_UI_EM_DASH,
-            &somnotrace_ibm_plex_mono_semibold_11,
-            HISTORY_UI_COLOR_TERTIARY, x, 5, 64, 16);
-        ui->stat_values[i] = history_ui_label(
-            ui->graph, HISTORY_UI_EM_DASH,
-            &somnotrace_ibm_plex_mono_semibold_13,
-            HISTORY_UI_COLOR_TEXT, x, 24, 64, 19);
+        ui->stat_labels[i] = history_ui_label(ui->graph,
+                                              HISTORY_UI_EM_DASH,
+                                              &somnotrace_ibm_plex_mono_semibold_11,
+                                              HISTORY_UI_COLOR_TERTIARY,
+                                              x,
+                                              5,
+                                              64,
+                                              16);
+        ui->stat_values[i] = history_ui_label(ui->graph,
+                                              HISTORY_UI_EM_DASH,
+                                              &somnotrace_ibm_plex_mono_semibold_13,
+                                              HISTORY_UI_COLOR_TEXT,
+                                              x,
+                                              24,
+                                              64,
+                                              19);
     }
-    ui->stats_warning = history_ui_label(
-        ui->graph, "Percentiles unavailable",
-        &somnotrace_ibm_plex_mono_semibold_11,
-        HISTORY_UI_COLOR_AMBER, 150, 12, 268, 24);
+    ui->stats_warning = history_ui_label(ui->graph,
+                                         "Percentiles unavailable",
+                                         &somnotrace_ibm_plex_mono_semibold_11,
+                                         HISTORY_UI_COLOR_AMBER,
+                                         150,
+                                         12,
+                                         268,
+                                         24);
     history_ui_set_hidden(ui->stats_warning, true);
 
-    ui->therapy_only_button = history_ui_button(
-        ui->graph, 422, 4, 106, HISTORY_UI_HIT, HISTORY_UI_COLOR_CONTROL);
-    history_ui_button_label(ui->therapy_only_button, "Therapy: On",
+    ui->therapy_only_button =
+        history_ui_button(ui->graph, 422, 4, 106, HISTORY_UI_HIT, HISTORY_UI_COLOR_CONTROL);
+    history_ui_button_label(ui->therapy_only_button,
+                            "Therapy: On",
                             &somnotrace_space_grotesk_semibold_13,
                             HISTORY_UI_COLOR_TEXT);
-    lv_obj_add_event_cb(ui->therapy_only_button,
-                        history_ui_therapy_only_pressed,
-                        LV_EVENT_PRESSED, ui);
+    lv_obj_add_event_cb(
+        ui->therapy_only_button, history_ui_therapy_only_pressed, LV_EVENT_PRESSED, ui);
     history_ui_set_hidden(ui->therapy_only_button, true);
 
     ui->zoom_out_button = history_ui_button(
-        ui->graph, 532, 4, HISTORY_UI_HIT, HISTORY_UI_HIT,
-        HISTORY_UI_COLOR_CONTROL);
-    history_ui_button_label(ui->zoom_out_button, "-",
-                            &somnotrace_space_grotesk_semibold_19,
-                            HISTORY_UI_COLOR_TEXT);
-    lv_obj_add_event_cb(ui->zoom_out_button, history_ui_zoom_out_pressed,
-                        LV_EVENT_PRESSED, ui);
+        ui->graph, 532, 4, HISTORY_UI_HIT, HISTORY_UI_HIT, HISTORY_UI_COLOR_CONTROL);
+    history_ui_button_label(
+        ui->zoom_out_button, "-", &somnotrace_space_grotesk_semibold_19, HISTORY_UI_COLOR_TEXT);
+    lv_obj_add_event_cb(ui->zoom_out_button, history_ui_zoom_out_pressed, LV_EVENT_PRESSED, ui);
     ui->zoom_in_button = history_ui_button(
-        ui->graph, 580, 4, HISTORY_UI_HIT, HISTORY_UI_HIT,
-        HISTORY_UI_COLOR_CONTROL);
-    history_ui_button_label(ui->zoom_in_button, "+",
-                            &somnotrace_space_grotesk_semibold_19,
-                            HISTORY_UI_COLOR_TEXT);
-    lv_obj_add_event_cb(ui->zoom_in_button, history_ui_zoom_in_pressed,
-                        LV_EVENT_PRESSED, ui);
-    ui->fit_button = history_ui_button(
-        ui->graph, 628, 4, 64, HISTORY_UI_HIT, HISTORY_UI_COLOR_CONTROL);
-    history_ui_button_label(ui->fit_button, "Fit",
-                            &somnotrace_space_grotesk_semibold_13,
-                            HISTORY_UI_COLOR_TEXT);
-    lv_obj_add_event_cb(ui->fit_button, history_ui_fit_pressed,
-                        LV_EVENT_PRESSED, ui);
+        ui->graph, 580, 4, HISTORY_UI_HIT, HISTORY_UI_HIT, HISTORY_UI_COLOR_CONTROL);
+    history_ui_button_label(
+        ui->zoom_in_button, "+", &somnotrace_space_grotesk_semibold_19, HISTORY_UI_COLOR_TEXT);
+    lv_obj_add_event_cb(ui->zoom_in_button, history_ui_zoom_in_pressed, LV_EVENT_PRESSED, ui);
+    ui->fit_button =
+        history_ui_button(ui->graph, 628, 4, 64, HISTORY_UI_HIT, HISTORY_UI_COLOR_CONTROL);
+    history_ui_button_label(
+        ui->fit_button, "Fit", &somnotrace_space_grotesk_semibold_13, HISTORY_UI_COLOR_TEXT);
+    lv_obj_add_event_cb(ui->fit_button, history_ui_fit_pressed, LV_EVENT_PRESSED, ui);
 
     /* Compact status badge; never intercept graph gestures. */
-    ui->zoom_overlay = history_ui_container(ui->graph, 410, 50, 126, 24,
-        HISTORY_UI_COLOR_PANEL, HISTORY_UI_COLOR_BORDER);
+    ui->zoom_overlay = history_ui_container(
+        ui->graph, 410, 50, 126, 24, HISTORY_UI_COLOR_PANEL, HISTORY_UI_COLOR_BORDER);
     lv_obj_clear_flag(ui->zoom_overlay, LV_OBJ_FLAG_CLICKABLE);
-    ui->zoom_overlay_text = history_ui_label(
-        ui->zoom_overlay, "Updating…",
-        &somnotrace_space_grotesk_semibold_13, HISTORY_UI_COLOR_TEXT,
-        6, 3, 114, 18);
+    ui->zoom_overlay_text = history_ui_label(ui->zoom_overlay,
+                                             "Updating…",
+                                             &somnotrace_space_grotesk_semibold_13,
+                                             HISTORY_UI_COLOR_TEXT,
+                                             6,
+                                             3,
+                                             114,
+                                             18);
     lv_obj_clear_flag(ui->zoom_overlay_text, LV_OBJ_FLAG_CLICKABLE);
     history_ui_set_hidden(ui->zoom_overlay, true);
 
-    ui->degraded_banner = history_ui_container(
-        ui->graph, HISTORY_UI_GRAPH_PAD_L, HISTORY_UI_GRAPH_PAD_T,
-        TOUCH_HISTORY_UI_DETAIL_WIDTH - HISTORY_UI_GRAPH_PAD_L -
-            HISTORY_UI_GRAPH_PAD_R,
-        36, 0x493817, HISTORY_UI_COLOR_AMBER);
-    ui->degraded_label = history_ui_label(
-        ui->degraded_banner, "Some history details are unavailable",
-        &somnotrace_space_grotesk_semibold_13, HISTORY_UI_COLOR_AMBER,
-        10, 8, 616, 20);
+    ui->degraded_banner = history_ui_container(ui->graph,
+                                               HISTORY_UI_GRAPH_PAD_L,
+                                               HISTORY_UI_GRAPH_PAD_T,
+                                               TOUCH_HISTORY_UI_DETAIL_WIDTH -
+                                                   HISTORY_UI_GRAPH_PAD_L - HISTORY_UI_GRAPH_PAD_R,
+                                               36,
+                                               0x493817,
+                                               HISTORY_UI_COLOR_AMBER);
+    ui->degraded_label = history_ui_label(ui->degraded_banner,
+                                          "Some history details are unavailable",
+                                          &somnotrace_space_grotesk_semibold_13,
+                                          HISTORY_UI_COLOR_AMBER,
+                                          10,
+                                          8,
+                                          616,
+                                          20);
     history_ui_set_hidden(ui->degraded_banner, true);
 
-    ui->marker_legend = history_ui_label(
-        ui->detail, "Markers: OA · CA · H · A · RERA",
-        &somnotrace_ibm_plex_mono_medium_11,
-        HISTORY_UI_COLOR_TERTIARY, 2, 430, 300, 18);
-    ui->safety_footer = history_ui_label(
-        ui->detail, "Trend review only. Not a diagnosis or a prescription.",
-        &somnotrace_space_grotesk_medium_13,
-        HISTORY_UI_COLOR_TERTIARY, 306, 428, 384, 20);
+    ui->marker_legend = history_ui_label(ui->detail,
+                                         "Markers: OA · CA · H · A · RERA",
+                                         &somnotrace_ibm_plex_mono_medium_11,
+                                         HISTORY_UI_COLOR_TERTIARY,
+                                         2,
+                                         430,
+                                         300,
+                                         18);
+    ui->safety_footer = history_ui_label(ui->detail,
+                                         "Trend review only. Not a diagnosis or a prescription.",
+                                         &somnotrace_space_grotesk_medium_13,
+                                         HISTORY_UI_COLOR_TERTIARY,
+                                         306,
+                                         428,
+                                         384,
+                                         20);
     lv_obj_set_style_text_align(ui->safety_footer, LV_TEXT_ALIGN_RIGHT, 0);
 
-    ui->state_overlay = history_ui_container(
-        ui->detail, 0, 0, TOUCH_HISTORY_UI_DETAIL_WIDTH,
-        TOUCH_HISTORY_UI_HEIGHT, HISTORY_UI_COLOR_CARD,
-        HISTORY_UI_COLOR_BORDER);
-    ui->state_icon = history_ui_label(
-        ui->state_overlay, "...",
-        &somnotrace_ibm_plex_mono_semibold_29, HISTORY_UI_COLOR_LIVE,
-        286, 82, 120, 42);
+    ui->state_overlay = history_ui_container(ui->detail,
+                                             0,
+                                             0,
+                                             TOUCH_HISTORY_UI_DETAIL_WIDTH,
+                                             TOUCH_HISTORY_UI_HEIGHT,
+                                             HISTORY_UI_COLOR_CARD,
+                                             HISTORY_UI_COLOR_BORDER);
+    ui->state_icon = history_ui_label(ui->state_overlay,
+                                      "...",
+                                      &somnotrace_ibm_plex_mono_semibold_29,
+                                      HISTORY_UI_COLOR_LIVE,
+                                      286,
+                                      82,
+                                      120,
+                                      42);
     lv_obj_set_style_text_align(ui->state_icon, LV_TEXT_ALIGN_CENTER, 0);
-    ui->state_title = history_ui_label(
-        ui->state_overlay, "Loading night",
-        &somnotrace_space_grotesk_semibold_23, HISTORY_UI_COLOR_TEXT,
-        96, 132, 500, 34);
+    ui->state_title = history_ui_label(ui->state_overlay,
+                                       "Loading night",
+                                       &somnotrace_space_grotesk_semibold_23,
+                                       HISTORY_UI_COLOR_TEXT,
+                                       96,
+                                       132,
+                                       500,
+                                       34);
     lv_obj_set_style_text_align(ui->state_title, LV_TEXT_ALIGN_CENTER, 0);
-    ui->state_body = history_ui_label(
-        ui->state_overlay, "Combining sessions and O₂ data",
-        &somnotrace_space_grotesk_medium_15,
-        HISTORY_UI_COLOR_SECONDARY, 96, 174, 500, 52);
+    ui->state_body = history_ui_label(ui->state_overlay,
+                                      "Combining sessions and O₂ data",
+                                      &somnotrace_space_grotesk_medium_15,
+                                      HISTORY_UI_COLOR_SECONDARY,
+                                      96,
+                                      174,
+                                      500,
+                                      52);
     lv_obj_set_style_text_align(ui->state_body, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(ui->state_body, LV_LABEL_LONG_WRAP);
     ui->state_progress = lv_bar_create(ui->state_overlay);
     lv_obj_set_pos(ui->state_progress, 146, 238);
     lv_obj_set_size(ui->state_progress, 400, 8);
-    lv_obj_set_style_bg_color(ui->state_progress,
-                              history_ui_color(HISTORY_UI_COLOR_CONTROL),
-                              LV_PART_MAIN);
-    lv_obj_set_style_bg_color(ui->state_progress,
-                              history_ui_color(HISTORY_UI_COLOR_LIVE),
-                              LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(
+        ui->state_progress, history_ui_color(HISTORY_UI_COLOR_CONTROL), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(
+        ui->state_progress, history_ui_color(HISTORY_UI_COLOR_LIVE), LV_PART_INDICATOR);
     lv_bar_set_range(ui->state_progress, 0, 1000);
     ui->state_primary = history_ui_button(
-        ui->state_overlay, 230, 278, 232, HISTORY_UI_HIT,
-        HISTORY_UI_COLOR_CONTROL);
+        ui->state_overlay, 230, 278, 232, HISTORY_UI_HIT, HISTORY_UI_COLOR_CONTROL);
     ui->state_primary_label = history_ui_button_label(
-        ui->state_primary, "Cancel",
-        &somnotrace_space_grotesk_semibold_15, HISTORY_UI_COLOR_TEXT);
-    lv_obj_add_event_cb(ui->state_primary, history_ui_state_primary_pressed,
-                        LV_EVENT_PRESSED, ui);
+        ui->state_primary, "Cancel", &somnotrace_space_grotesk_semibold_15, HISTORY_UI_COLOR_TEXT);
+    lv_obj_add_event_cb(ui->state_primary, history_ui_state_primary_pressed, LV_EVENT_PRESSED, ui);
     ui->state_secondary = history_ui_button(
-        ui->state_overlay, 230, 330, 232, HISTORY_UI_HIT,
-        HISTORY_UI_COLOR_CONTROL);
-    ui->state_secondary_label = history_ui_button_label(
-        ui->state_secondary, "Card status",
-        &somnotrace_space_grotesk_semibold_15, HISTORY_UI_COLOR_TEXT);
-    lv_obj_add_event_cb(ui->state_secondary,
-                        history_ui_state_secondary_pressed,
-                        LV_EVENT_PRESSED, ui);
+        ui->state_overlay, 230, 330, 232, HISTORY_UI_HIT, HISTORY_UI_COLOR_CONTROL);
+    ui->state_secondary_label = history_ui_button_label(ui->state_secondary,
+                                                        "Card status",
+                                                        &somnotrace_space_grotesk_semibold_15,
+                                                        HISTORY_UI_COLOR_TEXT);
+    lv_obj_add_event_cb(
+        ui->state_secondary, history_ui_state_secondary_pressed, LV_EVENT_PRESSED, ui);
     history_ui_set_hidden(ui->state_overlay, true);
     return ESP_OK;
 }
@@ -2017,8 +2341,7 @@ esp_err_t touch_history_ui_create(lv_obj_t *parent,
         return ESP_ERR_INVALID_ARG;
     *out_ui = NULL;
 
-    touch_history_ui_t *ui = heap_caps_calloc(
-        1, sizeof(*ui), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    touch_history_ui_t *ui = heap_caps_calloc(1, sizeof(*ui), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!ui)
         return ESP_ERR_NO_MEM;
     if (config)
@@ -2051,8 +2374,7 @@ lv_obj_t *touch_history_ui_root(touch_history_ui_t *ui)
     return ui ? ui->root : NULL;
 }
 
-static const char *history_ui_default_stat_label(touch_history_signal_t signal,
-                                                 size_t index)
+static const char *history_ui_default_stat_label(touch_history_signal_t signal, size_t index)
 {
     static const char *const labels[TOUCH_HISTORY_SIGNAL_COUNT][4] = {
         {"P50 |Flow|", "P95 |Flow|", "P99.5 |Flow|", ""},
@@ -2064,8 +2386,7 @@ static const char *history_ui_default_stat_label(touch_history_signal_t signal,
         {"Minimum", "Median", "Maximum", ""},
         {"Active", "Mean", "Peak", ""},
     };
-    return signal < TOUCH_HISTORY_SIGNAL_COUNT &&
-                   index < TOUCH_HISTORY_UI_STAT_COUNT
+    return signal < TOUCH_HISTORY_SIGNAL_COUNT && index < TOUCH_HISTORY_UI_STAT_COUNT
                ? labels[signal][index]
                : HISTORY_UI_EM_DASH;
 }
@@ -2077,19 +2398,17 @@ static void history_ui_update_list(touch_history_ui_t *ui)
     history_ui_set_hidden(ui->jump_to_date, calendar);
     history_ui_set_hidden(ui->list_viewport, calendar);
     lv_obj_set_style_bg_color(
-        ui->list_segment_button,
-        history_ui_color(calendar ? HISTORY_UI_COLOR_CARD : 0xe9edf3), 0);
+        ui->list_segment_button, history_ui_color(calendar ? HISTORY_UI_COLOR_CARD : 0xe9edf3), 0);
     lv_obj_set_style_bg_color(
-        ui->calendar_button,
-        history_ui_color(calendar ? 0xe9edf3 : HISTORY_UI_COLOR_CARD), 0);
+        ui->calendar_button, history_ui_color(calendar ? 0xe9edf3 : HISTORY_UI_COLOR_CARD), 0);
     lv_obj_set_style_text_color(
         ui->list_segment_label,
-        history_ui_color(calendar ? HISTORY_UI_COLOR_SECONDARY
-                                  : HISTORY_UI_COLOR_CARD), 0);
+        history_ui_color(calendar ? HISTORY_UI_COLOR_SECONDARY : HISTORY_UI_COLOR_CARD),
+        0);
     lv_obj_set_style_text_color(
         ui->calendar_button_label,
-        history_ui_color(calendar ? HISTORY_UI_COLOR_CARD
-                                  : HISTORY_UI_COLOR_SECONDARY), 0);
+        history_ui_color(calendar ? HISTORY_UI_COLOR_CARD : HISTORY_UI_COLOR_SECONDARY),
+        0);
 
     /* The Calendar owns this rail below the persistent segment. Keep the
      * recycled List tree dormant until List is selected again; rewriting its
@@ -2107,11 +2426,10 @@ static void history_ui_update_list(touch_history_ui_t *ui)
         const touch_history_day_t *day = &ui->days[i];
         char date[32], usage[24], meta[64];
         history_ui_format_day_short(day->day, date, sizeof(date));
-        history_ui_format_clock_minutes(day->usage_min, day->has_usage,
-                                        usage, sizeof(usage));
+        history_ui_format_clock_minutes(day->usage_min, day->has_usage, usage, sizeof(usage));
         if (day->sessions > 0)
-            snprintf(meta, sizeof(meta), "%d session%s",
-                     day->sessions, day->sessions == 1 ? "" : "s");
+            snprintf(
+                meta, sizeof(meta), "%d session%s", day->sessions, day->sessions == 1 ? "" : "s");
         else
             snprintf(meta, sizeof(meta), "sessions %s", HISTORY_UI_EM_DASH);
         lv_label_set_text(row->date, date);
@@ -2121,28 +2439,24 @@ static void history_ui_update_list(touch_history_ui_t *ui)
         history_ui_set_hidden(row->o2_dot, !day->has_oximetry);
         bool selected = i == ui->selected_row;
         lv_obj_set_style_bg_color(
-            row->button,
-            history_ui_color(selected ? 0xe9edf3
-                                      : HISTORY_UI_COLOR_ROW),
-            0);
+            row->button, history_ui_color(selected ? 0xe9edf3 : HISTORY_UI_COLOR_ROW), 0);
         lv_obj_set_style_border_width(row->button, 0, 0);
         lv_obj_set_style_text_color(
             row->date,
-            history_ui_color(selected ? HISTORY_UI_COLOR_CARD
-                                      : HISTORY_UI_COLOR_TEXT), 0);
+            history_ui_color(selected ? HISTORY_UI_COLOR_CARD : HISTORY_UI_COLOR_TEXT),
+            0);
         lv_obj_set_style_text_color(
             row->meta,
-            history_ui_color(selected ? HISTORY_UI_COLOR_CONTROL
-                                      : HISTORY_UI_COLOR_SECONDARY), 0);
+            history_ui_color(selected ? HISTORY_UI_COLOR_CONTROL : HISTORY_UI_COLOR_SECONDARY),
+            0);
         lv_obj_set_style_text_color(
             row->usage,
-            history_ui_color(selected ? HISTORY_UI_COLOR_CONTROL
-                                      : HISTORY_UI_COLOR_SECONDARY), 0);
+            history_ui_color(selected ? HISTORY_UI_COLOR_CONTROL : HISTORY_UI_COLOR_SECONDARY),
+            0);
     }
 
     char count[48];
-    snprintf(count, sizeof(count), "ALL %u RECORDED\nNIGHTS",
-             (unsigned)ui->page.total_days);
+    snprintf(count, sizeof(count), "ALL %u RECORDED\nNIGHTS", (unsigned)ui->page.total_days);
     lv_label_set_text(ui->list_title, count);
     history_ui_set_enabled(ui->jump_to_date, ui->page.total_days > 0);
 }
@@ -2151,18 +2465,19 @@ static void history_ui_update_header(touch_history_ui_t *ui)
 {
     const touch_history_day_t *day = history_ui_selected_day(ui);
     char title[40];
-    const char *selected_day = ui->has_night
-                                   ? ui->night.day
-                                   : (day ? day->day : NULL);
+    const char *selected_day = ui->has_night ? ui->night.day : (day ? day->day : NULL);
     if (selected_day) {
         history_ui_format_day(selected_day, title, sizeof(title));
         lv_point_t title_size = {0};
-        lv_txt_get_size(&title_size, title,
+        lv_txt_get_size(&title_size,
+                        title,
                         &somnotrace_space_grotesk_semibold_19,
-                        0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+                        0,
+                        0,
+                        LV_COORD_MAX,
+                        LV_TEXT_FLAG_NONE);
         if (title_size.x > lv_obj_get_content_width(ui->night_title))
-            history_ui_format_day_compact(selected_day, title,
-                                          sizeof(title));
+            history_ui_format_day_compact(selected_day, title, sizeof(title));
     } else {
         history_ui_copy_text(title, sizeof(title), "Select a recorded night");
     }
@@ -2171,36 +2486,33 @@ static void history_ui_update_header(touch_history_ui_t *ui)
     char subtitle[96];
     if (ui->has_night) {
         char start[12], end[12];
-        history_ui_format_clock(ui->night.axis_start_ms, false,
-                                start, sizeof(start));
-        history_ui_format_clock(ui->night.axis_end_ms, false,
-                                end, sizeof(end));
+        history_ui_format_clock(ui->night.axis_start_ms, false, start, sizeof(start));
+        history_ui_format_clock(ui->night.axis_end_ms, false, end, sizeof(end));
         snprintf(subtitle, sizeof(subtitle), "Review window %s–%s", start, end);
     } else {
-        history_ui_copy_text(subtitle, sizeof(subtitle),
-                             "Newest completed night opens automatically");
+        history_ui_copy_text(
+            subtitle, sizeof(subtitle), "Newest completed night opens automatically");
     }
     lv_label_set_text(ui->night_subtitle, subtitle);
 
     char usage[56];
     if (day && day->has_usage) {
         if (ui->usage_target_known)
-            snprintf(usage, sizeof(usage), "%d h %02d m · %s",
-                     day->usage_min / 60, day->usage_min % 60,
-                     ui->usage_on_target ? "≥4 h adherence"
-                                         : "<4 h adherence");
+            snprintf(usage,
+                     sizeof(usage),
+                     "%d h %02d m · %s",
+                     day->usage_min / 60,
+                     day->usage_min % 60,
+                     ui->usage_on_target ? "≥4 h adherence" : "<4 h adherence");
         else
-            snprintf(usage, sizeof(usage), "%d h %02d m",
-                     day->usage_min / 60, day->usage_min % 60);
+            snprintf(usage, sizeof(usage), "%d h %02d m", day->usage_min / 60, day->usage_min % 60);
         lv_label_set_text(ui->target_badge_label, usage);
         history_ui_set_hidden(ui->target_badge, false);
-        uint32_t badge_color =
-            ui->usage_target_known && !ui->usage_on_target
-                ? HISTORY_UI_COLOR_AMBER : HISTORY_UI_COLOR_LIVE;
-        lv_obj_set_style_text_color(
-            ui->target_badge_label, history_ui_color(badge_color), 0);
-        lv_obj_set_style_border_color(
-            ui->target_badge, history_ui_color(badge_color), 0);
+        uint32_t badge_color = ui->usage_target_known && !ui->usage_on_target
+                                   ? HISTORY_UI_COLOR_AMBER
+                                   : HISTORY_UI_COLOR_LIVE;
+        lv_obj_set_style_text_color(ui->target_badge_label, history_ui_color(badge_color), 0);
+        lv_obj_set_style_border_color(ui->target_badge, history_ui_color(badge_color), 0);
     } else {
         history_ui_set_hidden(ui->target_badge, true);
     }
@@ -2213,77 +2525,60 @@ static void history_ui_update_summary(touch_history_ui_t *ui)
     const touch_history_day_t *day = history_ui_selected_day(ui);
     char values[5][32];
     if (day && day->has_usage)
-        snprintf(values[0], sizeof(values[0]), "%.1f h",
-                 (double)day->usage_min / 60.0);
+        snprintf(values[0], sizeof(values[0]), "%.1f h", (double)day->usage_min / 60.0);
     else
-        history_ui_copy_text(values[0], sizeof(values[0]),
-                             HISTORY_UI_EM_DASH);
-    bool has_st_ahi = (ui->has_night && ui->night.has_st_ahi) ||
-                      (day && day->has_st_ahi);
-    float st_ahi = ui->has_night ? ui->night.st_ahi
-                                 : (day ? day->st_ahi : 0.0f);
+        history_ui_copy_text(values[0], sizeof(values[0]), HISTORY_UI_EM_DASH);
+    bool has_st_ahi = (ui->has_night && ui->night.has_st_ahi) || (day && day->has_st_ahi);
+    float st_ahi = ui->has_night ? ui->night.st_ahi : (day ? day->st_ahi : 0.0f);
     if (has_st_ahi)
         snprintf(values[1], sizeof(values[1]), "%.1f /h", (double)st_ahi);
     else
-        history_ui_copy_text(values[1], sizeof(values[1]),
-                             HISTORY_UI_EM_DASH);
+        history_ui_copy_text(values[1], sizeof(values[1]), HISTORY_UI_EM_DASH);
     bool has_device_ahi =
-        (ui->has_night && ui->night.has_device_ahi) ||
-        (day && day->has_device_ahi);
-    float device_ahi = ui->has_night ? ui->night.device_ahi
-                                     : (day ? day->device_ahi : 0.0f);
+        (ui->has_night && ui->night.has_device_ahi) || (day && day->has_device_ahi);
+    float device_ahi = ui->has_night ? ui->night.device_ahi : (day ? day->device_ahi : 0.0f);
     if (has_device_ahi)
-        snprintf(values[2], sizeof(values[2]), "%.1f /h",
-                 (double)device_ahi);
+        snprintf(values[2], sizeof(values[2]), "%.1f /h", (double)device_ahi);
     else
-        history_ui_copy_text(values[2], sizeof(values[2]),
-                             HISTORY_UI_EM_DASH);
+        history_ui_copy_text(values[2], sizeof(values[2]), HISTORY_UI_EM_DASH);
     if (ui->has_night)
-        snprintf(values[3], sizeof(values[3]), "%u session%s",
+        snprintf(values[3],
+                 sizeof(values[3]),
+                 "%u session%s",
                  (unsigned)ui->night.session_count,
                  ui->night.session_count == 1 ? "" : "s");
     else
-        history_ui_copy_text(values[3], sizeof(values[3]),
-                             HISTORY_UI_EM_DASH);
-    if (ui->has_night && ui->night.has_o2_coverage &&
-        day && day->has_usage) {
+        history_ui_copy_text(values[3], sizeof(values[3]), HISTORY_UI_EM_DASH);
+    if (ui->has_night && ui->night.has_o2_coverage && day && day->has_usage) {
         int coverage_minutes =
-            (int)(((int64_t)day->usage_min *
-                   ui->night.o2_coverage_per_mille + 500) / 1000);
-        history_ui_format_clock_minutes(coverage_minutes, true,
-                                        values[4], sizeof(values[4]));
+            (int)(((int64_t)day->usage_min * ui->night.o2_coverage_per_mille + 500) / 1000);
+        history_ui_format_clock_minutes(coverage_minutes, true, values[4], sizeof(values[4]));
     } else {
-        history_ui_copy_text(values[4], sizeof(values[4]),
-                             HISTORY_UI_EM_DASH);
+        history_ui_copy_text(values[4], sizeof(values[4]), HISTORY_UI_EM_DASH);
     }
     for (size_t i = 0; i < 5; ++i)
         lv_label_set_text(ui->summary_values[i], values[i]);
 }
 
-static bool history_ui_signal_available(const touch_history_ui_t *ui,
-                                        touch_history_signal_t signal)
+static bool history_ui_signal_available(const touch_history_ui_t *ui, touch_history_signal_t signal)
 {
     if (!ui->has_night)
         return false;
-    return (ui->night.available_signals &
-            TOUCH_HISTORY_SIGNAL_BIT(signal)) != 0;
+    return (ui->night.available_signals & TOUCH_HISTORY_SIGNAL_BIT(signal)) != 0;
 }
 
 static void history_ui_update_channels(touch_history_ui_t *ui)
 {
     for (size_t i = 0; i < TOUCH_HISTORY_UI_CHANNEL_CONTROLS; ++i) {
         bool selected = i == (size_t)ui->signal;
-        bool available = history_ui_signal_available(
-            ui, (touch_history_signal_t)i);
+        bool available = history_ui_signal_available(ui, (touch_history_signal_t)i);
         lv_obj_set_style_bg_color(
             ui->channels[i].pill,
-            history_ui_color(selected ? HISTORY_UI_COLOR_LIVE_DIM
-                                      : HISTORY_UI_COLOR_ROW),
+            history_ui_color(selected ? HISTORY_UI_COLOR_LIVE_DIM : HISTORY_UI_COLOR_ROW),
             0);
         lv_obj_set_style_text_color(
             ui->channels[i].label,
-            history_ui_color(selected ? HISTORY_UI_COLOR_TEXT
-                                      : HISTORY_UI_COLOR_SECONDARY),
+            history_ui_color(selected ? HISTORY_UI_COLOR_TEXT : HISTORY_UI_COLOR_SECONDARY),
             0);
         history_ui_set_enabled(ui->channels[i].button, available);
     }
@@ -2292,8 +2587,11 @@ static void history_ui_update_channels(touch_history_ui_t *ui)
 static void history_ui_update_graph_header(touch_history_ui_t *ui)
 {
     char graph_title[48];
-    snprintf(graph_title, sizeof(graph_title), "%s · %s",
-             s_signal_names[ui->signal], s_signal_units[ui->signal]);
+    snprintf(graph_title,
+             sizeof(graph_title),
+             "%s · %s",
+             s_signal_names[ui->signal],
+             s_signal_units[ui->signal]);
     lv_label_set_text(ui->graph_title, graph_title);
 
     /* The accepted Flow identity is intentionally longer than the other
@@ -2303,8 +2601,7 @@ static void history_ui_update_graph_header(touch_history_ui_t *ui)
     lv_obj_set_width(ui->graph_title, breathing_flow ? 200 : 132);
     lv_obj_set_width(ui->graph_source, breathing_flow ? 200 : 132);
     for (size_t i = 0; i < TOUCH_HISTORY_UI_STAT_COUNT; ++i) {
-        lv_coord_t stat_x = (breathing_flow ? 218 : 150) +
-                            (lv_coord_t)i * 68;
+        lv_coord_t stat_x = (breathing_flow ? 218 : 150) + (lv_coord_t)i * 68;
         lv_obj_set_x(ui->stat_labels[i], stat_x);
         lv_obj_set_x(ui->stat_values[i], stat_x);
     }
@@ -2315,34 +2612,25 @@ static void history_ui_update_graph_header(touch_history_ui_t *ui)
     if (!ui->has_overview) {
         history_ui_copy_text(source, sizeof(source), "Not loaded");
     } else {
-        uint64_t duration = ui->overview.axis_end_ms >
-                                    ui->overview.axis_start_ms
-                                ? (uint64_t)(ui->overview.axis_end_ms -
-                                             ui->overview.axis_start_ms)
+        uint64_t duration = ui->overview.axis_end_ms > ui->overview.axis_start_ms
+                                ? (uint64_t)(ui->overview.axis_end_ms - ui->overview.axis_start_ms)
                                 : 0;
         unsigned minutes = (unsigned)((duration + 30000ULL) / 60000ULL);
         if (ui->overview.preview) {
             snprintf(source, sizeof(source), "%um · preview", minutes);
+        } else if (ui->signal == TOUCH_HISTORY_SIGNAL_FLOW && ui->overview.source_raw) {
+            snprintf(source, sizeof(source), "%um · raw 25 Hz", minutes);
+        } else if (ui->signal == TOUCH_HISTORY_SIGNAL_FLOW && ui->overview.source_fallback) {
+            snprintf(source, sizeof(source), "%um · 1 Hz fallback", minutes);
         } else if (ui->signal == TOUCH_HISTORY_SIGNAL_FLOW &&
-                   ui->overview.source_raw) {
-            snprintf(source, sizeof(source),
-                     "%um · raw 25 Hz", minutes);
-        } else if (ui->signal == TOUCH_HISTORY_SIGNAL_FLOW &&
-                   ui->overview.source_fallback) {
-            snprintf(source, sizeof(source),
-                     "%um · 1 Hz fallback", minutes);
-        } else if (ui->signal == TOUCH_HISTORY_SIGNAL_FLOW &&
-                   ui->overview.aggregation ==
-                       TOUCH_HISTORY_AGGREGATION_ENVELOPE) {
+                   ui->overview.aggregation == TOUCH_HISTORY_AGGREGATION_ENVELOPE) {
             if (ui->has_night && ui->overview.axis_start_ms == ui->night.axis_start_ms &&
                 ui->overview.axis_end_ms == ui->night.axis_end_ms)
                 history_ui_copy_text(source, sizeof(source), "Full night · envelope");
             else
                 snprintf(source, sizeof(source), "%um · envelope", minutes);
-        } else if (ui->signal == TOUCH_HISTORY_SIGNAL_PRESSURE &&
-                   ui->overview.has_companion) {
-            history_ui_copy_text(source, sizeof(source),
-                                 "Pressure + EPR");
+        } else if (ui->signal == TOUCH_HISTORY_SIGNAL_PRESSURE && ui->overview.has_companion) {
+            history_ui_copy_text(source, sizeof(source), "Pressure + EPR");
         } else {
             snprintf(source, sizeof(source), "%um window", minutes);
         }
@@ -2351,36 +2639,26 @@ static void history_ui_update_graph_header(touch_history_ui_t *ui)
 
     bool o2_filter = ui->signal == TOUCH_HISTORY_SIGNAL_SPO2;
     history_ui_set_hidden(ui->therapy_only_button, !o2_filter);
-    lv_obj_t *therapy_label = o2_filter
-                                  ? lv_obj_get_child(ui->therapy_only_button, 0)
-                                  : NULL;
+    lv_obj_t *therapy_label = o2_filter ? lv_obj_get_child(ui->therapy_only_button, 0) : NULL;
     if (therapy_label)
-        lv_label_set_text(therapy_label,
-                          ui->therapy_only ? "Therapy: On"
-                                           : "Therapy: Off");
+        lv_label_set_text(therapy_label, ui->therapy_only ? "Therapy: On" : "Therapy: Off");
 
     bool stats_warning = ui->stats_warning_text[0] != '\0';
     history_ui_set_hidden(ui->stats_warning, !stats_warning);
     if (stats_warning)
         lv_label_set_text(ui->stats_warning, ui->stats_warning_text);
     for (size_t i = 0; i < TOUCH_HISTORY_UI_STAT_COUNT; ++i) {
-        bool fourth_visible =
-            i < 3 || ui->signal == TOUCH_HISTORY_SIGNAL_SPO2;
-        history_ui_set_hidden(ui->stat_labels[i],
-                              stats_warning || !fourth_visible);
-        history_ui_set_hidden(ui->stat_values[i],
-                              stats_warning || !fourth_visible);
+        bool fourth_visible = i < 3 || ui->signal == TOUCH_HISTORY_SIGNAL_SPO2;
+        history_ui_set_hidden(ui->stat_labels[i], stats_warning || !fourth_visible);
+        history_ui_set_hidden(ui->stat_values[i], stats_warning || !fourth_visible);
         lv_label_set_text(ui->stat_labels[i],
-                          ui->stats[i].label[0]
-                              ? ui->stats[i].label
-                              : history_ui_default_stat_label(ui->signal, i));
+                          ui->stats[i].label[0] ? ui->stats[i].label
+                                                : history_ui_default_stat_label(ui->signal, i));
         char value[40], numeric[24];
-        history_ui_format_x100(ui->stats[i].value_x100,
-                               ui->stats[i].available,
-                               numeric, sizeof(numeric));
+        history_ui_format_x100(
+            ui->stats[i].value_x100, ui->stats[i].available, numeric, sizeof(numeric));
         if (ui->stats[i].available && ui->stats[i].unit[0])
-            snprintf(value, sizeof(value), "%s %s",
-                     numeric, ui->stats[i].unit);
+            snprintf(value, sizeof(value), "%s %s", numeric, ui->stats[i].unit);
         else if (ui->stats[i].available)
             history_ui_copy_text(value, sizeof(value), numeric);
         else
@@ -2400,9 +2678,8 @@ static void history_ui_update_event_status(touch_history_ui_t *ui)
     uint32_t color = HISTORY_UI_COLOR_AMBER;
 
     if (ui->event_state == TOUCH_HISTORY_UI_EVENT_STATE_INCOMPLETE) {
-        text = ui->events_truncated
-            ? "Event data incomplete · view truncated"
-            : "Event data incomplete · markers missing";
+        text = ui->events_truncated ? "Event data incomplete · view truncated"
+                                    : "Event data incomplete · markers missing";
     } else if (ui->event_state == TOUCH_HISTORY_UI_EVENT_STATE_COMPLETE) {
         color = HISTORY_UI_COLOR_TERTIARY;
         if (ui->events_truncated) {
@@ -2418,8 +2695,7 @@ static void history_ui_update_event_status(touch_history_ui_t *ui)
     }
 
     lv_label_set_text(ui->marker_legend, text);
-    lv_obj_set_style_text_color(ui->marker_legend,
-                                history_ui_color(color), 0);
+    lv_obj_set_style_text_color(ui->marker_legend, history_ui_color(color), 0);
 }
 
 static void history_ui_update_state(touch_history_ui_t *ui)
@@ -2428,52 +2704,43 @@ static void history_ui_update_state(touch_history_ui_t *ui)
                         ui->state == TOUCH_HISTORY_UI_STATE_AUTO_LOADING ||
                         ui->state == TOUCH_HISTORY_UI_STATE_READ_ERROR;
     history_ui_set_hidden(ui->state_overlay, !full_overlay);
-    history_ui_set_hidden(ui->zoom_overlay,
-                          ui->state != TOUCH_HISTORY_UI_STATE_ZOOM_LOADING);
-    history_ui_set_hidden(
-        ui->degraded_banner,
-        ui->state != TOUCH_HISTORY_UI_STATE_DEGRADED_UNKNOWN);
+    history_ui_set_hidden(ui->zoom_overlay, ui->state != TOUCH_HISTORY_UI_STATE_ZOOM_LOADING);
+    history_ui_set_hidden(ui->degraded_banner,
+                          ui->state != TOUCH_HISTORY_UI_STATE_DEGRADED_UNKNOWN);
 
     if (ui->state == TOUCH_HISTORY_UI_STATE_ZOOM_LOADING) {
-        lv_label_set_text(
-            ui->zoom_overlay_text,
-            ui->status_text[0] ? ui->status_text
-                               : "Updating…");
+        lv_label_set_text(ui->zoom_overlay_text,
+                          ui->status_text[0] ? ui->status_text : "Updating…");
         /* Intentionally no cancel control exists in this overlay. */
     } else if (ui->state == TOUCH_HISTORY_UI_STATE_DEGRADED_UNKNOWN) {
-        lv_label_set_text(
-            ui->degraded_label,
-            ui->degraded_text[0] ? ui->degraded_text
-                                 : "Some history details are unavailable");
+        lv_label_set_text(ui->degraded_label,
+                          ui->degraded_text[0] ? ui->degraded_text
+                                               : "Some history details are unavailable");
     }
 
     if (!full_overlay)
         return;
     if (ui->state == TOUCH_HISTORY_UI_STATE_AUTO_LOADING) {
         lv_label_set_text(ui->state_icon, "...");
-        lv_obj_set_style_text_color(
-            ui->state_icon, history_ui_color(HISTORY_UI_COLOR_LIVE), 0);
+        lv_obj_set_style_text_color(ui->state_icon, history_ui_color(HISTORY_UI_COLOR_LIVE), 0);
         lv_label_set_text(ui->state_title, "Loading recorded night");
-        lv_label_set_text(
-            ui->state_body,
-            ui->status_text[0] ? ui->status_text
-                               : "Combining all completed sessions and O₂ data");
+        lv_label_set_text(ui->state_body,
+                          ui->status_text[0] ? ui->status_text
+                                             : "Combining all completed sessions and O₂ data");
         history_ui_set_hidden(ui->state_progress, false);
-        lv_bar_set_value(ui->state_progress, ui->progress_per_mille,
-                         LV_ANIM_OFF);
+        lv_bar_set_value(ui->state_progress, ui->progress_per_mille, LV_ANIM_OFF);
         history_ui_set_hidden(ui->state_primary, false);
         lv_label_set_text(ui->state_primary_label, "Cancel");
         history_ui_set_hidden(ui->state_secondary, true);
     } else if (ui->state == TOUCH_HISTORY_UI_STATE_READ_ERROR) {
         lv_label_set_text(ui->state_icon, "!");
-        lv_obj_set_style_text_color(
-            ui->state_icon, history_ui_color(HISTORY_UI_COLOR_FAULT), 0);
+        lv_obj_set_style_text_color(ui->state_icon, history_ui_color(HISTORY_UI_COLOR_FAULT), 0);
         lv_label_set_text(ui->state_title, "Could not read the card");
         char body[220];
-        snprintf(body, sizeof(body), "%s\nLive therapy is unaffected.",
-                 ui->error_text[0]
-                     ? ui->error_text
-                     : "History data did not respond.");
+        snprintf(body,
+                 sizeof(body),
+                 "%s\nLive therapy is unaffected.",
+                 ui->error_text[0] ? ui->error_text : "History data did not respond.");
         lv_label_set_text(ui->state_body, body);
         history_ui_set_hidden(ui->state_progress, true);
         history_ui_set_hidden(ui->state_primary, false);
@@ -2482,62 +2749,60 @@ static void history_ui_update_state(touch_history_ui_t *ui)
         lv_label_set_text(ui->state_secondary_label, "Card status");
     } else {
         lv_label_set_text(ui->state_icon, HISTORY_UI_EM_DASH);
-        lv_obj_set_style_text_color(
-            ui->state_icon, history_ui_color(HISTORY_UI_COLOR_TERTIARY), 0);
+        lv_obj_set_style_text_color(ui->state_icon, history_ui_color(HISTORY_UI_COLOR_TERTIARY), 0);
         lv_label_set_text(ui->state_title, "No recorded nights yet");
-        lv_label_set_text(
-            ui->state_body,
-            "Completed nights will appear here automatically.");
+        lv_label_set_text(ui->state_body, "Completed nights will appear here automatically.");
         history_ui_set_hidden(ui->state_progress, true);
         history_ui_set_hidden(ui->state_primary, true);
         history_ui_set_hidden(ui->state_secondary, true);
     }
 }
 
-static void history_ui_update_calendar(touch_history_ui_t *ui,
-                                       bool grid_content_changed)
+static void history_ui_update_calendar(touch_history_ui_t *ui, bool grid_content_changed)
 {
     if (!ui->calendar_overlay)
         return;
-    history_ui_set_hidden(ui->calendar_overlay,
-                          ui->rail_mode != TOUCH_HISTORY_UI_RAIL_CALENDAR);
+    history_ui_set_hidden(ui->calendar_overlay, ui->rail_mode != TOUCH_HISTORY_UI_RAIL_CALENDAR);
     if (ui->rail_mode != TOUCH_HISTORY_UI_RAIL_CALENDAR)
         return;
     char title[48];
     static const char *const months[] = {
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
     };
     if (ui->has_month && ui->month.month >= 1 && ui->month.month <= 12)
-        snprintf(title, sizeof(title), "%s %u",
-                 months[ui->month.month - 1], (unsigned)ui->month.year);
+        snprintf(
+            title, sizeof(title), "%s %u", months[ui->month.month - 1], (unsigned)ui->month.year);
     else
         history_ui_copy_text(title, sizeof(title), "Recorded nights");
     history_ui_set_label_text_if_changed(ui->calendar_title, title);
-    history_ui_set_enabled(ui->calendar_previous,
-                           ui->can_previous_month && !ui->calendar_loading);
-    history_ui_set_enabled(ui->calendar_next,
-                           ui->can_next_month && !ui->calendar_loading);
+    history_ui_set_enabled(ui->calendar_previous, ui->can_previous_month && !ui->calendar_loading);
+    history_ui_set_enabled(ui->calendar_next, ui->can_next_month && !ui->calendar_loading);
     if (ui->calendar_loading) {
-        history_ui_set_label_text_if_changed(
-            ui->calendar_status, "Loading month…");
+        history_ui_set_label_text_if_changed(ui->calendar_status, "Loading month…");
         lv_obj_set_style_text_color(
             ui->calendar_status, history_ui_color(HISTORY_UI_COLOR_LIVE), 0);
     } else if (ui->calendar_read_error) {
-        history_ui_set_label_text_if_changed(
-            ui->calendar_status, "Could not read this month");
+        history_ui_set_label_text_if_changed(ui->calendar_status, "Could not read this month");
         lv_obj_set_style_text_color(
             ui->calendar_status, history_ui_color(HISTORY_UI_COLOR_FAULT), 0);
     }
-    history_ui_set_hidden(
-        ui->calendar_status,
-        !ui->calendar_loading && !ui->calendar_read_error);
+    history_ui_set_hidden(ui->calendar_status, !ui->calendar_loading && !ui->calendar_read_error);
     if (grid_content_changed)
         lv_obj_invalidate(ui->calendar_grid);
 }
 
-static esp_err_t history_ui_validate_snapshot(
-    const touch_history_ui_snapshot_t *snapshot)
+static esp_err_t history_ui_validate_snapshot(const touch_history_ui_snapshot_t *snapshot)
 {
     if (!snapshot || snapshot->state > TOUCH_HISTORY_UI_STATE_DEGRADED_UNKNOWN ||
         snapshot->rail_mode > TOUCH_HISTORY_UI_RAIL_CALENDAR ||
@@ -2553,59 +2818,47 @@ static esp_err_t history_ui_validate_snapshot(
         (snapshot->session_count && !snapshot->sessions) ||
         (snapshot->event_count && !snapshot->events) ||
         (snapshot->event_state == TOUCH_HISTORY_UI_EVENT_STATE_UNAVAILABLE &&
-         (snapshot->event_count || snapshot->event_total_count ||
-          snapshot->events_truncated)) ||
-        (snapshot->selected_row != SIZE_MAX &&
-         snapshot->selected_row >= snapshot->day_count))
+         (snapshot->event_count || snapshot->event_total_count || snapshot->events_truncated)) ||
+        (snapshot->selected_row != SIZE_MAX && snapshot->selected_row >= snapshot->day_count))
         return ESP_ERR_INVALID_ARG;
     if (snapshot->overview &&
         (snapshot->overview->point_count > TOUCH_HISTORY_OVERVIEW_POINTS ||
          snapshot->overview->signal >= TOUCH_HISTORY_SIGNAL_COUNT ||
          snapshot->overview->signal != snapshot->selected_signal ||
          (snapshot->overview->has_data &&
-          snapshot->overview->axis_end_ms <=
-              snapshot->overview->axis_start_ms)))
+          snapshot->overview->axis_end_ms <= snapshot->overview->axis_start_ms)))
         return ESP_ERR_INVALID_ARG;
     if (snapshot->month &&
-        (snapshot->month->year > 9999 ||
-         snapshot->month->month < 1 || snapshot->month->month > 12))
+        (snapshot->month->year > 9999 || snapshot->month->month < 1 || snapshot->month->month > 12))
         return ESP_ERR_INVALID_ARG;
     return ESP_OK;
 }
 
-static bool history_ui_graph_content_changed(
-    const touch_history_ui_t *ui,
-    const touch_history_ui_snapshot_t *snapshot)
+static bool history_ui_graph_content_changed(const touch_history_ui_t *ui,
+                                             const touch_history_ui_snapshot_t *snapshot)
 {
     bool next_has_overview = snapshot->overview != NULL;
-    if (ui->has_overview != next_has_overview ||
-        ui->signal != snapshot->selected_signal ||
-        ui->therapy_only != snapshot->therapy_only ||
-        ui->cursor_valid != snapshot->cursor_valid ||
+    if (ui->has_overview != next_has_overview || ui->signal != snapshot->selected_signal ||
+        ui->therapy_only != snapshot->therapy_only || ui->cursor_valid != snapshot->cursor_valid ||
         (ui->cursor_valid && ui->cursor_ms != snapshot->cursor_ms) ||
-        ui->session_count != snapshot->session_count ||
-        ui->event_count != snapshot->event_count ||
+        ui->session_count != snapshot->session_count || ui->event_count != snapshot->event_count ||
         (ui->state == TOUCH_HISTORY_UI_STATE_DEGRADED_UNKNOWN) !=
             (snapshot->state == TOUCH_HISTORY_UI_STATE_DEGRADED_UNKNOWN))
         return true;
-    if (next_has_overview &&
-        memcmp(&ui->overview, snapshot->overview,
-               sizeof(ui->overview)) != 0)
+    if (next_has_overview && memcmp(&ui->overview, snapshot->overview, sizeof(ui->overview)) != 0)
         return true;
-    if (snapshot->session_count &&
-        memcmp(ui->sessions, snapshot->sessions,
-               snapshot->session_count * sizeof(ui->sessions[0])) != 0)
+    if (snapshot->session_count && memcmp(ui->sessions,
+                                          snapshot->sessions,
+                                          snapshot->session_count * sizeof(ui->sessions[0])) != 0)
         return true;
     if (snapshot->event_count &&
-        memcmp(ui->events, snapshot->events,
-               snapshot->event_count * sizeof(ui->events[0])) != 0)
+        memcmp(ui->events, snapshot->events, snapshot->event_count * sizeof(ui->events[0])) != 0)
         return true;
     return false;
 }
 
-static bool history_ui_calendar_grid_content_changed(
-    const touch_history_ui_t *ui,
-    const touch_history_ui_snapshot_t *snapshot)
+static bool history_ui_calendar_grid_content_changed(const touch_history_ui_t *ui,
+                                                     const touch_history_ui_snapshot_t *snapshot)
 {
     if (!ui->calendar_overlay || ui->rail_mode != snapshot->rail_mode)
         return true;
@@ -2613,8 +2866,7 @@ static bool history_ui_calendar_grid_content_changed(
     if (ui->has_month != next_has_month)
         return true;
     if (next_has_month &&
-        (ui->month.year != snapshot->month->year ||
-         ui->month.month != snapshot->month->month ||
+        (ui->month.year != snapshot->month->year || ui->month.month != snapshot->month->month ||
          ui->month.days_in_month != snapshot->month->days_in_month ||
          ui->month.therapy_days != snapshot->month->therapy_days ||
          ui->month.oximetry_days != snapshot->month->oximetry_days))
@@ -2633,18 +2885,15 @@ esp_err_t touch_history_ui_apply(touch_history_ui_t *ui,
     esp_err_t result = history_ui_validate_snapshot(snapshot);
     if (result != ESP_OK)
         return result;
-    bool graph_content_changed =
-        history_ui_graph_content_changed(ui, snapshot);
-    bool calendar_grid_content_changed =
-        history_ui_calendar_grid_content_changed(ui, snapshot);
+    bool graph_content_changed = history_ui_graph_content_changed(ui, snapshot);
+    bool calendar_grid_content_changed = history_ui_calendar_grid_content_changed(ui, snapshot);
 
     ui->state = snapshot->state;
     ui->rail_mode = snapshot->rail_mode;
     ui->day_count = snapshot->day_count;
     memset(ui->days, 0, sizeof(ui->days));
     if (snapshot->day_count)
-        memcpy(ui->days, snapshot->days,
-               snapshot->day_count * sizeof(ui->days[0]));
+        memcpy(ui->days, snapshot->days, snapshot->day_count * sizeof(ui->days[0]));
     ui->page = snapshot->page;
     ui->selected_row = snapshot->selected_row;
 
@@ -2657,8 +2906,7 @@ esp_err_t touch_history_ui_apply(touch_history_ui_t *ui,
     }
     ui->session_count = snapshot->session_count;
     if (snapshot->session_count)
-        memcpy(ui->sessions, snapshot->sessions,
-               snapshot->session_count * sizeof(ui->sessions[0]));
+        memcpy(ui->sessions, snapshot->sessions, snapshot->session_count * sizeof(ui->sessions[0]));
 
     if (snapshot->overview) {
         ui->overview = *snapshot->overview;
@@ -2672,8 +2920,7 @@ esp_err_t touch_history_ui_apply(touch_history_ui_t *ui,
     ui->event_state = snapshot->event_state;
     ui->events_truncated = snapshot->events_truncated;
     if (snapshot->event_count)
-        memcpy(ui->events, snapshot->events,
-               snapshot->event_count * sizeof(ui->events[0]));
+        memcpy(ui->events, snapshot->events, snapshot->event_count * sizeof(ui->events[0]));
 
     if (snapshot->month) {
         ui->month = *snapshot->month;
@@ -2688,12 +2935,9 @@ esp_err_t touch_history_ui_apply(touch_history_ui_t *ui,
     ui->calendar_read_error = snapshot->calendar_read_error;
     ui->signal = snapshot->selected_signal;
     for (size_t i = 0; i < TOUCH_HISTORY_UI_STAT_COUNT; ++i) {
-        history_ui_copy_text(ui->stats[i].label,
-                             sizeof(ui->stats[i].label),
-                             snapshot->stats[i].label);
-        history_ui_copy_text(ui->stats[i].unit,
-                             sizeof(ui->stats[i].unit),
-                             snapshot->stats[i].unit);
+        history_ui_copy_text(
+            ui->stats[i].label, sizeof(ui->stats[i].label), snapshot->stats[i].label);
+        history_ui_copy_text(ui->stats[i].unit, sizeof(ui->stats[i].unit), snapshot->stats[i].unit);
         ui->stats[i].value_x100 = snapshot->stats[i].value_x100;
         ui->stats[i].available = snapshot->stats[i].available;
     }
@@ -2703,15 +2947,11 @@ esp_err_t touch_history_ui_apply(touch_history_ui_t *ui,
     ui->usage_on_target = snapshot->usage_on_target;
     ui->therapy_only = snapshot->therapy_only;
     ui->progress_per_mille = snapshot->progress_per_mille;
-    history_ui_copy_text(ui->status_text, sizeof(ui->status_text),
-                         snapshot->status_text);
-    history_ui_copy_text(ui->error_text, sizeof(ui->error_text),
-                         snapshot->error_text);
-    history_ui_copy_text(ui->degraded_text, sizeof(ui->degraded_text),
-                         snapshot->degraded_text);
-    history_ui_copy_text(ui->stats_warning_text,
-                         sizeof(ui->stats_warning_text),
-                         snapshot->stats_warning_text);
+    history_ui_copy_text(ui->status_text, sizeof(ui->status_text), snapshot->status_text);
+    history_ui_copy_text(ui->error_text, sizeof(ui->error_text), snapshot->error_text);
+    history_ui_copy_text(ui->degraded_text, sizeof(ui->degraded_text), snapshot->degraded_text);
+    history_ui_copy_text(
+        ui->stats_warning_text, sizeof(ui->stats_warning_text), snapshot->stats_warning_text);
 
     ui->cursor_valid = snapshot->cursor_valid;
     ui->cursor_ms = snapshot->cursor_valid ? snapshot->cursor_ms : 0;

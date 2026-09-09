@@ -59,7 +59,6 @@
 #include "nvs_flash.h"
 #include "sdkconfig.h"
 
-
 static const char *TAG = "somnotrace";
 static volatile bool s_softap_requested = false;
 
@@ -84,29 +83,30 @@ typedef struct {
 
 static bool uploader_has_destination(const uploader_config_t *cfg)
 {
-    if (!cfg) return false;
-    bool smb = cfg->smb_enabled && cfg->smb_host[0] != '\0' &&
-               cfg->smb_share[0] != '\0';
-    bool sleephq = cfg->shq_enabled && cfg->shq_client_id[0] != '\0' &&
-                   cfg->shq_client_secret[0] != '\0';
+    if (!cfg)
+        return false;
+    bool smb = cfg->smb_enabled && cfg->smb_host[0] != '\0' && cfg->smb_share[0] != '\0';
+    bool sleephq =
+        cfg->shq_enabled && cfg->shq_client_id[0] != '\0' && cfg->shq_client_secret[0] != '\0';
     return smb || sleephq;
 }
 
 static bool boot_has_legacy_setup_evidence(const first_run_boot_facts_t *facts)
 {
-    if (!facts) return false;
-    return facts->wifi_configured || facts->timezone_saved ||
-           facts->drift_saved || facts->airsense_paired ||
-           facts->device_settings_saved || facts->alert_config_saved ||
+    if (!facts)
+        return false;
+    return facts->wifi_configured || facts->timezone_saved || facts->drift_saved ||
+           facts->airsense_paired || facts->device_settings_saved || facts->alert_config_saved ||
            facts->upload_config_saved;
 }
 
-static bool setup_reconcile_needed(
-    const first_run_setup_snapshot_t *snapshot,
-    const first_run_setup_observed_t *observed)
+static bool setup_reconcile_needed(const first_run_setup_snapshot_t *snapshot,
+                                   const first_run_setup_observed_t *observed)
 {
-    if (!snapshot || !observed || !snapshot->schema_compatible) return false;
-    if (!snapshot->persisted) return true;
+    if (!snapshot || !observed || !snapshot->schema_compatible)
+        return false;
+    if (!snapshot->persisted)
+        return true;
 
     const bool present[FIRST_RUN_SETUP_STEP_COUNT] = {
         [FIRST_RUN_SETUP_STEP_WIFI] = observed->wifi_configured,
@@ -117,8 +117,7 @@ static bool setup_reconcile_needed(
         [FIRST_RUN_SETUP_STEP_UPLOADS] = observed->uploads_configured,
     };
     for (unsigned step = 0; step < FIRST_RUN_SETUP_STEP_COUNT; step++) {
-        if (present[step] &&
-            (snapshot->state.completed_mask & SETUP_STEP_BIT(step)) == 0) {
+        if (present[step] && (snapshot->state.completed_mask & SETUP_STEP_BIT(step)) == 0) {
             return true;
         }
     }
@@ -127,11 +126,12 @@ static bool setup_reconcile_needed(
 
 static void reconcile_first_run_setup(const first_run_boot_facts_t *facts)
 {
-    if (!facts) return;
+    if (!facts)
+        return;
 
     const first_run_setup_observed_t observed = {
-        .established_installation = facts->setup_state_missing &&
-                                    boot_has_legacy_setup_evidence(facts),
+        .established_installation =
+            facts->setup_state_missing && boot_has_legacy_setup_evidence(facts),
         .wifi_configured = facts->wifi_configured,
         .time_configured = facts->timezone_saved,
         .airsense_paired = facts->airsense_paired,
@@ -143,7 +143,8 @@ static void reconcile_first_run_setup(const first_run_boot_facts_t *facts)
     first_run_setup_snapshot_t snapshot;
     first_run_setup_snapshot(&snapshot);
     if (!snapshot.schema_compatible) {
-        ESP_LOGE(TAG, "first-run setup state unavailable: %s",
+        ESP_LOGE(TAG,
+                 "first-run setup state unavailable: %s",
                  esp_err_to_name(snapshot.last_storage_result));
         return;
     }
@@ -151,8 +152,7 @@ static void reconcile_first_run_setup(const first_run_boot_facts_t *facts)
     if (setup_reconcile_needed(&snapshot, &observed)) {
         esp_err_t err = first_run_setup_reconcile(&observed);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "first-run setup reconcile failed: %s",
-                     esp_err_to_name(err));
+            ESP_LOGE(TAG, "first-run setup reconcile failed: %s", esp_err_to_name(err));
             return;
         }
         first_run_setup_snapshot(&snapshot);
@@ -256,7 +256,7 @@ static bool enter_softap(const struct netprov_config *cfg)
     char ap_ip[16] = "0.0.0.0";
     esp_err_t err = netprov_start_portal(cfg, ap_ip);
     if (err != ESP_OK) {
-        const char *lines[] = { "SoftAP failed" };
+        const char *lines[] = {"SoftAP failed"};
         show_status("Error", lines, 1);
         return false;
     }
@@ -264,7 +264,7 @@ static bool enter_softap(const struct netprov_config *cfg)
     /* Only drop the CPAP link after the setup network is known to be live. */
     as11_ble_disconnect();
     bsp_display_set_wifi_connected(false);
-    bsp_display_apply_backlight_policy(true);  /* always show display in AP mode */
+    bsp_display_apply_backlight_policy(true); /* always show display in AP mode */
 
     char ssid_line[48];
     snprintf(ssid_line, sizeof(ssid_line), "SSID: %s-setup", cfg->hostname);
@@ -281,7 +281,8 @@ static bool enter_softap(const struct netprov_config *cfg)
 void app_main(void)
 {
     const esp_app_desc_t *app_desc = esp_app_get_description();
-    ESP_LOGI(TAG, "SomnoTrace %s (IDF %s) starting up",
+    ESP_LOGI(TAG,
+             "SomnoTrace %s (IDF %s) starting up",
              app_desc ? app_desc->version : "unknown",
              app_desc ? app_desc->idf_ver : "?");
 
@@ -300,9 +301,9 @@ void app_main(void)
     ESP_ERROR_CHECK(psram_task_init());
 
     /* 2. Start button monitors. */
-    bsp_power_start_button_monitor(5000);   /* PWR 5 s = power off */
+    bsp_power_start_button_monitor(5000); /* PWR 5 s = power off */
     bsp_power_start_boot_monitor(&s_softap_requested, 5000);
-    bsp_power_start_plus_monitor();         /* PLUS double-click = toggle therapy */
+    bsp_power_start_plus_monitor(); /* PLUS double-click = toggle therapy */
 
     /* 3. Initialise display. */
     bool display_ready = bsp_display_init() == ESP_OK;
@@ -311,7 +312,7 @@ void app_main(void)
     }
     bsp_display_set_setup_callback(request_softap_from_display);
 
-    const char *boot_lines[] = { "Booting..." };
+    const char *boot_lines[] = {"Booting..."};
     show_status("SomnoTrace", boot_lines, 1);
 
     /* Initial battery reading for the status indicator */
@@ -330,10 +331,8 @@ void app_main(void)
     therapy_alert_set_nvs_executor((alert_nvs_exec_fn_t)nvs_writer_run);
 
     esp_err_t setup_load_ret = first_run_setup_load();
-    if (setup_load_ret != ESP_OK &&
-        setup_load_ret != ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGE(TAG, "first-run setup load failed: %s",
-                 esp_err_to_name(setup_load_ret));
+    if (setup_load_ret != ESP_OK && setup_load_ret != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGE(TAG, "first-run setup load failed: %s", esp_err_to_name(setup_load_ret));
     }
 
     /* Capture durable configuration evidence before this boot can change it.
@@ -356,12 +355,10 @@ void app_main(void)
     bool drift_saved = time_sync_has_drift();
 
     therapy_alert_config_t alert_cfg_probe;
-    bool alert_config_saved =
-        therapy_alert_load_config(&alert_cfg_probe) == ESP_OK;
+    bool alert_config_saved = therapy_alert_load_config(&alert_cfg_probe) == ESP_OK;
 
     uploader_config_t upload_cfg_probe;
-    bool upload_config_saved =
-        uploader_load_config(&upload_cfg_probe) == ESP_OK;
+    bool upload_config_saved = uploader_load_config(&upload_cfg_probe) == ESP_OK;
     bool upload_destination_configured =
         upload_config_saved && uploader_has_destination(&upload_cfg_probe);
 
@@ -441,7 +438,8 @@ void app_main(void)
     if (!as11_ready) {
         ESP_LOGE(TAG, "BLE init failed; CPAP pairing unavailable");
     }
-    ESP_LOGI(TAG, "[heap] after BLE init: internal free=%u min=%u",
+    ESP_LOGI(TAG,
+             "[heap] after BLE init: internal free=%u min=%u",
              (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
              (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
 
@@ -473,8 +471,7 @@ void app_main(void)
     /* Missing/removable peripherals are degraded states, not bad firmware.
      * A mounted card, however, must have a live writer; and the core display
      * and AirSense BLE runtime must both initialise before an OTA is trusted. */
-    confirm_pending_ota_image(display_ready && recording_runtime_ready &&
-                              as11_ready);
+    confirm_pending_ota_image(display_ready && recording_runtime_ready && as11_ready);
 
     /* 4c-bis. BLE startup has begun, so reconnect can now establish whether
      * therapy is already running.  Only now is it safe to let the idle post
@@ -488,21 +485,21 @@ void app_main(void)
     therapy_alert_set_therapy_active_fn(bsp_display_is_therapy_active);
     therapy_alert_init();
 
-    first_run_setup_snapshot_t setup_snapshot;
-    first_run_setup_snapshot(&setup_snapshot);
-    bool setup_incomplete = setup_snapshot.schema_compatible &&
-        !first_run_setup_is_finished(&setup_snapshot.state);
     bool native_setup_active = false;
 
 #if CONFIG_SOMNOTRACE_BOARD_WAVESHARE_7B
+    first_run_setup_snapshot_t setup_snapshot;
+    first_run_setup_snapshot(&setup_snapshot);
+    bool setup_incomplete =
+        setup_snapshot.schema_compatible && !first_run_setup_is_finished(&setup_snapshot.state);
+
     /* A fresh touch device is configured entirely on the panel.  Do not send
      * it into the old blocking captive-portal loop just because credentials
      * are absent; the native setup worker owns scan/join instead. */
     if (setup_incomplete) {
         esp_err_t setup_ui = bsp_display_start_first_run_setup(sd_ret);
         if (setup_ui != ESP_OK) {
-            ESP_LOGE(TAG, "could not open native first-run setup: %s",
-                     esp_err_to_name(setup_ui));
+            ESP_LOGE(TAG, "could not open native first-run setup: %s", esp_err_to_name(setup_ui));
             bsp_display_set_critical_notice("Setup screen unavailable");
         } else {
             native_setup_active = bsp_display_first_run_setup_active();
@@ -526,7 +523,7 @@ void app_main(void)
     char ip[16] = "0.0.0.0";
     esp_err_t err = ESP_FAIL;
     if (has_creds) {
-        const char *lines[] = { "Connecting to Wi-Fi..." };
+        const char *lines[] = {"Connecting to Wi-Fi..."};
         show_status("SomnoTrace", lines, 1);
         err = netprov_try_connect(&cfg, ip, 15000);
     }
@@ -544,7 +541,8 @@ void app_main(void)
     if (err == ESP_OK) {
         wifi_connected = true;
         ESP_LOGI(TAG, "Wi-Fi connected, IP=%s", ip);
-        ESP_LOGI(TAG, "[heap] after WiFi: internal free=%u min=%u",
+        ESP_LOGI(TAG,
+                 "[heap] after WiFi: internal free=%u min=%u",
                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
                  (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
         bsp_display_set_wifi_connected(true);
@@ -558,7 +556,7 @@ void app_main(void)
         if (!ntp_ok && time_sync_has_drift() && as11_ble_is_paired()) {
             /* Drift is only useful if we can read the AS11 clock over BLE.
              * Wait for BLE to connect before entering degraded mode. */
-            const char *wait_lines[] = { "Waiting for CPAP..." };
+            const char *wait_lines[] = {"Waiting for CPAP..."};
             show_status("SomnoTrace", wait_lines, 1);
             for (int i = 0; i < 30; i++) {
                 if (strcmp(as11_ble_get_status(), AS11_STATUS_PAIRED) == 0) {
@@ -623,7 +621,8 @@ void app_main(void)
             nvs_writer_unlock();
 
             if (boot_fail_count >= 3) {
-                ESP_LOGW(TAG, "3+ consecutive boot failures — entering SoftAP for user intervention");
+                ESP_LOGW(TAG,
+                         "3+ consecutive boot failures — entering SoftAP for user intervention");
                 nvs_writer_lock();
                 if (nvs_open("cfg", NVS_READWRITE, &nvs_h) == ESP_OK) {
                     nvs_set_i32(nvs_h, "boot_fail", 0);
@@ -636,8 +635,7 @@ void app_main(void)
                     softap_start_ticks = xTaskGetTickCount();
                 }
             } else {
-                ESP_LOGE(TAG, "No time source (attempt %d/3) — alarm + reboot",
-                         boot_fail_count);
+                ESP_LOGE(TAG, "No time source (attempt %d/3) — alarm + reboot", boot_fail_count);
 
                 const char *fail_lines[] = {
                     wifi_connected ? "NTP Sync Failed" : "No Wi-Fi / No NTP",
@@ -649,14 +647,16 @@ void app_main(void)
                     for (int i = 0; i < 5; i++) {
                         bsp_audio_beep(880, 1000, 100);
                         vTaskDelay(pdMS_TO_TICKS(1000));
-                        if (s_softap_requested) break;
+                        if (s_softap_requested)
+                            break;
                     }
                 }
 
                 if (s_softap_requested) {
                     ESP_LOGW(TAG, "BOOT pressed during alarm: entering SoftAP");
                     if (enter_softap(&cfg)) {
-                        while (true) vTaskDelay(pdMS_TO_TICKS(1000));
+                        while (true)
+                            vTaskDelay(pdMS_TO_TICKS(1000));
                     }
                 }
 
@@ -708,7 +708,8 @@ void app_main(void)
                         strlcpy(ftp_pass, upcfg.ftp_pass, sizeof(ftp_pass));
                     }
                     ftp_server_start();
-                    ESP_LOGI(TAG, "FTP server started (%s mode)",
+                    ESP_LOGI(TAG,
+                             "FTP server started (%s mode)",
                              upcfg.ftp_anonymous ? "anonymous" : "authenticated");
                 } else {
                     ESP_LOGI(TAG, "FTP server disabled in config");
@@ -751,7 +752,8 @@ void app_main(void)
 
     int refresh_counter = 0;
     static bool post_connect_init_done = false;
-    if (wifi_connected) post_connect_init_done = true;
+    if (wifi_connected)
+        post_connect_init_done = true;
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(1000));
         if (s_softap_requested && !in_softap) {
@@ -763,8 +765,7 @@ void app_main(void)
         }
         if (in_softap) {
             /* SoftAP idle timeout */
-            if ((xTaskGetTickCount() - softap_start_ticks) * portTICK_PERIOD_MS
-                 > 10 * 60 * 1000) {
+            if ((xTaskGetTickCount() - softap_start_ticks) * portTICK_PERIOD_MS > 10 * 60 * 1000) {
                 ESP_LOGW(TAG, "SoftAP 10-minute idle timeout: rebooting to retry connection");
                 controlled_restart();
             }

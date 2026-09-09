@@ -6,8 +6,13 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-static int walk(const char *path, maintenance_fs_action_t action, bool edf_root, unsigned depth,
-                maintenance_fs_totals_t *totals, maintenance_fs_cancel_fn cancelled, void *context)
+static int walk(const char *path,
+                maintenance_fs_action_t action,
+                bool edf_root,
+                unsigned depth,
+                maintenance_fs_totals_t *totals,
+                maintenance_fs_cancel_fn cancelled,
+                void *context)
 {
     if (depth > 8)
         return EOVERFLOW;
@@ -80,8 +85,11 @@ static int walk(const char *path, maintenance_fs_action_t action, bool edf_root,
         result = errno;
     return result;
 }
-int maintenance_fs_walk(const char *path, maintenance_fs_action_t action, bool edf_root,
-                        maintenance_fs_totals_t *totals, maintenance_fs_cancel_fn cancelled,
+int maintenance_fs_walk(const char *path,
+                        maintenance_fs_action_t action,
+                        bool edf_root,
+                        maintenance_fs_totals_t *totals,
+                        maintenance_fs_cancel_fn cancelled,
                         void *context)
 {
     if (!path || !totals)

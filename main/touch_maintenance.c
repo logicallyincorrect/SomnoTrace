@@ -68,8 +68,8 @@ void touch_maintenance_diagnostics(maintenance_diagnostics_t *out)
     const esp_app_desc_t *app = esp_app_get_description();
     strlcpy(out->version, app->version, sizeof(out->version));
     snprintf(out->build, sizeof(out->build), "%s %s", app->date, app->time);
-    snprintf(out->target, sizeof(out->target), "ESP32-S3 / %.15s",
-             somnotrace_firmware_target.board);
+    snprintf(
+        out->target, sizeof(out->target), "ESP32-S3 / %.15s", somnotrace_firmware_target.board);
     const unsigned internal = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
     out->free_internal = heap_caps_get_free_size(internal);
     out->min_internal = heap_caps_get_minimum_free_size(internal);
@@ -102,7 +102,8 @@ void touch_maintenance_diagnostics(maintenance_diagnostics_t *out)
             sizeof(out->airsense));
     if (airsense_ready && !strcmp(out->airsense, AS11_STATUS_ERROR))
         snprintf(out->airsense, sizeof(out->airsense), "Error: %.55s", as11_ble_get_error());
-    strlcpy(out->oxygen, oxygen_ready ? oximeter_get_status() : "O2 service not initialized",
+    strlcpy(out->oxygen,
+            oxygen_ready ? oximeter_get_status() : "O2 service not initialized",
             sizeof(out->oxygen));
     if (oxygen_ready && !strcmp(out->oxygen, OX_STATUS_ERROR))
         snprintf(out->oxygen, sizeof(out->oxygen), "Error: %.55s", oximeter_get_error());
@@ -112,7 +113,10 @@ void touch_maintenance_diagnostics(maintenance_diagnostics_t *out)
         strlcpy(out->uploads, up.status, sizeof(out->uploads));
         for (size_t i = 0; i < up.backend_count; i++)
             if (up.backends[i].error_valid) {
-                snprintf(out->uploads, sizeof(out->uploads), "%s: %s", up.backends[i].label,
+                snprintf(out->uploads,
+                         sizeof(out->uploads),
+                         "%s: %s",
+                         up.backends[i].label,
                          up.backends[i].error);
                 break;
             }
@@ -144,8 +148,8 @@ static bool exists_dir(const char *base, const char *name)
     return !stat(path, &st) && S_ISDIR(st.st_mode);
 }
 /* Bounded insertion sort keeps only one visible page, regardless of card size. */
-static void insert(maintenance_snapshot_t *s, const char *name, uint64_t bytes, uint32_t files,
-                   bool descending)
+static void insert(
+    maintenance_snapshot_t *s, const char *name, uint64_t bytes, uint32_t files, bool descending)
 {
     int boundary = strcmp(name, s->cursor);
     if (s->cursor[0] && (descending ? boundary >= 0 : boundary <= 0))
@@ -344,7 +348,9 @@ static esp_err_t list_files(maintenance_snapshot_t *s, bool images)
             }
             if (!S_ISREG(st.st_mode))
                 continue;
-            int n = snprintf(name, sizeof(name), "%s%s",
+            int n = snprintf(name,
+                             sizeof(name),
+                             "%s%s",
                              images ? ""
                              : r    ? "EDF/"
                                     : "Raw/",
@@ -399,14 +405,19 @@ static esp_err_t recreate(maintenance_snapshot_t *s)
         strlcpy(cursor, next, sizeof(cursor));
         if (s) {
             s->processed++;
-            snprintf(s->message, sizeof(s->message),
+            snprintf(s->message,
+                     sizeof(s->message),
                      "Rebuilt %lu nights; latest %s. Remaining time unknown.",
-                     (unsigned long)s->processed, next);
+                     (unsigned long)s->processed,
+                     next);
             publish(s);
         }
     }
 }
-esp_err_t touch_maintenance_recreate(void) { return recreate(NULL); }
+esp_err_t touch_maintenance_recreate(void)
+{
+    return recreate(NULL);
+}
 static esp_err_t destructive(maintenance_snapshot_t *s)
 {
     /* Final admission happens in the worker, after hold completion. The
@@ -422,21 +433,23 @@ static esp_err_t destructive(maintenance_snapshot_t *s)
     if (bsp_display_therapy_safe_maintenance_should_abort())
         error = ECANCELED;
     else if (s->action == MAINT_DELETE_EDF)
-        error = maintenance_fs_walk(SD_SDCARD_DIR, MAINT_FS_DELETE_GENERATED, true, &totals,
-                                    cancelled, NULL);
+        error = maintenance_fs_walk(
+            SD_SDCARD_DIR, MAINT_FS_DELETE_GENERATED, true, &totals, cancelled, NULL);
     else {
         const char *roots[] = {SD_SDCARD_DIR, SD_SESSIONS_DIR, SD_OXYMETRY_DIR};
         for (size_t i = 0; i < 3 && !error; i++)
-            error = maintenance_fs_walk(roots[i], MAINT_FS_DELETE_TREE, false, &totals, cancelled,
-                                        NULL);
+            error = maintenance_fs_walk(
+                roots[i], MAINT_FS_DELETE_TREE, false, &totals, cancelled, NULL);
     }
     sd_storage_lease_release(SD_LEASE_DESTRUCTIVE);
     bsp_display_end_therapy_safe_maintenance();
     s->processed = (uint32_t)totals.files;
     s->census_valid = false;
-    snprintf(s->message, sizeof(s->message),
+    snprintf(s->message,
+             sizeof(s->message),
              "%llu files deleted%s. Settings, pairing and device logs retained.",
-             (unsigned long long)totals.files, error ? " before operation stopped" : "");
+             (unsigned long long)totals.files,
+             error ? " before operation stopped" : "");
     if (!error && s->action == MAINT_RESET_RECORDINGS) {
         esp_err_t reset = uploader_reset_state();
         if (reset != ESP_OK) {
@@ -525,53 +538,78 @@ static esp_err_t export_report(maintenance_snapshot_t *s)
         return ESP_ERR_NO_MEM;
     }
     touch_maintenance_diagnostics(d);
-    snprintf(s->report_path, sizeof(s->report_path), "%s/diagnostics-%lld-%llu.txt", SD_LOG_DIR,
-             (long long)time(NULL), (unsigned long long)d->uptime_s);
+    snprintf(s->report_path,
+             sizeof(s->report_path),
+             "%s/diagnostics-%lld-%llu.txt",
+             SD_LOG_DIR,
+             (long long)time(NULL),
+             (unsigned long long)d->uptime_s);
     FILE *f = fopen(s->report_path, "wx");
     bool ok = f != NULL;
     if (f) {
         char capacity[96], signal[40];
         if (d->sd_capacity_valid)
-            snprintf(capacity, sizeof(capacity), "%llu/%llu bytes free",
-                     (unsigned long long)d->sd_free, (unsigned long long)d->sd_total);
+            snprintf(capacity,
+                     sizeof(capacity),
+                     "%llu/%llu bytes free",
+                     (unsigned long long)d->sd_free,
+                     (unsigned long long)d->sd_total);
         else
             strlcpy(capacity, "unknown; no valid sample", sizeof(capacity));
         if (d->rssi_valid)
             snprintf(signal, sizeof(signal), "%d dBm", d->rssi);
         else
             strlcpy(signal, "unavailable", sizeof(signal));
-        ok =
-            fprintf(f,
-                    "SomnoTrace diagnostic snapshot\nVersion: %s\nBuild: %s\nTarget: %s\nUptime: "
-                    "%llu s\n"
-                    "Internal free/min/largest: %lu/%lu/%lu bytes\nPSRAM free/min/largest: "
-                    "%lu/%lu/%lu bytes\nTasks: %lu\n"
-                    "Network: %s; IP %s; RSSI %s\nCard mounted: %d\nCapacity: %s\n"
-                    "Therapy active: %d; recording active: %d\nAirSense: %s\nO2: %s\nUploads: %s\n"
-                    "Controller history is %s; latest observed error episodes follow.\n",
-                    d->version, d->build, d->target, (unsigned long long)d->uptime_s,
-                    (unsigned long)d->free_internal, (unsigned long)d->min_internal,
-                    (unsigned long)d->largest_internal, (unsigned long)d->free_psram,
-                    (unsigned long)d->min_psram, (unsigned long)d->largest_psram,
-                    (unsigned long)d->tasks, d->wifi ? "connected" : "offline",
-                    d->wifi ? d->ip : "unavailable", signal, d->card_ready, capacity, d->therapy,
-                    d->recording, d->airsense, d->oxygen, d->uploads,
-                    d->controllers.simulated ? "simulated" : "measured") > 0;
+        ok = fprintf(f,
+                     "SomnoTrace diagnostic snapshot\nVersion: %s\nBuild: %s\nTarget: %s\nUptime: "
+                     "%llu s\n"
+                     "Internal free/min/largest: %lu/%lu/%lu bytes\nPSRAM free/min/largest: "
+                     "%lu/%lu/%lu bytes\nTasks: %lu\n"
+                     "Network: %s; IP %s; RSSI %s\nCard mounted: %d\nCapacity: %s\n"
+                     "Therapy active: %d; recording active: %d\nAirSense: %s\nO2: %s\nUploads: %s\n"
+                     "Controller history is %s; latest observed error episodes follow.\n",
+                     d->version,
+                     d->build,
+                     d->target,
+                     (unsigned long long)d->uptime_s,
+                     (unsigned long)d->free_internal,
+                     (unsigned long)d->min_internal,
+                     (unsigned long)d->largest_internal,
+                     (unsigned long)d->free_psram,
+                     (unsigned long)d->min_psram,
+                     (unsigned long)d->largest_psram,
+                     (unsigned long)d->tasks,
+                     d->wifi ? "connected" : "offline",
+                     d->wifi ? d->ip : "unavailable",
+                     signal,
+                     d->card_ready,
+                     capacity,
+                     d->therapy,
+                     d->recording,
+                     d->airsense,
+                     d->oxygen,
+                     d->uploads,
+                     d->controllers.simulated ? "simulated" : "measured") > 0;
         for (size_t i = 0; i < CONTROLLER_OPERATION_COUNT && ok; i++) {
             controller_operation_status_t *op = &d->controllers.operations[i];
             ok = !cancelled(NULL) &&
-                 fprintf(f, "%s: %s; last=%ld; errors=%lu; latest error uptime=%lld us\n",
+                 fprintf(f,
+                         "%s: %s; last=%ld; errors=%lu; latest error uptime=%lld us\n",
                          controller_diagnostics_operation_name(i),
-                         op->observed ? "observed" : "unknown", (long)op->last_result,
-                         (unsigned long)op->error_count, (long long)op->last_error_us) > 0;
+                         op->observed ? "observed" : "unknown",
+                         (long)op->last_result,
+                         (unsigned long)op->error_count,
+                         (long long)op->last_error_us) > 0;
         }
         for (size_t i = 0; i < d->controllers.history_count && ok; i++) {
             controller_error_episode_t *ep = &d->controllers.history[i];
-            ok = !cancelled(NULL) &&
-                 fprintf(f, "%s: %s x%lu; uptime=%lld..%lld us\n",
-                         controller_diagnostics_operation_name(ep->operation),
-                         esp_err_to_name(ep->result), (unsigned long)ep->occurrences,
-                         (long long)ep->first_us, (long long)ep->last_us) > 0;
+            ok = !cancelled(NULL) && fprintf(f,
+                                             "%s: %s x%lu; uptime=%lld..%lld us\n",
+                                             controller_diagnostics_operation_name(ep->operation),
+                                             esp_err_to_name(ep->result),
+                                             (unsigned long)ep->occurrences,
+                                             (long long)ep->first_us,
+                                             (long long)ep->last_us) > 0;
         }
         if (fflush(f))
             ok = false;
@@ -620,15 +658,18 @@ static void worker(void *arg)
         s->checked_uptime_us = esp_timer_get_time();
         s->release_valid = s->compatible_asset = true;
         strlcpy(s->release, "QEMU fixture", sizeof(s->release));
-        strlcpy(s->notes, "Deterministic release-check simulation. No network request was sent.",
+        strlcpy(s->notes,
+                "Deterministic release-check simulation. No network request was sent.",
                 sizeof(s->notes));
-        strlcpy(s->release_url, "https://example.invalid/somnotrace-7b-demo.bin",
+        strlcpy(s->release_url,
+                "https://example.invalid/somnotrace-7b-demo.bin",
                 sizeof(s->release_url));
     } else if (s->action == MAINT_SAVE_DISPLAY)
         result = device_settings_save_current();
     else {
         result = ESP_ERR_NOT_SUPPORTED;
-        strlcpy(s->message, "QEMU simulation: operation stopped without changing card data.",
+        strlcpy(s->message,
+                "QEMU simulation: operation stopped without changing card data.",
                 sizeof(s->message));
     }
 #else
@@ -701,19 +742,21 @@ static void worker(void *arg)
     s->complete = true;
     if (!s->message[0]) {
         if (result != ESP_OK)
-            snprintf(s->message, sizeof(s->message),
-                     "Operation stopped: %s. Recording may have priority; review the current state.",
-                     esp_err_to_name(result));
+            snprintf(
+                s->message,
+                sizeof(s->message),
+                "Operation stopped: %s. Recording may have priority; review the current state.",
+                esp_err_to_name(result));
         else if (s->action == MAINT_EXPORT_REPORT)
             snprintf(s->message, sizeof(s->message), "Saved diagnostic report: %s", s->report_path);
         else
             strlcpy(s->message,
-                    s->action == MAINT_SCAN ? "Card scan completed."
-                    : s->action == MAINT_FILES ? "Night file list loaded."
-                    : s->action == MAINT_IMAGES ? "Card image list loaded."
+                    s->action == MAINT_SCAN             ? "Card scan completed."
+                    : s->action == MAINT_FILES          ? "Night file list loaded."
+                    : s->action == MAINT_IMAGES         ? "Card image list loaded."
                     : s->action == MAINT_CHECK_FIRMWARE ? "Release check completed."
-                    : s->action == MAINT_SAVE_DISPLAY ? "Display settings saved."
-                    : "Operation completed.",
+                    : s->action == MAINT_SAVE_DISPLAY   ? "Display settings saved."
+                                                        : "Operation completed.",
                     sizeof(s->message));
     }
     publish(s);
@@ -729,10 +772,12 @@ esp_err_t touch_maintenance_request(maintenance_action_t action, const char *arg
 {
     return touch_maintenance_request_tracked(action, argument, NULL);
 }
-esp_err_t touch_maintenance_request_tracked(maintenance_action_t action, const char *argument,
-                                           uint32_t *job_id)
+esp_err_t touch_maintenance_request_tracked(maintenance_action_t action,
+                                            const char *argument,
+                                            uint32_t *job_id)
 {
-    if (job_id) *job_id = 0;
+    if (job_id)
+        *job_id = 0;
     if (action <= MAINT_NONE || action > MAINT_SAVE_DISPLAY ||
         (argument && strlen(argument) >= MAINTENANCE_NAME_MAX))
         return ESP_ERR_INVALID_ARG;
@@ -753,7 +798,8 @@ esp_err_t touch_maintenance_request_tracked(maintenance_action_t action, const c
         s_read_job_active = action == MAINT_SCAN || action == MAINT_FILES || action == MAINT_IMAGES;
         __atomic_store_n(&s_read_cancelled, false, __ATOMIC_RELAXED);
         job->value = *s_snapshot;
-        if (++s_next_job_id == 0) ++s_next_job_id;
+        if (++s_next_job_id == 0)
+            ++s_next_job_id;
         job->value.job_id = s_next_job_id;
     }
     portEXIT_CRITICAL(&s_lock);
@@ -788,9 +834,11 @@ esp_err_t touch_maintenance_request_tracked(maintenance_action_t action, const c
         strlcpy(s->cursor, argument ? argument : "", sizeof(s->cursor));
     publish(s);
     /* The worker can retire/free job before task creation returns. */
-    if (job_id) *job_id = s->job_id;
+    if (job_id)
+        *job_id = s->job_id;
     if (!psram_task_create(worker, "maintenance", 16384, job, 3, tskNO_AFFINITY, NULL, NULL)) {
-        if (job_id) *job_id = 0;
+        if (job_id)
+            *job_id = 0;
         s->result = ESP_ERR_NO_MEM;
         s->busy = false;
         s->complete = true;

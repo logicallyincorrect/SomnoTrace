@@ -35,19 +35,19 @@
 
 /* Driver type — determines which BLE protocol to use for the paired ring. */
 typedef enum {
-    OX_DRIVER_OXYII  = 0,  /* Gen2: O2 Ring S / SHQO2Pro (OxyII protocol) */
-    OX_DRIVER_LEGACY = 1,  /* Gen1: O2 Ring / ViaTom (Legacy protocol) */
-    OX_DRIVER_AUTO   = 2,  /* Auto-detect: try OxyII first, fall back to Legacy */
+    OX_DRIVER_OXYII = 0,  /* Gen2: O2 Ring S / SHQO2Pro (OxyII protocol) */
+    OX_DRIVER_LEGACY = 1, /* Gen1: O2 Ring / ViaTom (Legacy protocol) */
+    OX_DRIVER_AUTO = 2,   /* Auto-detect: try OxyII first, fall back to Legacy */
 } ox_driver_t;
 
 /* Oximeter state machine states (returned by oximeter_get_status). */
-#define OX_STATUS_IDLE       "idle"
-#define OX_STATUS_SCANNING   "scanning"
+#define OX_STATUS_IDLE "idle"
+#define OX_STATUS_SCANNING "scanning"
 #define OX_STATUS_CONNECTING "connecting"
-#define OX_STATUS_PULLING    "pulling"
-#define OX_STATUS_PAIRED     "paired"
-#define OX_STATUS_ERROR      "error"
-#define OX_STATUS_MONITORING "monitoring"  /* persistent connection held, polling LIVE_B */
+#define OX_STATUS_PULLING "pulling"
+#define OX_STATUS_PAIRED "paired"
+#define OX_STATUS_ERROR "error"
+#define OX_STATUS_MONITORING "monitoring" /* persistent connection held, polling LIVE_B */
 
 /* Probe mode determines how the watch task monitors a worn ring.
  *
@@ -59,7 +59,7 @@ typedef enum {
  *                      transfer are deferred until off-finger is detected.
  *                      Recommended mode (see .ai/OXIMETRY2.md). */
 typedef enum {
-    OX_PROBE_LEGACY     = 0,
+    OX_PROBE_LEGACY = 0,
     OX_PROBE_PERSISTENT = 1,
 } ox_probe_mode_t;
 

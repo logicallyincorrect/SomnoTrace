@@ -65,41 +65,52 @@
 static const char *TAG = "ox_oxyii";
 
 /* ── OxyII protocol constants ──────────────────────────────────────── */
-#define OXYII_LEAD         0xA5
-#define OXYII_HEADER_LEN   7
-#define OXYII_MAX_FRAME    2048
+#define OXYII_LEAD 0xA5
+#define OXYII_HEADER_LEN 7
+#define OXYII_MAX_FRAME 2048
 
-#define OP_GET_CONFIG      0x00
-#define OP_LIVE_B          0x04
-#define OP_SETUP           0x10
-#define OP_SET_UTC_TIME    0xC0
-#define OP_GET_INFO        0xE1
-#define OP_GET_BATTERY     0xE4
-#define OP_GET_FILE_LIST   0xF1
+#define OP_GET_CONFIG 0x00
+#define OP_LIVE_B 0x04
+#define OP_SETUP 0x10
+#define OP_SET_UTC_TIME 0xC0
+#define OP_GET_INFO 0xE1
+#define OP_GET_BATTERY 0xE4
+#define OP_GET_FILE_LIST 0xF1
 #define OP_READ_FILE_START 0xF2
-#define OP_READ_FILE_DATA  0xF3
-#define OP_READ_FILE_END   0xF4
-#define OP_AUTH            0xFF
+#define OP_READ_FILE_DATA 0xF3
+#define OP_READ_FILE_END 0xF4
+#define OP_AUTH 0xFF
 
-#define MFG_OXYII          0xF34E
-#define MFG_RECORDING      0x036F
+#define MFG_OXYII 0xF34E
+#define MFG_RECORDING 0x036F
 
 /* MD5("lepucloud") = c2a7cf50dafed885a8f8f7eac44335f3 */
 static const uint8_t LEPUCLOUD_MD5[16] = {
-    0xc2, 0xa7, 0xcf, 0x50, 0xda, 0xfe, 0xd8, 0x85,
-    0xa8, 0xf8, 0xf7, 0xea, 0xc4, 0x43, 0x35, 0xf3,
+    0xc2,
+    0xa7,
+    0xcf,
+    0x50,
+    0xda,
+    0xfe,
+    0xd8,
+    0x85,
+    0xa8,
+    0xf8,
+    0xf7,
+    0xea,
+    0xc4,
+    0x43,
+    0x35,
+    0xf3,
 };
 
 /* OxyII GATT UUIDs (128-bit, stored little-endian for NimBLE) */
-static const ble_uuid128_t OXYII_SVC_UUID =
-    BLE_UUID128_INIT(0x48, 0x12, 0xd0, 0x41, 0x29, 0x4e, 0x1b, 0x83,
-                     0xf9, 0x98, 0x4b, 0xa1, 0x01, 0x00, 0xfb, 0xe8);
-static const ble_uuid128_t OXYII_WRITE_UUID =
-    BLE_UUID128_INIT(0x48, 0x12, 0xd0, 0x41, 0x29, 0x4e, 0x1b, 0x83,
-                     0xf9, 0x98, 0x4b, 0xa1, 0x02, 0x00, 0xfb, 0xe8);
-static const ble_uuid128_t OXYII_NOTIFY_UUID =
-    BLE_UUID128_INIT(0x48, 0x12, 0xd0, 0x41, 0x29, 0x4e, 0x1b, 0x83,
-                     0xf9, 0x98, 0x4b, 0xa1, 0x03, 0x00, 0xfb, 0xe8);
+static const ble_uuid128_t OXYII_SVC_UUID = BLE_UUID128_INIT(
+    0x48, 0x12, 0xd0, 0x41, 0x29, 0x4e, 0x1b, 0x83, 0xf9, 0x98, 0x4b, 0xa1, 0x01, 0x00, 0xfb, 0xe8);
+static const ble_uuid128_t OXYII_WRITE_UUID = BLE_UUID128_INIT(
+    0x48, 0x12, 0xd0, 0x41, 0x29, 0x4e, 0x1b, 0x83, 0xf9, 0x98, 0x4b, 0xa1, 0x02, 0x00, 0xfb, 0xe8);
+static const ble_uuid128_t OXYII_NOTIFY_UUID = BLE_UUID128_INIT(
+    0x48, 0x12, 0xd0, 0x41, 0x29, 0x4e, 0x1b, 0x83, 0xf9, 0x98, 0x4b, 0xa1, 0x03, 0x00, 0xfb, 0xe8);
 
 /* ── CRC8 (poly=0x07, init=0) ──────────────────────────────────────── */
 static uint8_t oxyii_crc8(const uint8_t *data, int len)
@@ -108,8 +119,10 @@ static uint8_t oxyii_crc8(const uint8_t *data, int len)
     for (int i = 0; i < len; i++) {
         crc ^= data[i];
         for (int j = 0; j < 8; j++) {
-            if (crc & 0x80) crc = (crc << 1) ^ 0x07;
-            else            crc <<= 1;
+            if (crc & 0x80)
+                crc = (crc << 1) ^ 0x07;
+            else
+                crc <<= 1;
         }
     }
     return crc;
@@ -117,12 +130,17 @@ static uint8_t oxyii_crc8(const uint8_t *data, int len)
 
 /* ── Frame codec ───────────────────────────────────────────────────── */
 /* Encode an OxyII frame into buf.  Returns total frame length. */
-static int oxyii_encode(uint8_t *buf, int bufsz, uint8_t op,
-                         uint8_t flag, uint8_t seq,
-                         const uint8_t *payload, int payload_len)
+static int oxyii_encode(uint8_t *buf,
+                        int bufsz,
+                        uint8_t op,
+                        uint8_t flag,
+                        uint8_t seq,
+                        const uint8_t *payload,
+                        int payload_len)
 {
     int total = OXYII_HEADER_LEN + payload_len + 1;
-    if (total > bufsz) return -1;
+    if (total > bufsz)
+        return -1;
 
     buf[0] = OXYII_LEAD;
     buf[1] = op;
@@ -139,29 +157,42 @@ static int oxyii_encode(uint8_t *buf, int bufsz, uint8_t op,
 
 /* Try to decode a frame from buf.  Returns total frame length on success,
  * -1 if incomplete (need more data), -2 if invalid (bad lead/crc). */
-static int oxyii_try_decode(const uint8_t *buf, int len,
-                             uint8_t *op, uint8_t *flag, uint8_t *seq,
-                             uint8_t *payload, int *payload_len,
-                             int payload_cap)
+static int oxyii_try_decode(const uint8_t *buf,
+                            int len,
+                            uint8_t *op,
+                            uint8_t *flag,
+                            uint8_t *seq,
+                            uint8_t *payload,
+                            int *payload_len,
+                            int payload_cap)
 {
-    if (len < OXYII_HEADER_LEN) return -1;
-    if (buf[0] != OXYII_LEAD) return -2;
-    if ((uint8_t)(~buf[1]) != buf[2]) return -2;
+    if (len < OXYII_HEADER_LEN)
+        return -1;
+    if (buf[0] != OXYII_LEAD)
+        return -2;
+    if ((uint8_t)(~buf[1]) != buf[2])
+        return -2;
 
     int plen = buf[5] | (buf[6] << 8);
     int total = OXYII_HEADER_LEN + plen + 1;
-    if (len < total) return -1;
+    if (len < total)
+        return -1;
 
-    if (oxyii_crc8(buf, total - 1) != buf[total - 1]) return -2;
+    if (oxyii_crc8(buf, total - 1) != buf[total - 1])
+        return -2;
 
-    if (op)   *op = buf[1];
-    if (flag) *flag = buf[3];
-    if (seq)  *seq = buf[4];
+    if (op)
+        *op = buf[1];
+    if (flag)
+        *flag = buf[3];
+    if (seq)
+        *seq = buf[4];
     if (payload && payload_cap > 0) {
         int n = plen < payload_cap ? plen : payload_cap;
         memcpy(payload, buf + 7, n);
     }
-    if (payload_len) *payload_len = plen;
+    if (payload_len)
+        *payload_len = plen;
     return total;
 }
 
@@ -187,13 +218,14 @@ static void oxyii_crypto_reset(void)
 /* Encrypt payload using AES-128-ECB with PKCS7 padding into out.
  * out_cap must be at least ((in_len / 16) + 1) * 16.
  * Returns padded ciphertext length on success, or -1 on error. */
-static int oxyii_aes_encrypt(const uint8_t *in, int in_len,
-                             uint8_t *out, int out_cap)
+static int oxyii_aes_encrypt(const uint8_t *in, int in_len, uint8_t *out, int out_cap)
 {
-    if (!s_encrypted) return -1;
+    if (!s_encrypted)
+        return -1;
     int pad = 16 - (in_len % 16);
     int padded_len = in_len + pad;
-    if (padded_len > out_cap) return -1;
+    if (padded_len > out_cap)
+        return -1;
 
     uint8_t block[16];
     for (int off = 0; off < padded_len; off += 16) {
@@ -219,8 +251,7 @@ static int oxyii_aes_decrypt_inplace(uint8_t *in_out, int in_len)
         return -1;
 
     for (int off = 0; off < in_len; off += 16) {
-        mbedtls_aes_crypt_ecb(&s_aes_dec, MBEDTLS_AES_DECRYPT,
-                              in_out + off, in_out + off);
+        mbedtls_aes_crypt_ecb(&s_aes_dec, MBEDTLS_AES_DECRYPT, in_out + off, in_out + off);
     }
 
     uint8_t pad = in_out[in_len - 1];
@@ -274,13 +305,14 @@ static void oxyii_time_payload(uint8_t *out8)
 
 static int64_t oxyii_filename_epoch_ms(const char *name)
 {
-    if (!name || strlen(name) < 14) return 0;
+    if (!name || strlen(name) < 14)
+        return 0;
     for (int i = 0; i < 14; i++)
-        if (name[i] < '0' || name[i] > '9') return 0;
+        if (name[i] < '0' || name[i] > '9')
+            return 0;
     struct tm tm = {0};
     int year, mon, day, hour, min, sec;
-    if (sscanf(name, "%4d%2d%2d%2d%2d%2d", &year, &mon, &day,
-               &hour, &min, &sec) != 6)
+    if (sscanf(name, "%4d%2d%2d%2d%2d%2d", &year, &mon, &day, &hour, &min, &sec) != 6)
         return 0;
     tm.tm_year = year - 1900;
     tm.tm_mon = mon - 1;
@@ -298,7 +330,8 @@ static void oxyii_file_start_payload(uint8_t *out20, const char *name)
 {
     memset(out20, 0, 20);
     size_t n = strlen(name);
-    if (n > 16) n = 16;
+    if (n > 16)
+        n = 16;
     memcpy(out20, name, n);
     /* bytes 16..19: file type = 0 */
 }
@@ -329,10 +362,10 @@ struct pair_arg {
 };
 
 static SemaphoreHandle_t s_state_mtx;
-static SemaphoreHandle_t s_ops_mtx;     /* serialise BLE ops (scan/pair/pull) */
-static SemaphoreHandle_t s_op_sem;      /* GATT op completion */
-static SemaphoreHandle_t s_conn_sem;    /* connect completion */
-static SemaphoreHandle_t s_resp_sem;    /* notification response */
+static SemaphoreHandle_t s_ops_mtx;  /* serialise BLE ops (scan/pair/pull) */
+static SemaphoreHandle_t s_op_sem;   /* GATT op completion */
+static SemaphoreHandle_t s_conn_sem; /* connect completion */
+static SemaphoreHandle_t s_resp_sem; /* notification response */
 static SemaphoreHandle_t s_scan_done;
 static volatile int s_op_status;
 static volatile int s_conn_status;
@@ -344,27 +377,27 @@ static char s_error[128];
 /* Paired ring info (loaded from NVS at init) */
 static char s_firmware[16];
 static char s_name_prefix[16];
-static char s_ble_name[40];      /* BLE advertised name (e.g. "SHQO2Pro 0897") */
+static char s_ble_name[40]; /* BLE advertised name (e.g. "SHQO2Pro 0897") */
 static char s_paired_addr[18];
 static bool s_paired = false;
 static bool s_presence_served = false;
 static bool s_synced_this_idle = false;
 static bool s_ring_present = false;
 static TickType_t s_served_at;
-static int s_f1_fail_count = 0;  /* consecutive F1 timeouts in this sync window */
-static int s_pull_fail_count = 0;   /* consecutive failed pulls in this presence */
+static int s_f1_fail_count = 0;      /* consecutive F1 timeouts in this sync window */
+static int s_pull_fail_count = 0;    /* consecutive failed pulls in this presence */
 static int s_connect_fail_count = 0; /* consecutive connect failures in this presence */
-#define OX_PULL_MAX_FAST_RETRIES 3  /* quick retries before applying curfew */
-#define OX_CONNECT_MAX_RETRIES 3   /* connect failures before cooldown curfew */
+#define OX_PULL_MAX_FAST_RETRIES 3   /* quick retries before applying curfew */
+#define OX_CONNECT_MAX_RETRIES 3     /* connect failures before cooldown curfew */
 static ox_probe_mode_t s_probe_mode = OX_PROBE_PERSISTENT;
 
 /* Measured: END powers off ~120s after take-off IF no one connects.
  * Any GATT connection resets that timer. Pull happens inside the
  * window, so after a pull: never reconnect while the advert lasts.
  * Still advertising at pull+130s can only mean re-worn. */
-#define OX_END_WINDOW_MS  130000
-#define OX_WORN_PROBE_MS  60000  /* LIVE_B interval while worn; END lasts ~120s */
-#define OX_F1_MAX_RETRIES 3      /* give up on F1 after N consecutive timeouts */
+#define OX_END_WINDOW_MS 130000
+#define OX_WORN_PROBE_MS 60000 /* LIVE_B interval while worn; END lasts ~120s */
+#define OX_F1_MAX_RETRIES 3    /* give up on F1 after N consecutive timeouts */
 
 /* Persistent-mode polling: one held connection, unauthenticated LIVE_B.
  * See .ai/OXIMETRY2.md for the experiment that established this value. */
@@ -372,8 +405,9 @@ static ox_probe_mode_t s_probe_mode = OX_PROBE_PERSISTENT;
 
 /* BLE connection state */
 static uint16_t s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
-static uint16_t s_connect_event_handle = BLE_HS_CONN_HANDLE_NONE; /* saved in CONNECT event before DISCONNECT can overwrite */
-static uint16_t s_negotiated_mtu = 23;  /* updated by on_mtu / BLE_GAP_EVENT_MTU */
+static uint16_t s_connect_event_handle =
+    BLE_HS_CONN_HANDLE_NONE;           /* saved in CONNECT event before DISCONNECT can overwrite */
+static uint16_t s_negotiated_mtu = 23; /* updated by on_mtu / BLE_GAP_EVENT_MTU */
 static uint16_t s_write_handle;
 static uint16_t s_notify_handle;
 static uint16_t s_cccd_handle;
@@ -414,7 +448,8 @@ static void set_error(const char *fmt, ...)
 
 static void clear_op_sem(void)
 {
-    while (xSemaphoreTake(s_op_sem, 0) == pdTRUE) { }
+    while (xSemaphoreTake(s_op_sem, 0) == pdTRUE) {
+    }
 }
 
 static int wait_op(int timeout_ms)
@@ -426,36 +461,43 @@ static int wait_op(int timeout_ms)
 
 static bool name_is_oxyii(const char *name)
 {
-    if (!name || !name[0]) return false;
+    if (!name || !name[0])
+        return false;
     char up[32];
     int i;
     for (i = 0; i < 31 && name[i]; i++)
         up[i] = toupper((unsigned char)name[i]);
     up[i] = '\0';
-    return strncmp(up, "S8-AW", 5) == 0 ||
-           strncmp(up, "SHQO2PRO", 8) == 0;
+    return strncmp(up, "S8-AW", 5) == 0 || strncmp(up, "SHQO2PRO", 8) == 0;
 }
 
 static void addr_to_str(const ble_addr_t *a, char *out, size_t outsz)
 {
     static const char hex[] = "0123456789abcdef";
-    if (!a || !out || outsz < 18) return;
+    if (!a || !out || outsz < 18)
+        return;
     for (int i = 5, p = 0; i >= 0; i--) {
         out[p++] = hex[(a->val[i] >> 4) & 0x0F];
         out[p++] = hex[a->val[i] & 0x0F];
-        if (i > 0) out[p++] = ':';
-        else       out[p]   = '\0';
+        if (i > 0)
+            out[p++] = ':';
+        else
+            out[p] = '\0';
     }
 }
 
 static bool parse_addr(const char *str, ble_addr_t *out)
 {
     unsigned int v[6];
-    int n = sscanf(str, "%x:%x:%x:%x:%x:%x",
-                   &v[0], &v[1], &v[2], &v[3], &v[4], &v[5]);
-    if (n != 6) return false;
-    out->val[5] = v[0]; out->val[4] = v[1]; out->val[3] = v[2];
-    out->val[2] = v[3]; out->val[1] = v[4]; out->val[0] = v[5];
+    int n = sscanf(str, "%x:%x:%x:%x:%x:%x", &v[0], &v[1], &v[2], &v[3], &v[4], &v[5]);
+    if (n != 6)
+        return false;
+    out->val[5] = v[0];
+    out->val[4] = v[1];
+    out->val[3] = v[2];
+    out->val[2] = v[3];
+    out->val[1] = v[4];
+    out->val[0] = v[5];
     /* Static random addresses have the top two bits of the most-significant
      * byte set (0xC0 mask).  O2 Ring uses a static random address. */
     out->type = (v[0] & 0xC0) == 0xC0 ? BLE_ADDR_RANDOM : BLE_ADDR_PUBLIC;
@@ -482,8 +524,7 @@ static int gap_event(struct ble_gap_event *event, void *arg);
 static void handle_notify_rx(const uint8_t *data, int len)
 {
     if (s_resp_len + len > OXYII_MAX_FRAME) {
-        ESP_LOGW(TAG, "notify overflow: resp_len=%d + %d > %d",
-                 s_resp_len, len, OXYII_MAX_FRAME);
+        ESP_LOGW(TAG, "notify overflow: resp_len=%d + %d > %d", s_resp_len, len, OXYII_MAX_FRAME);
         s_resp_len = 0;
     }
     memcpy(s_resp_buf + s_resp_len, data, len);
@@ -491,8 +532,8 @@ static void handle_notify_rx(const uint8_t *data, int len)
 
     uint8_t op, flag, seq;
     int plen;
-    int rc = oxyii_try_decode(s_resp_buf, s_resp_len, &op, &flag, &seq,
-                               s_resp_payload, &plen, OXYII_MAX_FRAME);
+    int rc = oxyii_try_decode(
+        s_resp_buf, s_resp_len, &op, &flag, &seq, s_resp_payload, &plen, OXYII_MAX_FRAME);
     if (rc > 0) {
         s_resp_opcode = op;
         s_resp_payload_len = plen;
@@ -521,15 +562,24 @@ static void handle_notify_rx(const uint8_t *data, int len)
 static const char *hci_err_str(int reason)
 {
     switch (reason & 0xFF) {
-    case 0x08: return "Connection Timeout";
-    case 0x0B: return "Conn Already Exists";
-    case 0x13: return "Remote User Terminated";
-    case 0x16: return "Terminated by Local Host";
-    case 0x22: return "LMP Response Timeout";
-    case 0x28: return "Instant Passed";
-    case 0x3B: return "Unacceptable Connection Parameters";
-    case 0x44: return "Conn Fail to Be Established";
-    default:   return "Unknown";
+    case 0x08:
+        return "Connection Timeout";
+    case 0x0B:
+        return "Conn Already Exists";
+    case 0x13:
+        return "Remote User Terminated";
+    case 0x16:
+        return "Terminated by Local Host";
+    case 0x22:
+        return "LMP Response Timeout";
+    case 0x28:
+        return "Instant Passed";
+    case 0x3B:
+        return "Unacceptable Connection Parameters";
+    case 0x44:
+        return "Conn Fail to Be Established";
+    default:
+        return "Unknown";
     }
 }
 
@@ -549,9 +599,10 @@ static int gap_event(struct ble_gap_event *event, void *arg)
 
         memset(&f, 0, sizeof(f));
         if (ble_hs_adv_parse_fields(&f, raw, raw_len) != 0) {
-            for (int off = 0; off + 1 < raw_len; ) {
+            for (int off = 0; off + 1 < raw_len;) {
                 uint8_t ad_len = raw[off];
-                if (ad_len == 0 || off + 1 + ad_len > raw_len) break;
+                if (ad_len == 0 || off + 1 + ad_len > raw_len)
+                    break;
                 uint8_t ad_type = raw[off + 1];
                 const uint8_t *ad_data = raw + off + 2;
                 int ad_data_len = ad_len - 1;
@@ -585,17 +636,17 @@ static int gap_event(struct ble_gap_event *event, void *arg)
          * 1. Manufacturer ID 0xF34E (OxyII sync/idle advertisement)
          * 2. Known paired MAC address match (non-recording)
          * 3. Gen2 device name pattern (non-recording) */
-        bool match = (cid == MFG_OXYII) ||
-                     (name_is_oxyii(name) && cid != MFG_RECORDING) ||
-                     (s_paired && s_paired_addr[0] != '\0' && strcmp(addr_str, s_paired_addr) == 0 && cid != MFG_RECORDING);
-        if (!match) return 0;
+        bool match = (cid == MFG_OXYII) || (name_is_oxyii(name) && cid != MFG_RECORDING) ||
+                     (s_paired && s_paired_addr[0] != '\0' &&
+                      strcmp(addr_str, s_paired_addr) == 0 && cid != MFG_RECORDING);
+        if (!match)
+            return 0;
         if (name[0] == '\0')
             strlcpy(name, "O2Ring", sizeof(name));
 
         /* Dedupe by address */
         for (int i = 0; i < s_scan_count; i++) {
-            if (memcmp(&s_scan[i].addr, &event->disc.addr,
-                       sizeof(ble_addr_t)) == 0) {
+            if (memcmp(&s_scan[i].addr, &event->disc.addr, sizeof(ble_addr_t)) == 0) {
                 s_scan[i].rssi = event->disc.rssi;
                 s_scan[i].mfg = cid;
                 if (name[0] && strncmp(name, "O2Ring", 6) != 0)
@@ -605,13 +656,16 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         }
         if (s_scan_count < OX_SCAN_MAX) {
             s_scan[s_scan_count].addr = event->disc.addr;
-            strlcpy(s_scan[s_scan_count].name, name,
-                    sizeof(s_scan[s_scan_count].name));
+            strlcpy(s_scan[s_scan_count].name, name, sizeof(s_scan[s_scan_count].name));
             s_scan[s_scan_count].rssi = event->disc.rssi;
             s_scan[s_scan_count].mfg = cid;
             s_scan_count++;
-            ESP_LOGD(TAG, "scan: '%s' rssi=%d addr=%s mfg=0x%04x",
-                     name, event->disc.rssi, addr_str, cid);
+            ESP_LOGD(TAG,
+                     "scan: '%s' rssi=%d addr=%s mfg=0x%04x",
+                     name,
+                     event->disc.rssi,
+                     addr_str,
+                     cid);
         }
         return 0;
     }
@@ -623,13 +677,16 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         s_connect_event_handle = event->connect.conn_handle;
         s_conn_handle = event->connect.conn_handle;
         s_conn_status = event->connect.status;
-        ESP_LOGD(TAG, "gap CONNECT: handle=%d status=%d",
-                 event->connect.conn_handle, event->connect.status);
+        ESP_LOGD(TAG,
+                 "gap CONNECT: handle=%d status=%d",
+                 event->connect.conn_handle,
+                 event->connect.status);
         xSemaphoreGive(s_conn_sem);
         return 0;
 
     case BLE_GAP_EVENT_DISCONNECT:
-        ESP_LOGI(TAG, "disconnected (reason=%d / 0x%02X %s)",
+        ESP_LOGI(TAG,
+                 "disconnected (reason=%d / 0x%02X %s)",
                  event->disconnect.reason,
                  event->disconnect.reason & 0xFF,
                  hci_err_str(event->disconnect.reason));
@@ -642,15 +699,18 @@ static int gap_event(struct ble_gap_event *event, void *arg)
 
     case BLE_GAP_EVENT_L2CAP_UPDATE_REQ:
         ESP_LOGD(TAG, "accepting L2CAP connection parameter update request");
-        return 0;  /* 0 = accept */
+        return 0; /* 0 = accept */
 
     case BLE_GAP_EVENT_CONN_UPDATE: {
         struct ble_gap_conn_desc desc;
         if (ble_gap_conn_find(event->conn_update.conn_handle, &desc) == 0) {
-            ESP_LOGI(TAG, "conn params updated: itvl=%d (%.1fms) latency=%d timeout=%d (%dms)",
-                     desc.conn_itvl, desc.conn_itvl * 1.25f,
+            ESP_LOGI(TAG,
+                     "conn params updated: itvl=%d (%.1fms) latency=%d timeout=%d (%dms)",
+                     desc.conn_itvl,
+                     desc.conn_itvl * 1.25f,
                      desc.conn_latency,
-                     desc.supervision_timeout, desc.supervision_timeout * 10);
+                     desc.supervision_timeout,
+                     desc.supervision_timeout * 10);
         }
         return 0;
     }
@@ -659,9 +719,11 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         if (event->notify_rx.conn_handle != s_conn_handle)
             return 0;
         int len = OS_MBUF_PKTLEN(event->notify_rx.om);
-        if (len <= 0) return 0;
+        if (len <= 0)
+            return 0;
         uint8_t *data = malloc(len);
-        if (!data) return 0;
+        if (!data)
+            return 0;
         os_mbuf_copydata(event->notify_rx.om, 0, len, data);
         handle_notify_rx(data, len);
         free(data);
@@ -677,10 +739,10 @@ static int gap_event(struct ble_gap_event *event, void *arg)
 }
 
 /* ── GATT discovery callbacks ──────────────────────────────────────── */
-static int on_mtu(uint16_t conn, const struct ble_gatt_error *err,
-                  uint16_t mtu, void *arg)
+static int on_mtu(uint16_t conn, const struct ble_gatt_error *err, uint16_t mtu, void *arg)
 {
-    (void)conn; (void)arg;
+    (void)conn;
+    (void)arg;
     s_op_status = err ? err->status : 0;
     if (!err || err->status == 0)
         s_negotiated_mtu = mtu;
@@ -688,10 +750,13 @@ static int on_mtu(uint16_t conn, const struct ble_gatt_error *err,
     return 0;
 }
 
-static int on_disc_svc(uint16_t conn, const struct ble_gatt_error *err,
-                       const struct ble_gatt_svc *svc, void *arg)
+static int on_disc_svc(uint16_t conn,
+                       const struct ble_gatt_error *err,
+                       const struct ble_gatt_svc *svc,
+                       void *arg)
 {
-    (void)conn; (void)arg;
+    (void)conn;
+    (void)arg;
     if (err && err->status == 0 && svc) {
         s_svc_start = svc->start_handle;
         s_svc_end = svc->end_handle;
@@ -703,10 +768,13 @@ static int on_disc_svc(uint16_t conn, const struct ble_gatt_error *err,
     return 0;
 }
 
-static int on_disc_chr(uint16_t conn, const struct ble_gatt_error *err,
-                       const struct ble_gatt_chr *chr, void *arg)
+static int on_disc_chr(uint16_t conn,
+                       const struct ble_gatt_error *err,
+                       const struct ble_gatt_chr *chr,
+                       void *arg)
 {
-    (void)conn; (void)arg;
+    (void)conn;
+    (void)arg;
     if (err && err->status == 0 && chr) {
         if (ble_uuid_cmp(&chr->uuid.u, &OXYII_WRITE_UUID.u) == 0)
             s_write_handle = chr->val_handle;
@@ -720,11 +788,15 @@ static int on_disc_chr(uint16_t conn, const struct ble_gatt_error *err,
     return 0;
 }
 
-static int on_disc_dsc(uint16_t conn, const struct ble_gatt_error *err,
-                       uint16_t chr_val_handle, const struct ble_gatt_dsc *dsc,
+static int on_disc_dsc(uint16_t conn,
+                       const struct ble_gatt_error *err,
+                       uint16_t chr_val_handle,
+                       const struct ble_gatt_dsc *dsc,
                        void *arg)
 {
-    (void)conn; (void)chr_val_handle; (void)arg;
+    (void)conn;
+    (void)chr_val_handle;
+    (void)arg;
     if (err && err->status == 0 && dsc) {
         const ble_uuid16_t cccd = BLE_UUID16_INIT(0x2902);
         if (ble_uuid_cmp(&dsc->uuid.u, &cccd.u) == 0 && s_cccd_handle == 0)
@@ -737,10 +809,14 @@ static int on_disc_dsc(uint16_t conn, const struct ble_gatt_error *err,
     return 0;
 }
 
-static int on_write_done(uint16_t conn, const struct ble_gatt_error *err,
-                         struct ble_gatt_attr *attr, void *arg)
+static int on_write_done(uint16_t conn,
+                         const struct ble_gatt_error *err,
+                         struct ble_gatt_attr *attr,
+                         void *arg)
 {
-    (void)conn; (void)attr; (void)arg;
+    (void)conn;
+    (void)attr;
+    (void)arg;
     s_op_status = err ? err->status : 0;
     xSemaphoreGive(s_op_sem);
     return 0;
@@ -760,7 +836,8 @@ static esp_err_t do_connect_and_discover(ble_addr_t *target, bool do_mtu)
      * immediately on the stale token and we proceed with a dead
      * handle (BLE_HS_CONN_HANDLE_NONE), causing every subsequent
      * GATT operation to fail. */
-    while (xSemaphoreTake(s_conn_sem, 0) == pdTRUE) { }
+    while (xSemaphoreTake(s_conn_sem, 0) == pdTRUE) {
+    }
     s_conn_status = -1;
     s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
     s_connect_event_handle = BLE_HS_CONN_HANDLE_NONE;
@@ -774,11 +851,14 @@ static esp_err_t do_connect_and_discover(ble_addr_t *target, bool do_mtu)
         return ESP_FAIL;
     }
     clear_op_sem();
-    rc = ble_gap_connect(own_addr_type, target,
-                         15000, NULL, gap_event, NULL);
-    if (rc != 0) { set_error("connect start failed: %d", rc); return ESP_FAIL; }
+    rc = ble_gap_connect(own_addr_type, target, 15000, NULL, gap_event, NULL);
+    if (rc != 0) {
+        set_error("connect start failed: %d", rc);
+        return ESP_FAIL;
+    }
     if (xSemaphoreTake(s_conn_sem, pdMS_TO_TICKS(16000)) != pdTRUE) {
-        set_error("connect timeout"); return ESP_FAIL;
+        set_error("connect timeout");
+        return ESP_FAIL;
     }
     if (s_conn_status != 0 || s_conn_handle == BLE_HS_CONN_HANDLE_NONE) {
         /* Race: the ring connected and immediately disconnected (e.g.
@@ -788,13 +868,13 @@ static esp_err_t do_connect_and_discover(ble_addr_t *target, bool do_mtu)
          * the CONNECT event, so it doesn't linger for ~98s until the
          * ring's internal timeout fires. */
         if (s_conn_status == 0 && s_connect_event_handle != BLE_HS_CONN_HANDLE_NONE) {
-            ESP_LOGW(TAG, "connect/disconnect race — terminating orphaned handle=%d",
+            ESP_LOGW(TAG,
+                     "connect/disconnect race — terminating orphaned handle=%d",
                      s_connect_event_handle);
             ble_gap_terminate(s_connect_event_handle, BLE_ERR_REM_USER_CONN_TERM);
             xSemaphoreTake(s_conn_sem, pdMS_TO_TICKS(2000));
         }
-        set_error("connect failed: status=%d handle=%d",
-                  s_conn_status, s_conn_handle);
+        set_error("connect failed: status=%d handle=%d", s_conn_status, s_conn_handle);
         return ESP_FAIL;
     }
     ESP_LOGI(TAG, "connected, handle=%d", s_conn_handle);
@@ -802,15 +882,18 @@ static esp_err_t do_connect_and_discover(ble_addr_t *target, bool do_mtu)
     /* Log negotiated connection parameters for diagnostics. */
     struct ble_gap_conn_desc cdesc;
     if (ble_gap_conn_find(s_conn_handle, &cdesc) == 0) {
-        ESP_LOGI(TAG, "conn params: itvl=%d (%.1fms) latency=%d timeout=%d (%dms)",
-                 cdesc.conn_itvl, cdesc.conn_itvl * 1.25f,
+        ESP_LOGI(TAG,
+                 "conn params: itvl=%d (%.1fms) latency=%d timeout=%d (%dms)",
+                 cdesc.conn_itvl,
+                 cdesc.conn_itvl * 1.25f,
                  cdesc.conn_latency,
-                 cdesc.supervision_timeout, cdesc.supervision_timeout * 10);
+                 cdesc.supervision_timeout,
+                 cdesc.supervision_timeout * 10);
     }
 
     /* MTU exchange (skipped in persistent contact-polling mode) */
     if (do_mtu) {
-        s_negotiated_mtu = 23;  /* reset before exchange */
+        s_negotiated_mtu = 23; /* reset before exchange */
         clear_op_sem();
         ble_gattc_exchange_mtu(s_conn_handle, on_mtu, NULL);
         int mtu_rc = wait_op(2000);
@@ -830,8 +913,8 @@ static esp_err_t do_connect_and_discover(ble_addr_t *target, bool do_mtu)
          * legacy driver.  Abort early with a clear message instead of
          * failing later with "service range empty". */
         if (s_negotiated_mtu <= 23) {
-            ESP_LOGW(TAG, "MTU=%d after exchange — ring may be in recording mode",
-                     s_negotiated_mtu);
+            ESP_LOGW(
+                TAG, "MTU=%d after exchange — ring may be in recording mode", s_negotiated_mtu);
             set_error("MTU=%d — ring may be in recording mode; remove from finger and retry. "
                       "If this is a Gen1 O2 Ring, pair as Gen1 (legacy)",
                       s_negotiated_mtu);
@@ -841,42 +924,49 @@ static esp_err_t do_connect_and_discover(ble_addr_t *target, bool do_mtu)
 
     /* Discover OxyII service by UUID */
     clear_op_sem();
-    rc = ble_gattc_disc_svc_by_uuid(s_conn_handle, &OXYII_SVC_UUID.u,
-                                     on_disc_svc, NULL);
+    rc = ble_gattc_disc_svc_by_uuid(s_conn_handle, &OXYII_SVC_UUID.u, on_disc_svc, NULL);
     if (rc != 0 || wait_op(10000) != 0) {
-        set_error("OxyII service not found"); return ESP_FAIL;
+        set_error("OxyII service not found");
+        return ESP_FAIL;
     }
-    if (s_svc_start == 0) { set_error("service range empty"); return ESP_FAIL; }
+    if (s_svc_start == 0) {
+        set_error("service range empty");
+        return ESP_FAIL;
+    }
     ESP_LOGI(TAG, "service: 0x%04x-0x%04x", s_svc_start, s_svc_end);
 
     /* Discover characteristics */
     clear_op_sem();
-    rc = ble_gattc_disc_all_chrs(s_conn_handle, s_svc_start, s_svc_end,
-                                 on_disc_chr, NULL);
+    rc = ble_gattc_disc_all_chrs(s_conn_handle, s_svc_start, s_svc_end, on_disc_chr, NULL);
     if (rc != 0 || wait_op(10000) != 0) {
-        set_error("characteristic discovery failed"); return ESP_FAIL;
+        set_error("characteristic discovery failed");
+        return ESP_FAIL;
     }
     if (s_write_handle == 0 || s_notify_handle == 0) {
-        set_error("write/notify char not found"); return ESP_FAIL;
+        set_error("write/notify char not found");
+        return ESP_FAIL;
     }
     ESP_LOGI(TAG, "write=%d notify=%d", s_write_handle, s_notify_handle);
 
     /* Discover CCCD for notify characteristic */
     clear_op_sem();
-    rc = ble_gattc_disc_all_dscs(s_conn_handle, s_notify_handle, s_svc_end,
-                                 on_disc_dsc, NULL);
+    rc = ble_gattc_disc_all_dscs(s_conn_handle, s_notify_handle, s_svc_end, on_disc_dsc, NULL);
     if (rc != 0 || wait_op(10000) != 0) {
-        set_error("CCCD discovery failed"); return ESP_FAIL;
+        set_error("CCCD discovery failed");
+        return ESP_FAIL;
     }
-    if (s_cccd_handle == 0) { set_error("CCCD not found"); return ESP_FAIL; }
+    if (s_cccd_handle == 0) {
+        set_error("CCCD not found");
+        return ESP_FAIL;
+    }
 
     /* Enable notifications */
-    uint8_t cccd_val[2] = { 0x01, 0x00 };
+    uint8_t cccd_val[2] = {0x01, 0x00};
     clear_op_sem();
-    rc = ble_gattc_write_flat(s_conn_handle, s_cccd_handle,
-                              cccd_val, 2, on_write_done, NULL);
+    rc = ble_gattc_write_flat(s_conn_handle, s_cccd_handle, cccd_val, 2, on_write_done, NULL);
     if (rc != 0 || wait_op(5000) != 0) {
-        set_error("enable notify failed"); return ESP_FAIL;
+        set_error("enable notify failed");
+        return ESP_FAIL;
     }
     ESP_LOGI(TAG, "notifications enabled (cccd=%d)", s_cccd_handle);
     return ESP_OK;
@@ -892,16 +982,16 @@ static void do_disconnect(void)
 }
 
 /* ── Protocol request/response ─────────────────────────────────────── */
-static esp_err_t oxyii_request(uint8_t op, const uint8_t *payload, int plen,
-                                bool expect_reply, int timeout_ms)
+static esp_err_t oxyii_request(
+    uint8_t op, const uint8_t *payload, int plen, bool expect_reply, int timeout_ms)
 {
     uint8_t enc_buf[OXYII_MAX_FRAME];
     const uint8_t *tx_payload = payload;
     int tx_plen = plen;
 
     if (s_encrypted && op != OP_AUTH) {
-        int enc_len = oxyii_aes_encrypt(payload ? payload : (const uint8_t *)"",
-                                        plen, enc_buf, sizeof(enc_buf));
+        int enc_len = oxyii_aes_encrypt(
+            payload ? payload : (const uint8_t *)"", plen, enc_buf, sizeof(enc_buf));
         if (enc_len < 0) {
             ESP_LOGE(TAG, "payload encrypt failed op=0x%02x", op);
             return ESP_FAIL;
@@ -911,25 +1001,26 @@ static esp_err_t oxyii_request(uint8_t op, const uint8_t *payload, int plen,
     }
 
     uint8_t frame[OXYII_MAX_FRAME];
-    int flen = oxyii_encode(frame, sizeof(frame), op, 0, s_seq++,
-                             tx_payload, tx_plen);
-    if (flen < 0) return ESP_FAIL;
+    int flen = oxyii_encode(frame, sizeof(frame), op, 0, s_seq++, tx_payload, tx_plen);
+    if (flen < 0)
+        return ESP_FAIL;
 
     if (expect_reply) {
-        while (xSemaphoreTake(s_resp_sem, 0) == pdTRUE) { }
+        while (xSemaphoreTake(s_resp_sem, 0) == pdTRUE) {
+        }
         s_resp_len = 0;
     }
 
     /* Use write-without-response (OxyII protocol uses WRITE_CMD, not WRITE_REQ).
      * This eliminates one BLE round-trip per request, roughly doubling throughput. */
-    int rc = ble_gattc_write_no_rsp_flat(s_conn_handle, s_write_handle,
-                                          frame, flen);
+    int rc = ble_gattc_write_no_rsp_flat(s_conn_handle, s_write_handle, frame, flen);
     if (rc != 0) {
         ESP_LOGE(TAG, "write failed op=0x%02x rc=%d", op, rc);
         return ESP_FAIL;
     }
 
-    if (!expect_reply) return ESP_OK;
+    if (!expect_reply)
+        return ESP_OK;
 
     TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(timeout_ms);
     while (true) {
@@ -952,8 +1043,11 @@ static esp_err_t oxyii_request(uint8_t op, const uint8_t *payload, int plen,
             return ESP_FAIL;
         if (s_resp_opcode == op)
             return ESP_OK;
-        ESP_LOGW(TAG, "ignoring leftover notify op=0x%02x (want 0x%02x, %d B)",
-                 s_resp_opcode, op, s_resp_payload_len);
+        ESP_LOGW(TAG,
+                 "ignoring leftover notify op=0x%02x (want 0x%02x, %d B)",
+                 s_resp_opcode,
+                 op,
+                 s_resp_payload_len);
     }
 }
 
@@ -988,12 +1082,15 @@ static esp_err_t oxyii_session_open(void)
             s_encrypted = true;
             ESP_LOGI(TAG, "auth: session key negotiated (AES-128-ECB enabled)");
         } else {
-            ESP_LOGW(TAG, "auth: unexpected key format (type=0x%02x, len=%d, payload_len=%d)",
-                     dec[0], dec[1], s_resp_payload_len);
+            ESP_LOGW(TAG,
+                     "auth: unexpected key format (type=0x%02x, len=%d, payload_len=%d)",
+                     dec[0],
+                     dec[1],
+                     s_resp_payload_len);
         }
     } else if (rc == ESP_OK) {
-        ESP_LOGW(TAG, "auth: OP_AUTH response too short (%d bytes, want >= 20)",
-                 s_resp_payload_len);
+        ESP_LOGW(
+            TAG, "auth: OP_AUTH response too short (%d bytes, want >= 20)", s_resp_payload_len);
     }
 
     if (!s_encrypted) {
@@ -1030,8 +1127,7 @@ static esp_err_t oxyii_prepare_files(void)
 }
 
 /* ── GET_INFO: extract firmware + serial ───────────────────────────── */
-static esp_err_t oxyii_get_info(char *serial, size_t serial_sz,
-                                 char *firmware, size_t fw_sz)
+static esp_err_t oxyii_get_info(char *serial, size_t serial_sz, char *firmware, size_t fw_sz)
 {
     if (oxyii_request(OP_GET_INFO, NULL, 0, true, 5000) != ESP_OK)
         return ESP_FAIL;
@@ -1041,14 +1137,17 @@ static esp_err_t oxyii_get_info(char *serial, size_t serial_sz,
      *   byte 37: serial length
      *   bytes 38..: serial string */
     if (s_resp_payload_len < 38) {
-        ESP_LOGW(TAG, "get_info: response payload too short (%d bytes, want >= 38, enc=%d)",
-                 s_resp_payload_len, s_encrypted);
+        ESP_LOGW(TAG,
+                 "get_info: response payload too short (%d bytes, want >= 38, enc=%d)",
+                 s_resp_payload_len,
+                 s_encrypted);
         return ESP_FAIL;
     }
 
     if (firmware && fw_sz > 0) {
         int fl = s_resp_payload_len - 9 < 8 ? s_resp_payload_len - 9 : 8;
-        if (fl < 0) fl = 0;
+        if (fl < 0)
+            fl = 0;
         memcpy(firmware, s_resp_payload + 9, fl);
         firmware[fl] = '\0';
         /* Trim trailing nulls */
@@ -1058,7 +1157,8 @@ static esp_err_t oxyii_get_info(char *serial, size_t serial_sz,
 
     if (serial && serial_sz > 0) {
         int slen = s_resp_payload[37];
-        if (slen > 18) slen = 18;
+        if (slen > 18)
+            slen = 18;
         if (slen > 0 && 38 + slen <= s_resp_payload_len) {
             int n = slen < (int)serial_sz - 1 ? slen : (int)serial_sz - 1;
             memcpy(serial, s_resp_payload + 38, n);
@@ -1069,8 +1169,11 @@ static esp_err_t oxyii_get_info(char *serial, size_t serial_sz,
             serial[0] = '\0';
         }
     }
-    ESP_LOGI(TAG, "device info: serial='%s' fw='%s' (encrypted=%d)",
-             serial ? serial : "", firmware ? firmware : "", s_encrypted);
+    ESP_LOGI(TAG,
+             "device info: serial='%s' fw='%s' (encrypted=%d)",
+             serial ? serial : "",
+             firmware ? firmware : "",
+             s_encrypted);
     return ESP_OK;
 }
 
@@ -1084,10 +1187,11 @@ static int oxyii_off_finger(void)
 {
     if (oxyii_request(OP_LIVE_B, NULL, 0, true, 2000) != ESP_OK)
         return -1;
-    if (s_resp_payload_len < 9) return -1;
+    if (s_resp_payload_len < 9)
+        return -1;
     uint8_t state = s_resp_payload[5];
-    uint8_t spo2  = s_resp_payload[6];
-    uint8_t hr    = s_resp_payload[8];
+    uint8_t spo2 = s_resp_payload[6];
+    uint8_t hr = s_resp_payload[8];
     ESP_LOGI(TAG, "live_b: state=0x%02x spo2=%u hr=%u", state, spo2, hr);
 
     /* 0x03 = leftover file handle from the ring's own recording
@@ -1098,15 +1202,16 @@ static int oxyii_off_finger(void)
         oxyii_request(OP_READ_FILE_END, NULL, 0, true, 2000);
         if (oxyii_request(OP_LIVE_B, NULL, 0, true, 2000) != ESP_OK)
             return -1;
-        if (s_resp_payload_len < 9) return -1;
+        if (s_resp_payload_len < 9)
+            return -1;
         state = s_resp_payload[5];
-        spo2  = s_resp_payload[6];
-        hr    = s_resp_payload[8];
-        ESP_LOGI(TAG, "live_b after F4: state=0x%02x spo2=%u hr=%u",
-                 state, spo2, hr);
+        spo2 = s_resp_payload[6];
+        hr = s_resp_payload[8];
+        ESP_LOGI(TAG, "live_b after F4: state=0x%02x spo2=%u hr=%u", state, spo2, hr);
     }
 
-    if (state == 0x00) return 1;
+    if (state == 0x00)
+        return 1;
     return 0;
 }
 
@@ -1123,17 +1228,21 @@ static int oxyii_get_file_list(char names[][17], int max_count)
     }
 
     if (s_resp_payload_len < 1) {
-        ESP_LOGW(TAG, "file list: empty response payload (len=%d, enc=%d)",
-                 s_resp_payload_len, s_encrypted);
+        ESP_LOGW(TAG,
+                 "file list: empty response payload (len=%d, enc=%d)",
+                 s_resp_payload_len,
+                 s_encrypted);
         return -1;
     }
     int count = s_resp_payload[0];
-    if (count > max_count) count = max_count;
+    if (count > max_count)
+        count = max_count;
     ESP_LOGI(TAG, "file list: %d files on ring (enc=%d)", count, s_encrypted);
 
     int pos = 1;
     for (int i = 0; i < count; i++) {
-        if (pos + 16 > s_resp_payload_len) break;
+        if (pos + 16 > s_resp_payload_len)
+            break;
         memcpy(names[i], s_resp_payload + pos, 16);
         names[i][16] = '\0';
         /* Trim trailing nulls */
@@ -1148,13 +1257,12 @@ static int oxyii_get_file_list(char names[][17], int max_count)
 static esp_err_t oxyii_convert_stored(const char *name)
 {
     char source_path[640];
-    snprintf(source_path, sizeof(source_path), SD_OXYMETRY_DIR "/files/%s/%s.bin",
-             s_serial, name);
+    snprintf(source_path, sizeof(source_path), SD_OXYMETRY_DIR "/files/%s/%s.bin", s_serial, name);
     esp_err_t conversion = oximetry_canonical_convert_format_a(
         s_serial, name, source_path, oxyii_filename_epoch_ms(name));
     if (conversion != ESP_OK) {
-        ESP_LOGW(TAG, "canonical conversion pending for '%s': %s", name,
-                 esp_err_to_name(conversion));
+        ESP_LOGW(
+            TAG, "canonical conversion pending for '%s': %s", name, esp_err_to_name(conversion));
         ox_store_index_mark_converted(s_serial, name, false, esp_err_to_name(conversion));
         return ESP_ERR_INVALID_STATE;
     }
@@ -1173,8 +1281,8 @@ static esp_err_t oxyii_pull_file(const char *name)
 
     uint32_t file_size = 0;
     if (s_resp_payload_len >= 4)
-        file_size = s_resp_payload[0] | (s_resp_payload[1] << 8) |
-                    (s_resp_payload[2] << 16) | (s_resp_payload[3] << 24);
+        file_size = s_resp_payload[0] | (s_resp_payload[1] << 8) | (s_resp_payload[2] << 16) |
+                    (s_resp_payload[3] << 24);
     ESP_LOGI(TAG, "pulling '%s' (%lu bytes)", name, (unsigned long)file_size);
 
     /* Resume from the durable partial length.  The device's reported size is
@@ -1198,14 +1306,15 @@ static esp_err_t oxyii_pull_file(const char *name)
         /* Payload is the file data chunk */
         int chunk_len = s_resp_payload_len;
         if (chunk_len <= 0) {
-            if (++empty_count > 2) break;
+            if (++empty_count > 2)
+                break;
             continue;
         }
         empty_count = 0;
 
         if (file_size > 0 && (uint64_t)offset + chunk_len > file_size) {
-            ESP_LOGW(TAG, "device returned data past file size at offset=%lu",
-                     (unsigned long)offset);
+            ESP_LOGW(
+                TAG, "device returned data past file size at offset=%lu", (unsigned long)offset);
             break;
         }
         if (ox_store_part_append(name, s_resp_payload, chunk_len) != ESP_OK) {
@@ -1225,14 +1334,17 @@ static esp_err_t oxyii_pull_file(const char *name)
 
     /* Completion requires both an exact transfer and the O2 Ring S trailer. */
     if (!transfer_complete || file_size == 0) {
-        ESP_LOGW(TAG, "incomplete '%s': %lu/%lu bytes; retaining .part",
-                 name, (unsigned long)offset, (unsigned long)file_size);
+        ESP_LOGW(TAG,
+                 "incomplete '%s': %lu/%lu bytes; retaining .part",
+                 name,
+                 (unsigned long)offset,
+                 (unsigned long)file_size);
         return ESP_FAIL;
     }
     bool finalised = ox_store_promote(s_serial, name);
-    ESP_LOGI(TAG, "pulled '%s': %lu bytes, finalised=%d",
-             name, (unsigned long)offset, finalised);
-    if (!finalised) return ESP_FAIL;
+    ESP_LOGI(TAG, "pulled '%s': %lu bytes, finalised=%d", name, (unsigned long)offset, finalised);
+    if (!finalised)
+        return ESP_FAIL;
 
     return oxyii_convert_stored(name);
 }
@@ -1254,17 +1366,25 @@ static esp_err_t do_save_nvs(void *arg)
     struct ox_nvs_arg local = *a;
     nvs_handle_t h;
     esp_err_t e = nvs_open(OX_NVS_NS, NVS_READWRITE, &h);
-    if (e != ESP_OK) return e;
+    if (e != ESP_OK)
+        return e;
     e = nvs_set_str(h, "serial", local.serial);
-    if (e == ESP_OK) e = nvs_set_str(h, "firmware", local.firmware);
-    if (e == ESP_OK) e = nvs_set_str(h, "name_prefix", local.name_prefix);
-    if (e == ESP_OK) e = nvs_set_str(h, "ble_name", local.ble_name);
-    if (e == ESP_OK) e = nvs_set_str(h, "last_addr", local.last_addr);
-    if (e == ESP_OK) e = nvs_set_u8(h, "driver", (uint8_t)OX_DRIVER_OXYII);
+    if (e == ESP_OK)
+        e = nvs_set_str(h, "firmware", local.firmware);
+    if (e == ESP_OK)
+        e = nvs_set_str(h, "name_prefix", local.name_prefix);
+    if (e == ESP_OK)
+        e = nvs_set_str(h, "ble_name", local.ble_name);
+    if (e == ESP_OK)
+        e = nvs_set_str(h, "last_addr", local.last_addr);
+    if (e == ESP_OK)
+        e = nvs_set_u8(h, "driver", (uint8_t)OX_DRIVER_OXYII);
     /* Clear a prior Forget tombstone only after the complete replacement
      * pairing record has been accepted by NVS. */
-    if (e == ESP_OK) e = nvs_set_u8(h, "forgotten", 0);
-    if (e == ESP_OK) e = nvs_commit(h);
+    if (e == ESP_OK)
+        e = nvs_set_u8(h, "forgotten", 0);
+    if (e == ESP_OK)
+        e = nvs_commit(h);
     nvs_close(h);
     return e;
 }
@@ -1280,18 +1400,27 @@ static esp_err_t do_erase_nvs(void *arg)
     (void)arg;
     nvs_handle_t h;
     esp_err_t e = nvs_open(OX_NVS_NS, NVS_READWRITE, &h);
-    if (e != ESP_OK) return e;
+    if (e != ESP_OK)
+        return e;
     e = erase_nvs_key_if_present(h, "serial");
-    if (e == ESP_OK) e = erase_nvs_key_if_present(h, "firmware");
-    if (e == ESP_OK) e = erase_nvs_key_if_present(h, "name_prefix");
-    if (e == ESP_OK) e = erase_nvs_key_if_present(h, "ble_name");
-    if (e == ESP_OK) e = erase_nvs_key_if_present(h, "last_addr");
-    if (e == ESP_OK) e = erase_nvs_key_if_present(h, "driver");
-    if (e == ESP_OK) e = erase_nvs_key_if_present(h, "probe_mode");
+    if (e == ESP_OK)
+        e = erase_nvs_key_if_present(h, "firmware");
+    if (e == ESP_OK)
+        e = erase_nvs_key_if_present(h, "name_prefix");
+    if (e == ESP_OK)
+        e = erase_nvs_key_if_present(h, "ble_name");
+    if (e == ESP_OK)
+        e = erase_nvs_key_if_present(h, "last_addr");
+    if (e == ESP_OK)
+        e = erase_nvs_key_if_present(h, "driver");
+    if (e == ESP_OK)
+        e = erase_nvs_key_if_present(h, "probe_mode");
     /* Keep this key after erasing the pairing record.  If paired.json cannot
      * be deleted because the card is busy, reboot must not resurrect it. */
-    if (e == ESP_OK) e = nvs_set_u8(h, "forgotten", 1);
-    if (e == ESP_OK) e = nvs_commit(h);
+    if (e == ESP_OK)
+        e = nvs_set_u8(h, "forgotten", 1);
+    if (e == ESP_OK)
+        e = nvs_commit(h);
     nvs_close(h);
     return e;
 }
@@ -1301,7 +1430,8 @@ static esp_err_t do_save_probe_mode(void *arg)
     uint8_t mode = (uint8_t)(intptr_t)arg;
     nvs_handle_t h;
     esp_err_t e = nvs_open(OX_NVS_NS, NVS_READWRITE, &h);
-    if (e != ESP_OK) return e;
+    if (e != ESP_OK)
+        return e;
     nvs_set_u8(h, "probe_mode", mode);
     e = nvs_commit(h);
     nvs_close(h);
@@ -1316,8 +1446,7 @@ static void load_paired_from_nvs(void)
     if (nvs_open(OX_NVS_NS, NVS_READONLY, &h) == ESP_OK) {
         size_t len;
         uint8_t forgotten_value = 0;
-        forgotten = nvs_get_u8(h, "forgotten", &forgotten_value) == ESP_OK &&
-                    forgotten_value == 1;
+        forgotten = nvs_get_u8(h, "forgotten", &forgotten_value) == ESP_OK && forgotten_value == 1;
 
         uint8_t drv;
         bool driver_matches = nvs_get_u8(h, "driver", &drv) == ESP_OK && drv == OX_DRIVER_OXYII;
@@ -1343,12 +1472,17 @@ static void load_paired_from_nvs(void)
                 }
             }
             if (!valid) {
-                ESP_LOGW(TAG, "invalid or corrupted serial in NVS ('%s') — clearing paired state", s_serial);
+                ESP_LOGW(TAG,
+                         "invalid or corrupted serial in NVS ('%s') — clearing paired state",
+                         s_serial);
                 s_paired = false;
                 s_serial[0] = '\0';
             } else {
-                ESP_LOGI(TAG, "paired ring loaded: serial='%s' name='%s' addr='%s'",
-                         s_serial, s_ble_name, s_paired_addr);
+                ESP_LOGI(TAG,
+                         "paired ring loaded: serial='%s' name='%s' addr='%s'",
+                         s_serial,
+                         s_ble_name,
+                         s_paired_addr);
             }
         } else {
             s_serial[0] = '\0';
@@ -1363,12 +1497,18 @@ static void load_paired_from_nvs(void)
     /* Also try loading from paired.json (SD) as fallback */
     if (!s_paired && !forgotten) {
         char serial[32], fw[16], prefix[16], addr[18], drv[16], bname[40];
-        if (ox_store_load_paired(serial, sizeof(serial),
-                                 fw, sizeof(fw),
-                                 prefix, sizeof(prefix),
-                                 addr, sizeof(addr),
-                                 drv, sizeof(drv),
-                                 bname, sizeof(bname))) {
+        if (ox_store_load_paired(serial,
+                                 sizeof(serial),
+                                 fw,
+                                 sizeof(fw),
+                                 prefix,
+                                 sizeof(prefix),
+                                 addr,
+                                 sizeof(addr),
+                                 drv,
+                                 sizeof(drv),
+                                 bname,
+                                 sizeof(bname))) {
             if (strcmp(drv, "wellue_oxyii") == 0) {
                 strlcpy(s_serial, serial, sizeof(s_serial));
                 strlcpy(s_firmware, fw, sizeof(s_firmware));
@@ -1532,21 +1672,22 @@ static esp_err_t do_scan(int timeout_sec)
     s_scan_count = 0;
 
     struct ble_gap_disc_params dp = {
-        .itvl = 160,   /* 100 ms */
-        .window = 48,  /* 30 ms  — low duty; pairing scan uses 96/96 */
+        .itvl = 160,  /* 100 ms */
+        .window = 48, /* 30 ms  — low duty; pairing scan uses 96/96 */
         .filter_policy = 0,
         .limited = 0,
-        .passive = 0,  /* Active scan: requests SCAN_RSP for complete name */
+        .passive = 0, /* Active scan: requests SCAN_RSP for complete name */
     };
 
     uint8_t own_addr_type;
     int rc = ble_hs_id_infer_auto(BLE_ADDR_RANDOM, &own_addr_type);
-    if (rc != 0) own_addr_type = as11_ble_get_own_addr_type();
+    if (rc != 0)
+        own_addr_type = as11_ble_get_own_addr_type();
 
-    while (xSemaphoreTake(s_scan_done, 0) == pdTRUE) { }
+    while (xSemaphoreTake(s_scan_done, 0) == pdTRUE) {
+    }
 
-    rc = ble_gap_disc(own_addr_type,
-                      timeout_sec * 1000, &dp, gap_event, NULL);
+    rc = ble_gap_disc(own_addr_type, timeout_sec * 1000, &dp, gap_event, NULL);
     if (rc != 0) {
         ESP_LOGW(TAG, "scan start failed: %d", rc);
         return ESP_FAIL;
@@ -1583,16 +1724,20 @@ static void canonical_migration_task(void *arg)
  * s_presence_served may be set inside on F1 exhaustion. */
 static bool do_pull_and_mark(bool *pulled_any)
 {
-    if (pulled_any) *pulled_any = false;
+    if (pulled_any)
+        *pulled_any = false;
     set_state(OX_STATUS_PULLING);
 
     char names[32][17];
     int count = oxyii_get_file_list(names, 32);
     if (count < 0) {
         s_f1_fail_count++;
-        ESP_LOGW(TAG, "file list failed (op=0x%02x len=%d), attempt %d/%d",
-                 s_resp_opcode, s_resp_payload_len,
-                 s_f1_fail_count, OX_F1_MAX_RETRIES);
+        ESP_LOGW(TAG,
+                 "file list failed (op=0x%02x len=%d), attempt %d/%d",
+                 s_resp_opcode,
+                 s_resp_payload_len,
+                 s_f1_fail_count,
+                 OX_F1_MAX_RETRIES);
         if (s_f1_fail_count >= OX_F1_MAX_RETRIES) {
             /* F1 never responds on this ring (firmware quirk).
              * Mark served so we stop reconnecting — each connection
@@ -1600,7 +1745,8 @@ static bool do_pull_and_mark(bool *pulled_any)
              * (next take-off) will try again fresh. */
             s_presence_served = true;
             s_served_at = xTaskGetTickCount();
-            ESP_LOGW(TAG, "F1 unreachable after %d attempts — treating as served, ring can sleep",
+            ESP_LOGW(TAG,
+                     "F1 unreachable after %d attempts — treating as served, ring can sleep",
                      OX_F1_MAX_RETRIES);
         }
         return false;
@@ -1619,7 +1765,8 @@ static bool do_pull_and_mark(bool *pulled_any)
 
     bool pull_ok = true;
     for (int i = 0; i < count; i++) {
-        if (names[i][0] == '\0') continue;
+        if (names[i][0] == '\0')
+            continue;
 
         int idx = ox_store_index_check(s_serial, names[i]);
         if (idx == 1) {
@@ -1638,14 +1785,16 @@ static bool do_pull_and_mark(bool *pulled_any)
         if (result != ESP_OK) {
             pull_ok = false;
             if (result == ESP_ERR_INVALID_STATE) {
-                if (pulled_any) *pulled_any = true;
+                if (pulled_any)
+                    *pulled_any = true;
                 ESP_LOGW(TAG, "downloaded '%s'; conversion deferred", names[i]);
                 continue;
             }
             ESP_LOGW(TAG, "transfer failed for '%s' — ending this sync attempt", names[i]);
             break;
         }
-        if (pulled_any) *pulled_any = true;
+        if (pulled_any)
+            *pulled_any = true;
     }
     ox_store_end_io();
     return pull_ok;
@@ -1709,7 +1858,8 @@ static void pull_task(void *arg)
         int idx = find_paired_in_scan();
         if (idx < 0) {
             if (s_paired_addr[0] != '\0') {
-                ESP_LOGW(TAG, "paired addr %s not in scan results; "
+                ESP_LOGW(TAG,
+                         "paired addr %s not in scan results; "
                          "using first device (serial will be verified)",
                          s_paired_addr);
             }
@@ -1717,8 +1867,7 @@ static void pull_task(void *arg)
         }
 
         if (!s_ring_present) {
-            ESP_LOGI(TAG, "ring present: '%s' rssi=%d",
-                     s_scan[idx].name, s_scan[idx].rssi);
+            ESP_LOGI(TAG, "ring present: '%s' rssi=%d", s_scan[idx].name, s_scan[idx].rssi);
             s_ring_present = true;
         }
 
@@ -1755,8 +1904,10 @@ static void pull_task(void *arg)
                 ESP_LOGW(TAG, "watch: connect failed: %s", s_error);
                 do_disconnect();
                 if (++s_connect_fail_count >= OX_CONNECT_MAX_RETRIES) {
-                    ESP_LOGW(TAG, "connect failed %d times — curfew %ds (let ring reset)",
-                             s_connect_fail_count, OX_END_WINDOW_MS / 1000);
+                    ESP_LOGW(TAG,
+                             "connect failed %d times — curfew %ds (let ring reset)",
+                             s_connect_fail_count,
+                             OX_END_WINDOW_MS / 1000);
                     s_presence_served = true;
                     s_served_at = xTaskGetTickCount();
                     s_connect_fail_count = 0;
@@ -1773,7 +1924,8 @@ static void pull_task(void *arg)
                 int off = oxyii_off_finger();
                 if (off == 1) {
                     if (s_synced_this_idle) {
-                        ESP_LOGI(TAG, "watch: ring off-finger / charging (already synced) — standby");
+                        ESP_LOGI(TAG,
+                                 "watch: ring off-finger / charging (already synced) — standby");
                         do_disconnect();
                         s_presence_served = true;
                         s_served_at = xTaskGetTickCount();
@@ -1794,12 +1946,11 @@ static void pull_task(void *arg)
                     }
 
                     char serial[32] = {0}, firmware[16] = {0};
-                    if (oxyii_get_info(serial, sizeof(serial),
-                                       firmware, sizeof(firmware)) != ESP_OK
-                        || serial[0] == '\0'
-                        || strcmp(serial, s_serial) != 0) {
-                        ESP_LOGW(TAG, "watch: serial mismatch (got '%s', want '%s')",
-                                 serial, s_serial);
+                    if (oxyii_get_info(serial, sizeof(serial), firmware, sizeof(firmware)) !=
+                            ESP_OK ||
+                        serial[0] == '\0' || strcmp(serial, s_serial) != 0) {
+                        ESP_LOGW(
+                            TAG, "watch: serial mismatch (got '%s', want '%s')", serial, s_serial);
                         break;
                     }
 
@@ -1823,8 +1974,7 @@ static void pull_task(void *arg)
                     /* If the first check found no new files, the ring
                      * may still be finalizing.  Wait once more and retry
                      * before giving up on this sync window. */
-                    if (pull_ok && !pulled_any &&
-                        s_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
+                    if (pull_ok && !pulled_any && s_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
                         ESP_LOGI(TAG, "watch: no new files yet — waiting 5s for ring to finalize");
                         vTaskDelay(pdMS_TO_TICKS(5000));
                         if (s_conn_handle != BLE_HS_CONN_HANDLE_NONE)
@@ -1838,20 +1988,26 @@ static void pull_task(void *arg)
                         s_synced_this_idle = true;
                         s_served_at = xTaskGetTickCount();
                         s_pull_fail_count = 0;
-                        ESP_LOGI(TAG, "sync window served — no reconnect; ring powers off on its own");
+                        ESP_LOGI(TAG,
+                                 "sync window served — no reconnect; ring powers off on its own");
                     } else if (!s_presence_served) {
                         /* Pull failed.  Retry quickly while the ring is still
                          * advertising.  After OX_PULL_MAX_FAST_RETRIES, apply
                          * the curfew so the ring can power off and conserve
                          * battery between advertising cycles. */
                         if (++s_pull_fail_count < OX_PULL_MAX_FAST_RETRIES) {
-                            ESP_LOGW(TAG, "sync incomplete — fast retry %d/%d (ring still advertising)",
-                                     s_pull_fail_count, OX_PULL_MAX_FAST_RETRIES);
+                            ESP_LOGW(TAG,
+                                     "sync incomplete — fast retry %d/%d (ring still advertising)",
+                                     s_pull_fail_count,
+                                     OX_PULL_MAX_FAST_RETRIES);
                         } else {
                             s_presence_served = true;
                             s_served_at = xTaskGetTickCount();
-                            ESP_LOGW(TAG, "sync incomplete after %d retries — curfew %ds (let ring rest)",
-                                     s_pull_fail_count, OX_END_WINDOW_MS / 1000);
+                            ESP_LOGW(
+                                TAG,
+                                "sync incomplete after %d retries — curfew %ds (let ring rest)",
+                                s_pull_fail_count,
+                                OX_END_WINDOW_MS / 1000);
                         }
                     }
                     pulled = true;
@@ -1892,8 +2048,10 @@ static void pull_task(void *arg)
             ESP_LOGW(TAG, "watch: connect failed: %s", s_error);
             do_disconnect();
             if (++s_connect_fail_count >= OX_CONNECT_MAX_RETRIES) {
-                ESP_LOGW(TAG, "connect failed %d times — curfew %ds (let ring reset)",
-                         s_connect_fail_count, OX_END_WINDOW_MS / 1000);
+                ESP_LOGW(TAG,
+                         "connect failed %d times — curfew %ds (let ring reset)",
+                         s_connect_fail_count,
+                         OX_END_WINDOW_MS / 1000);
                 s_presence_served = true;
                 s_served_at = xTaskGetTickCount();
                 s_connect_fail_count = 0;
@@ -1914,10 +2072,9 @@ static void pull_task(void *arg)
         }
 
         char serial[32] = {0}, firmware[16] = {0};
-        if (oxyii_get_info(serial, sizeof(serial), firmware, sizeof(firmware)) != ESP_OK
-            || serial[0] == '\0' || strcmp(serial, s_serial) != 0) {
-            ESP_LOGW(TAG, "watch: serial mismatch (got '%s', want '%s')",
-                     serial, s_serial);
+        if (oxyii_get_info(serial, sizeof(serial), firmware, sizeof(firmware)) != ESP_OK ||
+            serial[0] == '\0' || strcmp(serial, s_serial) != 0) {
+            ESP_LOGW(TAG, "watch: serial mismatch (got '%s', want '%s')", serial, s_serial);
             do_disconnect();
             set_state(OX_STATUS_PAIRED);
             xSemaphoreGive(s_ops_mtx);
@@ -1931,8 +2088,10 @@ static void pull_task(void *arg)
         int off = oxyii_off_finger();
         if (off != 1) {
             s_synced_this_idle = false;
-            ESP_LOGI(TAG, "watch: not off-finger (live_b=%d) — disconnect, retry in %ds",
-                     off, OX_WORN_PROBE_MS / 1000);
+            ESP_LOGI(TAG,
+                     "watch: not off-finger (live_b=%d) — disconnect, retry in %ds",
+                     off,
+                     OX_WORN_PROBE_MS / 1000);
             do_disconnect();
             set_state(OX_STATUS_PAIRED);
             xSemaphoreGive(s_ops_mtx);
@@ -1972,13 +2131,17 @@ static void pull_task(void *arg)
              * the curfew so the ring can power off and conserve
              * battery between advertising cycles. */
             if (++s_pull_fail_count < OX_PULL_MAX_FAST_RETRIES) {
-                ESP_LOGW(TAG, "sync incomplete — fast retry %d/%d (ring still advertising)",
-                         s_pull_fail_count, OX_PULL_MAX_FAST_RETRIES);
+                ESP_LOGW(TAG,
+                         "sync incomplete — fast retry %d/%d (ring still advertising)",
+                         s_pull_fail_count,
+                         OX_PULL_MAX_FAST_RETRIES);
             } else {
                 s_presence_served = true;
                 s_served_at = xTaskGetTickCount();
-                ESP_LOGW(TAG, "sync incomplete after %d retries — curfew %ds (let ring rest)",
-                         s_pull_fail_count, OX_END_WINDOW_MS / 1000);
+                ESP_LOGW(TAG,
+                         "sync incomplete after %d retries — curfew %ds (let ring rest)",
+                         s_pull_fail_count,
+                         OX_END_WINDOW_MS / 1000);
             }
         }
         set_state(OX_STATUS_PAIRED);
@@ -1990,20 +2153,19 @@ static void pull_task(void *arg)
 /* ── Public API (driver vtable) ───────────────────────────────────── */
 static void oxyii_init(void)
 {
-    if (s_initialized) return;
+    if (s_initialized)
+        return;
     s_initialized = true;
     s_state_mtx = xSemaphoreCreateMutex();
-    s_ops_mtx   = xSemaphoreCreateMutex();
-    s_op_sem    = xSemaphoreCreateBinary();
-    s_conn_sem  = xSemaphoreCreateBinary();
-    s_resp_sem  = xSemaphoreCreateBinary();
+    s_ops_mtx = xSemaphoreCreateMutex();
+    s_op_sem = xSemaphoreCreateBinary();
+    s_conn_sem = xSemaphoreCreateBinary();
+    s_resp_sem = xSemaphoreCreateBinary();
     s_scan_done = xSemaphoreCreateBinary();
-    if (!s_state_mtx || !s_ops_mtx || !s_op_sem || !s_conn_sem ||
-        !s_resp_sem || !s_scan_done)
+    if (!s_state_mtx || !s_ops_mtx || !s_op_sem || !s_conn_sem || !s_resp_sem || !s_scan_done)
         return;
 
-    s_scan = heap_caps_malloc(sizeof(struct ox_scan_result) * OX_SCAN_MAX,
-                              MALLOC_CAP_SPIRAM);
+    s_scan = heap_caps_malloc(sizeof(struct ox_scan_result) * OX_SCAN_MAX, MALLOC_CAP_SPIRAM);
     s_resp_buf = heap_caps_malloc(OXYII_MAX_FRAME, MALLOC_CAP_SPIRAM);
     s_resp_payload = heap_caps_malloc(OXYII_MAX_FRAME, MALLOC_CAP_SPIRAM);
     if (!s_scan || !s_resp_buf || !s_resp_payload) {
@@ -2021,15 +2183,15 @@ static void oxyii_init(void)
     if (s_paired)
         set_state(OX_STATUS_PAIRED);
 
-    TaskHandle_t h = psram_task_create(pull_task, "ox_pull", 8192, NULL, 3,
-                                       tskNO_AFFINITY, NULL, NULL);
+    TaskHandle_t h =
+        psram_task_create(pull_task, "ox_pull", 8192, NULL, 3, tskNO_AFFINITY, NULL, NULL);
     if (!h) {
         ESP_LOGW(TAG, "failed to create pull task");
     }
-    TaskHandle_t migration = psram_task_create(canonical_migration_task,
-                                               "ox_migrate", 12288, NULL, 1,
-                                               0, NULL, NULL);
-    if (!migration) ESP_LOGW(TAG, "failed to create canonical migration task");
+    TaskHandle_t migration =
+        psram_task_create(canonical_migration_task, "ox_migrate", 12288, NULL, 1, 0, NULL, NULL);
+    if (!migration)
+        ESP_LOGW(TAG, "failed to create canonical migration task");
 }
 
 static esp_err_t oxyii_scan(int timeout_sec)
@@ -2052,10 +2214,10 @@ static esp_err_t oxyii_scan(int timeout_sec)
 
     uint8_t own_addr_type;
     int rc = ble_hs_id_infer_auto(BLE_ADDR_RANDOM, &own_addr_type);
-    if (rc != 0) own_addr_type = as11_ble_get_own_addr_type();
+    if (rc != 0)
+        own_addr_type = as11_ble_get_own_addr_type();
 
-    rc = ble_gap_disc(own_addr_type,
-                      timeout_sec * 1000, &dp, gap_event, NULL);
+    rc = ble_gap_disc(own_addr_type, timeout_sec * 1000, &dp, gap_event, NULL);
     if (rc != 0) {
         set_error("scan start failed: %d", rc);
         xSemaphoreGive(s_ops_mtx);
@@ -2095,7 +2257,8 @@ static esp_err_t oxyii_pair(const char *addr_str)
         return ESP_ERR_INVALID_STATE;
 
     struct pair_arg *pa = calloc(1, sizeof(*pa));
-    if (!pa) return ESP_ERR_NO_MEM;
+    if (!pa)
+        return ESP_ERR_NO_MEM;
     strlcpy(pa->addr_str, addr_str, sizeof(pa->addr_str));
 
     /* Look up the BLE advertised name from the last scan results. */
@@ -2108,8 +2271,8 @@ static esp_err_t oxyii_pair(const char *addr_str)
         }
     }
 
-    TaskHandle_t h = psram_task_create(pair_task, "ox_pair", 8192, pa, 5,
-                                       tskNO_AFFINITY, NULL, NULL);
+    TaskHandle_t h =
+        psram_task_create(pair_task, "ox_pair", 8192, pa, 5, tskNO_AFFINITY, NULL, NULL);
     if (!h) {
         free(pa);
         return ESP_ERR_NO_MEM;
@@ -2161,13 +2324,18 @@ static bool oxyii_is_paired(void)
 
 static cJSON *oxyii_get_paired_info(void)
 {
-    if (!s_paired) return NULL;
+    if (!s_paired)
+        return NULL;
     cJSON *info = cJSON_CreateObject();
     cJSON_AddStringToObject(info, "serial", s_serial);
-    if (s_firmware[0]) cJSON_AddStringToObject(info, "firmware", s_firmware);
-    if (s_name_prefix[0]) cJSON_AddStringToObject(info, "name_prefix", s_name_prefix);
-    if (s_ble_name[0]) cJSON_AddStringToObject(info, "ble_name", s_ble_name);
-    if (s_paired_addr[0]) cJSON_AddStringToObject(info, "addr", s_paired_addr);
+    if (s_firmware[0])
+        cJSON_AddStringToObject(info, "firmware", s_firmware);
+    if (s_name_prefix[0])
+        cJSON_AddStringToObject(info, "name_prefix", s_name_prefix);
+    if (s_ble_name[0])
+        cJSON_AddStringToObject(info, "ble_name", s_ble_name);
+    if (s_paired_addr[0])
+        cJSON_AddStringToObject(info, "addr", s_paired_addr);
     cJSON_AddStringToObject(info, "driver", "wellue_oxyii");
     return info;
 }
@@ -2186,21 +2354,20 @@ static esp_err_t oxyii_set_probe_mode(ox_probe_mode_t mode)
     s_probe_mode = mode;
     /* Persist to NVS (fire-and-forget; nvs_writer_run handles flash safety). */
     nvs_writer_run(do_save_probe_mode, (void *)(intptr_t)mode);
-    ESP_LOGI(TAG, "probe mode set to %s",
-             mode == OX_PROBE_PERSISTENT ? "persistent" : "legacy");
+    ESP_LOGI(TAG, "probe mode set to %s", mode == OX_PROBE_PERSISTENT ? "persistent" : "legacy");
     return ESP_OK;
 }
 
 const ox_driver_ops_t oxyii_driver_ops = {
-    .init             = oxyii_init,
-    .scan             = oxyii_scan,
+    .init = oxyii_init,
+    .scan = oxyii_scan,
     .get_scan_results = oxyii_get_scan_results,
-    .pair             = oxyii_pair,
-    .forget           = oxyii_forget,
-    .get_status       = oxyii_get_status,
-    .get_error        = oxyii_get_error,
-    .is_paired        = oxyii_is_paired,
-    .get_paired_info  = oxyii_get_paired_info,
-    .get_probe_mode   = oxyii_get_probe_mode,
-    .set_probe_mode   = oxyii_set_probe_mode,
+    .pair = oxyii_pair,
+    .forget = oxyii_forget,
+    .get_status = oxyii_get_status,
+    .get_error = oxyii_get_error,
+    .is_paired = oxyii_is_paired,
+    .get_paired_info = oxyii_get_paired_info,
+    .get_probe_mode = oxyii_get_probe_mode,
+    .set_probe_mode = oxyii_set_probe_mode,
 };

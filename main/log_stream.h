@@ -62,14 +62,14 @@ esp_err_t log_stream_init(void);
 
 typedef enum {
     LOG_STREAM_RETAINED_LEVEL_UNKNOWN = (1u << 0),
-    LOG_STREAM_RETAINED_LEVEL_ERROR   = (1u << 1),
-    LOG_STREAM_RETAINED_LEVEL_WARN    = (1u << 2),
-    LOG_STREAM_RETAINED_LEVEL_INFO    = (1u << 3),
-    LOG_STREAM_RETAINED_LEVEL_DEBUG   = (1u << 4),
+    LOG_STREAM_RETAINED_LEVEL_ERROR = (1u << 1),
+    LOG_STREAM_RETAINED_LEVEL_WARN = (1u << 2),
+    LOG_STREAM_RETAINED_LEVEL_INFO = (1u << 3),
+    LOG_STREAM_RETAINED_LEVEL_DEBUG = (1u << 4),
     LOG_STREAM_RETAINED_LEVEL_VERBOSE = (1u << 5),
-    LOG_STREAM_RETAINED_LEVEL_ALL     = ((1u << 6) - 1u),
+    LOG_STREAM_RETAINED_LEVEL_ALL = ((1u << 6) - 1u),
     /* Explicit empty selection; zero retains its existing all-level meaning. */
-    LOG_STREAM_RETAINED_LEVEL_NONE    = (1u << 6),
+    LOG_STREAM_RETAINED_LEVEL_NONE = (1u << 6),
 } log_stream_retained_level_t;
 
 typedef enum {
@@ -152,12 +152,11 @@ esp_err_t log_stream_retained_retry(void);
  * set to NULL and can be used to obtain metadata only.  The filter and its
  * optional query string are borrowed only for the duration of the call.
  */
-esp_err_t log_stream_retained_snapshot(
-    log_stream_retained_line_t *lines,
-    size_t line_capacity,
-    const log_stream_retained_filter_t *filter,
-    size_t *line_count,
-    log_stream_retained_info_t *info);
+esp_err_t log_stream_retained_snapshot(log_stream_retained_line_t *lines,
+                                       size_t line_capacity,
+                                       const log_stream_retained_filter_t *filter,
+                                       size_t *line_count,
+                                       log_stream_retained_info_t *info);
 
 /**
  * Copy one bounded page without creating an LVGL row per retained line.
@@ -167,13 +166,12 @@ esp_err_t log_stream_retained_snapshot(
  * interpreted in `filter->order`; a non-zero before_sequence keeps paused
  * pages stable while capture continues.
  */
-esp_err_t log_stream_retained_snapshot_page(
-    log_stream_retained_line_t *lines,
-    size_t line_capacity,
-    const log_stream_retained_filter_t *filter,
-    size_t match_offset,
-    log_stream_retained_page_t *page,
-    log_stream_retained_info_t *info);
+esp_err_t log_stream_retained_snapshot_page(log_stream_retained_line_t *lines,
+                                            size_t line_capacity,
+                                            const log_stream_retained_filter_t *filter,
+                                            size_t match_offset,
+                                            log_stream_retained_page_t *page,
+                                            log_stream_retained_info_t *info);
 
 /**
  * Clear only the touchscreen-visible retained RAM ring.  The WebSocket ring,
@@ -193,13 +191,12 @@ esp_err_t log_stream_retained_clear(void);
  * and reports scanned source lines, so filtered saves still reach 100%; the
  * callback runs synchronously on the caller's worker task.
  */
-esp_err_t log_stream_retained_save_to_sd(
-    const log_stream_retained_filter_t *filter,
-    char *saved_path,
-    size_t saved_path_size,
-    size_t *saved_line_count,
-    log_stream_retained_progress_fn progress_fn,
-    void *progress_ctx);
+esp_err_t log_stream_retained_save_to_sd(const log_stream_retained_filter_t *filter,
+                                         char *saved_path,
+                                         size_t saved_path_size,
+                                         size_t *saved_line_count,
+                                         log_stream_retained_progress_fn progress_fn,
+                                         void *progress_ctx);
 
 /**
  * Register the system WebSocket & log HTTP endpoints on the given server:

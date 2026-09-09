@@ -27,6 +27,13 @@ def function_body(source: str, name: str) -> str:
     return source[match.end(): cursor - 1]
 
 
+def contains_c(source: str, statement: str) -> bool:
+    """Match a C statement while ignoring formatter-selected whitespace."""
+    return re.search(
+        r"\s*".join(re.escape(token) for token in statement.split()), source
+    ) is not None
+
+
 flush = function_body(SOURCE, "log_flush_once")
 acknowledge = function_body(SOURCE, "writebuf_acknowledge")
 archive = function_body(SOURCE, "stream_persistent_log_files")
@@ -54,7 +61,7 @@ assert -1 not in (lease_at, open_at, write_at, ack_at, release_at)
 assert lease_at < open_at < write_at < ack_at < release_at
 assert "s_writebuf_tail += chunk" not in flush
 assert "s_writebuf_tail += written" in acknowledge
-assert "if (written > pending) written = pending" in acknowledge
+assert contains_c(acknowledge, "if (written > pending) written = pending")
 
 # Browser history and download share one leased archive reader. The lease
 # spans open/read/close and the pending RAM boundary snapshot.
@@ -73,12 +80,12 @@ assert "stream_complete_log_archive" in download
 # Initialisation reports failure, remains idempotent, and every consumer which
 # can touch the byte ring or WS mutex has an explicit degraded-state guard.
 assert "esp_err_t log_stream_init(void)" in HEADER
-assert "if (s_init_attempted) return s_init_result" in initialise
+assert contains_c(initialise, "if (s_init_attempted) return s_init_result")
 assert "return s_init_result" in initialise
-assert "if (!s_ringbuf)" in recent
-assert "if (!s_ringbuf || !s_ws_mutex)" in ws_handler
-assert "if (!s_ringbuf || !s_ws_mutex)" in ws_json
-assert "if (!s_ringbuf || !s_ws_mutex)" in ws_raw
+assert contains_c(recent, "if (!s_ringbuf)")
+assert contains_c(ws_handler, "if (!s_ringbuf || !s_ws_mutex)")
+assert contains_c(ws_json, "if (!s_ringbuf || !s_ws_mutex)")
+assert contains_c(ws_raw, "if (!s_ringbuf || !s_ws_mutex)")
 
 # Publication never deletes the last good export first. A failed final rename
 # rolls the backup back, and the temporary source remains caller-cleanable.
@@ -96,7 +103,7 @@ assert ws_exit.find("ws_forwarder_clear_current()") < ws_exit.find(
 )
 assert "s_ws_fwd_starting = true" in ws_start
 assert "s_ws_fwd_starting = false" in ws_start
-assert "if (task) s_ws_fwd_task = task" in ws_start
+assert contains_c(ws_start, "if (task) s_ws_fwd_task = task")
 assert ws_task.count("ws_forwarder_exit()") >= 2
 
 

@@ -28,13 +28,11 @@ esp_err_t first_run_setup_controller_start(esp_err_t initial_card_result);
 void first_run_setup_controller_stop(void);
 
 /* Controller callbacks passed directly to first_run_setup_ui_create(). */
-const first_run_setup_ui_controller_t *
-first_run_setup_controller_callbacks(void);
+const first_run_setup_ui_controller_t *first_run_setup_controller_callbacks(void);
 
 /* Coherent value snapshot. generation changes only when visible state does,
  * allowing the display task to avoid rebuilding an unchanged LVGL pane. */
-bool first_run_setup_controller_snapshot(first_run_setup_ui_live_t *out,
-                                         uint32_t *generation);
+bool first_run_setup_controller_snapshot(first_run_setup_ui_live_t *out, uint32_t *generation);
 
 /* The finished callback only sets a flag.  The display task consumes it on a
  * later timer pass, after LVGL has unwound the touch event safely. */

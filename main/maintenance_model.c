@@ -30,7 +30,8 @@ bool maintenance_hold_ready(maintenance_hold_t *h, uint32_t now, bool allowed)
         return false;
     }
     h->observed_ms = now;
-    if (maintenance_hold_elapsed(h, now) < MAINTENANCE_HOLD_MS) return false;
+    if (maintenance_hold_elapsed(h, now) < MAINTENANCE_HOLD_MS)
+        return false;
     maintenance_hold_reset(h);
     return true;
 }

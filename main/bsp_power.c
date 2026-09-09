@@ -22,7 +22,6 @@
  * (https://github.com/ilyakruchinin)." See the NOTICE file for details.
  */
 
-
 #include "bsp_power.h"
 
 #include <stdlib.h>
@@ -49,11 +48,11 @@
 #include "therapy_alert.h"
 #include "device_settings.h"
 
-#define BSP_PIN_BAT_EN   2
-#define BSP_PIN_KEY_PWR  5
-#define BSP_PIN_BOOT     0
+#define BSP_PIN_BAT_EN 2
+#define BSP_PIN_KEY_PWR 5
+#define BSP_PIN_BOOT 0
 #define BSP_PIN_KEY_PLUS 4
-#define BSP_PIN_BAT_ADC  1
+#define BSP_PIN_BAT_ADC 1
 #define BSP_PIN_CHG_STAT 3
 
 static const char *TAG = "bsp_power";
@@ -75,7 +74,7 @@ void bsp_power_hold(void)
 void bsp_power_off(void)
 {
     ESP_LOGW(TAG, "releasing battery latch (power off)");
-    
+
     // Turn off screen backlight
     bsp_display_set_backlight(false);
 
@@ -102,11 +101,11 @@ void bsp_power_off(void)
  */
 
 static struct {
-    int  pwr_hold_ms;
-    int  pwr_held_ms;
+    int pwr_hold_ms;
+    int pwr_held_ms;
     volatile bool *softap_flag;
-    int  boot_held_ms;
-    int  plus_last_press_ms;
+    int boot_held_ms;
+    int plus_last_press_ms;
 } s_btn;
 
 static esp_err_t start_therapy_with_lifecycle_gate(void)
@@ -116,8 +115,7 @@ static esp_err_t start_therapy_with_lifecycle_gate(void)
     }
     bool may_have_started = false;
     esp_err_t result = as11_ble_start_therapy_tracked(&may_have_started);
-    if ((result == ESP_OK || may_have_started) &&
-        !bsp_display_set_therapy_active(true)) {
+    if ((result == ESP_OK || may_have_started) && !bsp_display_set_therapy_active(true)) {
         /* The start claim excludes a restart commit, so this is defensive. */
         result = ESP_ERR_INVALID_STATE;
     }
@@ -136,9 +134,8 @@ static void button_monitor_task(void *arg)
     /* Configure all three button GPIOs at once */
     gpio_config_t cfg = {
         .mode = GPIO_MODE_INPUT,
-        .pin_bit_mask = (1ULL << BSP_PIN_KEY_PWR) |
-                        (1ULL << BSP_PIN_BOOT)    |
-                        (1ULL << BSP_PIN_KEY_PLUS),
+        .pin_bit_mask =
+            (1ULL << BSP_PIN_KEY_PWR) | (1ULL << BSP_PIN_BOOT) | (1ULL << BSP_PIN_KEY_PLUS),
         .pull_up_en = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE,
@@ -156,7 +153,8 @@ static void button_monitor_task(void *arg)
          *                  5 s hold = power off --- */
         int pwr_level = gpio_get_level(BSP_PIN_KEY_PWR);
         if (!pwr_armed) {
-            if (pwr_level != 0) pwr_armed = true;
+            if (pwr_level != 0)
+                pwr_armed = true;
             s_btn.pwr_held_ms = 0;
             pwr_pressed = false;
         } else if (pwr_level == 0) {
@@ -164,7 +162,7 @@ static void button_monitor_task(void *arg)
             s_btn.pwr_held_ms += poll_ms;
             if (s_btn.pwr_held_ms >= s_btn.pwr_hold_ms) {
                 ESP_LOGW(TAG, "power button long-press: shutting down");
-                const char *msg[] = { "Powering off..." };
+                const char *msg[] = {"Powering off..."};
                 bsp_display_show_lines("SomnoTrace", msg, 1);
                 vTaskDelay(pdMS_TO_TICKS(1000));
                 bsp_power_off();
@@ -181,8 +179,7 @@ static void button_monitor_task(void *arg)
                     ESP_LOGI(TAG, "POWER button: canceled temporary wake");
                 } else {
                     bool on = bsp_display_toggle_backlight();
-                    ESP_LOGI(TAG, "POWER button short-press: backlight %s",
-                             on ? "on" : "off");
+                    ESP_LOGI(TAG, "POWER button short-press: backlight %s", on ? "on" : "off");
                 }
             }
             s_btn.pwr_held_ms = 0;
@@ -194,7 +191,7 @@ static void button_monitor_task(void *arg)
             s_btn.boot_held_ms += poll_ms;
             if (s_btn.boot_held_ms >= 5000 && s_btn.softap_flag && !*s_btn.softap_flag) {
                 ESP_LOGW(TAG, "BOOT long-press: flagging SoftAP entry");
-                const char *msg[] = { "Entering Wi-Fi setup..." };
+                const char *msg[] = {"Entering Wi-Fi setup..."};
                 bsp_display_show_lines("SomnoTrace", msg, 1);
                 vTaskDelay(pdMS_TO_TICKS(1000));
                 *s_btn.softap_flag = true;
@@ -215,15 +212,13 @@ static void button_monitor_task(void *arg)
                     ESP_LOGI(TAG, "stopping therapy via EnterStandby RPC");
                     esp_err_t ret = as11_ble_stop_therapy();
                     if (ret != ESP_OK) {
-                        ESP_LOGW(TAG, "stop_therapy failed: %s",
-                                 esp_err_to_name(ret));
+                        ESP_LOGW(TAG, "stop_therapy failed: %s", esp_err_to_name(ret));
                     }
                 } else {
                     ESP_LOGI(TAG, "starting therapy via EnterTherapy RPC");
                     esp_err_t ret = start_therapy_with_lifecycle_gate();
                     if (ret != ESP_OK) {
-                        ESP_LOGW(TAG, "start_therapy failed: %s",
-                                 esp_err_to_name(ret));
+                        ESP_LOGW(TAG, "start_therapy failed: %s", esp_err_to_name(ret));
                     }
                 }
 
@@ -243,8 +238,8 @@ static void button_monitor_task(void *arg)
              * If none arrives, fire single-click action (alert acknowledge). */
             if (s_btn.plus_last_press_ms >= 0) {
                 int release_ms = (int)(xTaskGetTickCount() * portTICK_PERIOD_MS);
-                int deadline = release_ms + double_click_window_ms -
-                               (release_ms - s_btn.plus_last_press_ms);
+                int deadline =
+                    release_ms + double_click_window_ms - (release_ms - s_btn.plus_last_press_ms);
                 while ((int)(xTaskGetTickCount() * portTICK_PERIOD_MS) < deadline) {
                     vTaskDelay(pdMS_TO_TICKS(poll_ms));
                     if (gpio_get_level(BSP_PIN_KEY_PLUS) == 0) {
@@ -254,15 +249,13 @@ static void button_monitor_task(void *arg)
                             ESP_LOGI(TAG, "stopping therapy via EnterStandby RPC");
                             esp_err_t ret = as11_ble_stop_therapy();
                             if (ret != ESP_OK) {
-                                ESP_LOGW(TAG, "stop_therapy failed: %s",
-                                         esp_err_to_name(ret));
+                                ESP_LOGW(TAG, "stop_therapy failed: %s", esp_err_to_name(ret));
                             }
                         } else {
                             ESP_LOGI(TAG, "starting therapy via EnterTherapy RPC");
                             esp_err_t ret = start_therapy_with_lifecycle_gate();
                             if (ret != ESP_OK) {
-                                ESP_LOGW(TAG, "start_therapy failed: %s",
-                                         esp_err_to_name(ret));
+                                ESP_LOGW(TAG, "start_therapy failed: %s", esp_err_to_name(ret));
                             }
                         }
                         s_btn.plus_last_press_ms = -1;
@@ -280,7 +273,7 @@ static void button_monitor_task(void *arg)
                     s_btn.plus_last_press_ms = -1;
                 }
             }
-        plus_done: ;
+        plus_done:;
         }
 
         vTaskDelay(pdMS_TO_TICKS(poll_ms));
@@ -343,44 +336,48 @@ void bsp_power_start_plus_monitor(void)
 static adc_oneshot_unit_handle_t s_adc_handle = NULL;
 static adc_cali_handle_t s_adc_cali = NULL;
 static bool s_adc_ready = false;
-static const adc_channel_t s_bat_adc_channel = ADC_CHANNEL_0;  /* GPIO1 = ADC1_CH0 */
+static const adc_channel_t s_bat_adc_channel = ADC_CHANNEL_0; /* GPIO1 = ADC1_CH0 */
 
-#define BAT_DIVIDER_RATIO   3     /* 200k + 100k divider → ×3 */
+#define BAT_DIVIDER_RATIO 3 /* 200k + 100k divider → ×3 */
 
 /* Sample burst: 256 reads spread over ~1 s (4 ms apart). */
-#define BAT_BURST_SAMPLES   256
-#define BAT_BURST_GAP_MS    4
+#define BAT_BURST_SAMPLES 256
+#define BAT_BURST_GAP_MS 4
 /* Discard the lowest and highest eighth before averaging. */
-#define BAT_TRIM_FRACTION   8
+#define BAT_TRIM_FRACTION 8
 
 /* Cadence: sample ADC burst every 10 s for smooth filtering and responsive tracking. */
-#define BAT_SAMPLE_PERIOD_S     10   /* base sampling cadence (10s) */
-#define BAT_UNPLUG_SETTLE_S     10   /* electrochemical relaxation window (10s) */
-#define BAT_DEBOUNCE_SEC        2    /* 2 s debounce to confirm physical plug/unplug edge */
+#define BAT_SAMPLE_PERIOD_S 10 /* base sampling cadence (10s) */
+#define BAT_UNPLUG_SETTLE_S 10 /* electrochemical relaxation window (10s) */
+#define BAT_DEBOUNCE_SEC 2     /* 2 s debounce to confirm physical plug/unplug edge */
 
 /* Above this voltage or burst spread the reading cannot be a real Li-ion cell.
  * A real chemical cell has massive capacitance, so voltage spread during a
  * 1-second burst is <15 mV. Without a battery (open ~10uF cap), the charger
  * oscillates and spreads the voltage by >40 mV. */
-#define BAT_NO_BATTERY_MV         4250
-#define BAT_NO_BATTERY_SPREAD_MV  35
+#define BAT_NO_BATTERY_MV 4250
+#define BAT_NO_BATTERY_SPREAD_MV 35
 
 /* Published snapshot, guarded by a mutex. */
 static SemaphoreHandle_t s_bat_mutex = NULL;
 static bsp_battery_t s_bat_state = {
-    .percent = -1, .millivolts = -1, .charging = false, .valid = false, .age_s = 0,
+    .percent = -1,
+    .millivolts = -1,
+    .charging = false,
+    .valid = false,
+    .age_s = 0,
 };
 static TickType_t s_bat_last_ok_tick = 0;
 
 /* Warm-reboot persistence: RTC Fast SRAM survives software resets, watchdog
  * resets, and flashing over USB without power loss. This prevents the battery
  * gauge from jumping to a false 100% when rebooted on an active charger. */
-#define BAT_RTC_MAGIC   0x534E5442   /* 'SNTB' */
+#define BAT_RTC_MAGIC 0x534E5442 /* 'SNTB' */
 
 typedef struct {
     uint32_t magic;
-    int16_t  shown_pct;
-    int16_t  filtered_mv;
+    int16_t shown_pct;
+    int16_t filtered_mv;
     uint32_t crc;
 } rtc_bat_backup_t;
 
@@ -403,15 +400,19 @@ static inline uint32_t bat_calc_backup_crc(const rtc_bat_backup_t *b)
  */
 static inline int bat_charge_step_delay_s(int pct)
 {
-    if (pct < 70) return 35;
-    if (pct < 85) return 60;
-    if (pct < 95) return 120;
+    if (pct < 70)
+        return 35;
+    if (pct < 85)
+        return 60;
+    if (pct < 95)
+        return 120;
     return 180;
 }
 
 static inline int bat_discharge_step_delay_s(int pct)
 {
-    if (pct < 20) return 15;
+    if (pct < 20)
+        return 15;
     return 30;
 }
 
@@ -419,25 +420,28 @@ static inline int bat_discharge_step_delay_s(int pct)
  * interpolation between rows.  The 100% anchor is adaptive: it learns the
  * cell's charge-termination voltage so the display reaches 100% when the
  * charger IC stops, rather than requiring an unrealistic 4200 mV. */
-static const struct { int mv; int pct; } s_ocv_curve[] = {
-    { 4160, 100 },
-    { 4100,  90 },
-    { 3950,  75 },
-    { 3850,  60 },
-    { 3750,  45 },
-    { 3650,  30 },
-    { 3550,  15 },
-    { 3450,   5 },
-    { 3300,   0 },
+static const struct {
+    int mv;
+    int pct;
+} s_ocv_curve[] = {
+    {4160, 100},
+    {4100, 90},
+    {3950, 75},
+    {3850, 60},
+    {3750, 45},
+    {3650, 30},
+    {3550, 15},
+    {3450, 5},
+    {3300, 0},
 };
 
 /* Adaptive 100% anchor: updated to the observed charge-termination voltage.
  * Defaults to the OCV curve's 4160 mV; replaced with the real value once the
  * charger IC stops for the first time.  Persisted in NVS so it survives reboots. */
-#define BAT_NVS_NS         "bat"
-#define BAT_NVS_KEY_FULL   "full_mv"
-#define BAT_ANCHOR_MIN_MV  4000
-#define BAT_ANCHOR_MAX_MV  4160
+#define BAT_NVS_NS "bat"
+#define BAT_NVS_KEY_FULL "full_mv"
+#define BAT_ANCHOR_MIN_MV 4000
+#define BAT_ANCHOR_MAX_MV 4160
 static int s_full_charge_mv = 4160;
 
 /* NVS write callback — runs on the internal-stack nvs_writer task. */
@@ -445,9 +449,11 @@ static esp_err_t do_save_bat_anchor(void *arg)
 {
     int mv = *(const int *)arg;
     nvs_handle_t h;
-    if (nvs_open(BAT_NVS_NS, NVS_READWRITE, &h) != ESP_OK) return ESP_FAIL;
+    if (nvs_open(BAT_NVS_NS, NVS_READWRITE, &h) != ESP_OK)
+        return ESP_FAIL;
     esp_err_t err = nvs_set_i32(h, BAT_NVS_KEY_FULL, mv);
-    if (err == ESP_OK) err = nvs_commit(h);
+    if (err == ESP_OK)
+        err = nvs_commit(h);
     nvs_close(h);
     return err;
 }
@@ -458,10 +464,13 @@ static void bat_load_anchor(void)
 {
     nvs_handle_t h;
     nvs_writer_lock();
-    if (nvs_open(BAT_NVS_NS, NVS_READONLY, &h) != ESP_OK) { nvs_writer_unlock(); return; }
+    if (nvs_open(BAT_NVS_NS, NVS_READONLY, &h) != ESP_OK) {
+        nvs_writer_unlock();
+        return;
+    }
     int32_t mv = 4200;
-    if (nvs_get_i32(h, BAT_NVS_KEY_FULL, &mv) == ESP_OK &&
-        mv >= BAT_ANCHOR_MIN_MV && mv <= BAT_ANCHOR_MAX_MV) {
+    if (nvs_get_i32(h, BAT_NVS_KEY_FULL, &mv) == ESP_OK && mv >= BAT_ANCHOR_MIN_MV &&
+        mv <= BAT_ANCHOR_MAX_MV) {
         s_full_charge_mv = mv;
         ESP_LOGI(TAG, "battery: loaded full-charge anchor = %dmV from NVS", mv);
     }
@@ -472,14 +481,17 @@ static void bat_load_anchor(void)
 static int bat_mv_to_percent(int mv)
 {
     const int n = sizeof(s_ocv_curve) / sizeof(s_ocv_curve[0]);
-    if (mv >= s_full_charge_mv) return 100;
-    if (mv <= s_ocv_curve[n - 1].mv) return 0;
+    if (mv >= s_full_charge_mv)
+        return 100;
+    if (mv <= s_ocv_curve[n - 1].mv)
+        return 0;
     for (int i = 0; i < n - 1; i++) {
         int hi_mv = s_ocv_curve[i].mv, lo_mv = s_ocv_curve[i + 1].mv;
         int hi_pct = s_ocv_curve[i].pct, lo_pct = s_ocv_curve[i + 1].pct;
         /* Stretch the top segment so its upper bound is the adaptive 100%
          * anchor rather than the hardcoded 4200 mV. */
-        if (i == 0) hi_mv = s_full_charge_mv;
+        if (i == 0)
+            hi_mv = s_full_charge_mv;
         if (mv <= hi_mv && mv > lo_mv) {
             return lo_pct + (mv - lo_mv) * (hi_pct - lo_pct) / (hi_mv - lo_mv);
         }
@@ -489,9 +501,10 @@ static int bat_mv_to_percent(int mv)
 
 static esp_err_t bat_adc_init(void)
 {
-    if (s_adc_ready) return ESP_OK;
+    if (s_adc_ready)
+        return ESP_OK;
 
-    adc_oneshot_unit_init_cfg_t unit_cfg = { .unit_id = ADC_UNIT_1 };
+    adc_oneshot_unit_init_cfg_t unit_cfg = {.unit_id = ADC_UNIT_1};
     esp_err_t err = adc_oneshot_new_unit(&unit_cfg, &s_adc_handle);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "battery: ADC unit init failed: %s", esp_err_to_name(err));
@@ -520,8 +533,9 @@ static esp_err_t bat_adc_init(void)
         ESP_LOGI(TAG, "battery: using eFuse ADC calibration");
     } else {
         s_adc_cali = NULL;
-        ESP_LOGW(TAG, "battery: no eFuse ADC calibration, falling back to "
-                      "nominal scaling (readings may be a few %% off)");
+        ESP_LOGW(TAG,
+                 "battery: no eFuse ADC calibration, falling back to "
+                 "nominal scaling (readings may be a few %% off)");
     }
 
     s_adc_ready = true;
@@ -551,7 +565,8 @@ static int cmp_int(const void *a, const void *b)
  * so the IR rise tapers to 0 mV at 4160 mV. */
 static int bat_calc_ocv(int mv, bool charging)
 {
-    if (!charging) return mv;
+    if (!charging)
+        return mv;
     int ir_offset = 0;
     if (mv < 3900) {
         ir_offset = 60;
@@ -579,17 +594,22 @@ static int bat_sample_burst(int *out_spread_mv)
         }
         vTaskDelay(pdMS_TO_TICKS(BAT_BURST_GAP_MS));
     }
-    if (n == 0) return -1;
+    if (n == 0)
+        return -1;
 
     qsort(samples, n, sizeof(int), cmp_int);
 
     /* Trimmed mean: drop the tails where the TX dips and spikes live. */
     int trim = n / BAT_TRIM_FRACTION;
     int lo = trim, hi = n - trim;
-    if (hi <= lo) { lo = 0; hi = n; }
+    if (hi <= lo) {
+        lo = 0;
+        hi = n;
+    }
 
     int64_t sum = 0;
-    for (int i = lo; i < hi; i++) sum += samples[i];
+    for (int i = lo; i < hi; i++)
+        sum += samples[i];
     int raw_avg = (int)(sum / (hi - lo));
 
     if (out_spread_mv) {
@@ -603,7 +623,8 @@ static int bat_sample_burst(int *out_spread_mv)
 
 static void bat_publish(int mv, int pct, bool charging, bool ok)
 {
-    if (!s_bat_mutex) return;
+    if (!s_bat_mutex)
+        return;
     xSemaphoreTake(s_bat_mutex, portMAX_DELAY);
     if (ok) {
         s_bat_state.millivolts = mv;
@@ -631,17 +652,18 @@ static void battery_monitor_task(void *arg)
 
     /* Diagnostic: report stack high-water mark after init. */
     UBaseType_t hwm = uxTaskGetStackHighWaterMark(NULL);
-    ESP_LOGI(TAG, "battery: init done, stack high-water = %u bytes",
+    ESP_LOGI(TAG,
+             "battery: init done, stack high-water = %u bytes",
              (unsigned)(hwm * sizeof(StackType_t)));
 
-    int  filtered_mv = -1;   /* IIR-filtered VBAT */
-    int  shown_pct = -1;     /* slew-limited percentage actually published */
+    int filtered_mv = -1; /* IIR-filtered VBAT */
+    int shown_pct = -1;   /* slew-limited percentage actually published */
     bool debounced_charging = bsp_power_is_charging();
     bool settling = false;
     TickType_t settle_until = 0;
     TickType_t last_nvs_save = 0;
     TickType_t last_step_tick = 0;
-    int  charging_duration_s = 0;
+    int charging_duration_s = 0;
     bool is_calibrated = false;
 
     /* Check for reboot: restore shown_pct and filtered_mv from RTC Fast RAM.
@@ -651,16 +673,19 @@ static void battery_monitor_task(void *arg)
     esp_reset_reason_t rst_reason = esp_reset_reason();
     if (s_rtc_bat_backup.magic == BAT_RTC_MAGIC &&
         s_rtc_bat_backup.crc == bat_calc_backup_crc(&s_rtc_bat_backup) &&
-        s_rtc_bat_backup.shown_pct >= 0 &&
-        s_rtc_bat_backup.shown_pct <= 100) {
+        s_rtc_bat_backup.shown_pct >= 0 && s_rtc_bat_backup.shown_pct <= 100) {
         shown_pct = s_rtc_bat_backup.shown_pct;
         if (s_rtc_bat_backup.filtered_mv > 0) {
             filtered_mv = s_rtc_bat_backup.filtered_mv;
         }
         is_calibrated = true;
         last_step_tick = xTaskGetTickCount();
-        ESP_LOGI(TAG, "battery: restored shown_pct=%d%% filt=%dmV from RTC RAM across reboot (reason=%d)",
-                 shown_pct, filtered_mv, (int)rst_reason);
+        ESP_LOGI(
+            TAG,
+            "battery: restored shown_pct=%d%% filt=%dmV from RTC RAM across reboot (reason=%d)",
+            shown_pct,
+            filtered_mv,
+            (int)rst_reason);
     } else {
         memset(&s_rtc_bat_backup, 0, sizeof(s_rtc_bat_backup));
     }
@@ -684,8 +709,10 @@ static void battery_monitor_task(void *arg)
 
             /* IIR low-pass across bursts.  Anything faster than this is
              * noise by definition at a 20-30 s cadence. */
-            if (filtered_mv < 0) filtered_mv = ocv_mv;
-            else filtered_mv += (ocv_mv - filtered_mv) / 4;
+            if (filtered_mv < 0)
+                filtered_mv = ocv_mv;
+            else
+                filtered_mv += (ocv_mv - filtered_mv) / 4;
 
             int target_pct = bat_mv_to_percent(filtered_mv);
 
@@ -763,15 +790,24 @@ static void battery_monitor_task(void *arg)
                 s_rtc_bat_backup.filtered_mv = (int16_t)filtered_mv;
                 s_rtc_bat_backup.crc = bat_calc_backup_crc(&s_rtc_bat_backup);
             }
-            ESP_LOGD(TAG, "battery: vbat=%dmV filt=%dmV target=%d%% shown=%d%% chg=%d cal=%d spread=%dmV",
-                     mv, filtered_mv, target_pct, shown_pct, debounced_charging, is_calibrated, spread_mv);
+            ESP_LOGD(
+                TAG,
+                "battery: vbat=%dmV filt=%dmV target=%d%% shown=%d%% chg=%d cal=%d spread=%dmV",
+                mv,
+                filtered_mv,
+                target_pct,
+                shown_pct,
+                debounced_charging,
+                is_calibrated,
+                spread_mv);
         }
 
         int period_s;
         if (settling && xTaskGetTickCount() < settle_until) {
             TickType_t rem = settle_until - xTaskGetTickCount();
             period_s = (int)((rem + pdMS_TO_TICKS(999)) / pdMS_TO_TICKS(1000));
-            if (period_s < 1) period_s = 1;
+            if (period_s < 1)
+                period_s = 1;
         } else {
             period_s = BAT_SAMPLE_PERIOD_S;
         }
@@ -781,7 +817,8 @@ static void battery_monitor_task(void *arg)
         /* Sleep in 1 s slices while tracking and debouncing charger state transitions. */
         for (int s = 0; s < period_s; s++) {
             vTaskDelay(pdMS_TO_TICKS(1000));
-            if (debounced_charging) charging_duration_s++;
+            if (debounced_charging)
+                charging_duration_s++;
 
             bool raw = bsp_power_is_charging();
             if (raw != candidate_charging) {
@@ -794,25 +831,26 @@ static void battery_monitor_task(void *arg)
             /* Require BAT_DEBOUNCE_SEC consecutive seconds of new state before committing */
             if (candidate_charging != debounced_charging && raw_same_count >= BAT_DEBOUNCE_SEC) {
                 debounced_charging = candidate_charging;
-                ESP_LOGI(TAG, "battery: charger %s (debounced)",
+                ESP_LOGI(TAG,
+                         "battery: charger %s (debounced)",
                          debounced_charging ? "connected" : "disconnected");
                 last_step_tick = xTaskGetTickCount();
 
                 if (!debounced_charging) {
                     settling = true;
-                    settle_until = xTaskGetTickCount() +
-                                   pdMS_TO_TICKS(BAT_UNPLUG_SETTLE_S * 1000);
+                    settle_until = xTaskGetTickCount() + pdMS_TO_TICKS(BAT_UNPLUG_SETTLE_S * 1000);
 
                     /* Only update 100% anchor if we had a sustained charge session (>5 min)
                      * and haven't written to NVS recently (rate-limited to 4h). */
                     TickType_t now = xTaskGetTickCount();
                     if (charging_duration_s >= 300 &&
-                        (now - last_nvs_save > pdMS_TO_TICKS(4 * 3600 * 1000) || last_nvs_save == 0)) {
+                        (now - last_nvs_save > pdMS_TO_TICKS(4 * 3600 * 1000) ||
+                         last_nvs_save == 0)) {
                         if (filtered_mv >= BAT_ANCHOR_MIN_MV && filtered_mv <= BAT_ANCHOR_MAX_MV) {
                             if (filtered_mv != s_full_charge_mv) {
                                 s_full_charge_mv = filtered_mv;
-                                ESP_LOGI(TAG, "battery: full-charge anchor = %dmV",
-                                         s_full_charge_mv);
+                                ESP_LOGI(
+                                    TAG, "battery: full-charge anchor = %dmV", s_full_charge_mv);
                                 nvs_writer_run(do_save_bat_anchor, &s_full_charge_mv);
                                 last_nvs_save = now;
                             }
@@ -823,8 +861,9 @@ static void battery_monitor_task(void *arg)
                 }
 
                 charging_duration_s = 0;
-                /* Do NOT wipe shown_pct! Preserving shown_pct prevents sudden jumps on plug-in/unplug.
-                 * Reset filtered_mv so the IIR filter starts fresh from the new OCV. */
+                /* Do NOT wipe shown_pct! Preserving shown_pct prevents sudden jumps on
+                 * plug-in/unplug. Reset filtered_mv so the IIR filter starts fresh from the new
+                 * OCV. */
                 filtered_mv = -1;
                 break;
             }
@@ -834,29 +873,33 @@ static void battery_monitor_task(void *arg)
 
 esp_err_t bsp_power_battery_monitor_start(void)
 {
-    if (s_bat_mutex) return ESP_OK;   /* already running */
+    if (s_bat_mutex)
+        return ESP_OK; /* already running */
 
     bat_load_anchor();
     nvs_writer_init();
 
     s_bat_mutex = xSemaphoreCreateMutex();
-    if (!s_bat_mutex) return ESP_ERR_NO_MEM;
+    if (!s_bat_mutex)
+        return ESP_ERR_NO_MEM;
 
-    TaskHandle_t h = psram_task_create(battery_monitor_task, "bat_mon", 8192,
-                                       NULL, 3, tskNO_AFFINITY, NULL, NULL);
+    TaskHandle_t h = psram_task_create(
+        battery_monitor_task, "bat_mon", 8192, NULL, 3, tskNO_AFFINITY, NULL, NULL);
     if (!h) {
         vSemaphoreDelete(s_bat_mutex);
         s_bat_mutex = NULL;
         return ESP_FAIL;
     }
-    ESP_LOGI(TAG, "battery monitor started (%ds sampling cadence, dynamic CC/CV slew rate)",
+    ESP_LOGI(TAG,
+             "battery monitor started (%ds sampling cadence, dynamic CC/CV slew rate)",
              BAT_SAMPLE_PERIOD_S);
     return ESP_OK;
 }
 
 void bsp_power_battery_get(bsp_battery_t *out)
 {
-    if (!out) return;
+    if (!out)
+        return;
     if (!device_settings_battery_enabled() || !s_bat_mutex) {
         out->percent = -1;
         out->millivolts = -1;
@@ -868,8 +911,8 @@ void bsp_power_battery_get(bsp_battery_t *out)
     xSemaphoreTake(s_bat_mutex, portMAX_DELAY);
     *out = s_bat_state;
     if (s_bat_state.valid) {
-        out->age_s = (uint32_t)((xTaskGetTickCount() - s_bat_last_ok_tick)
-                                * portTICK_PERIOD_MS / 1000);
+        out->age_s =
+            (uint32_t)((xTaskGetTickCount() - s_bat_last_ok_tick) * portTICK_PERIOD_MS / 1000);
     }
     xSemaphoreGive(s_bat_mutex);
 }

@@ -79,13 +79,14 @@ assert "≥4 h adherence" in SOURCE and "usage_target_known" in HEADER
 require(
     SOURCE,
     r"history_ui_format_day_compact.*?"
-    r'"Jan", "Feb", "Mar".*?"Sun", "Mon", "Tue".*?'
+    r'"Jan"\s*,\s*"Feb"\s*,\s*"Mar".*?'
+    r'"Sun"\s*,\s*"Mon"\s*,\s*"Tue".*?'
     r'snprintf\(output, capacity, "%s %u %s %u"',
     "compact weekday/date/month/year formatter",
 )
 require(
     SOURCE,
-    r"lv_txt_get_size\(&title_size, title.*?"
+    r"lv_txt_get_size\s*\(\s*&title_size\s*,\s*title.*?"
     r"title_size\.x > lv_obj_get_content_width\(ui->night_title\).*?"
     r"history_ui_format_day_compact",
     "full date falls back responsively to Tue 1 Sep 2026",

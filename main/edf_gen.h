@@ -47,11 +47,9 @@
  * Output goes to SDCARD/ (ResMed-compatible SD card image, OSCAR-ready):
  *   /somnotrace/SDCARD/
  *     STR.edf                ← Multi-record daily summary (one record per day
- *                              from .somnotrace/sessions/summaries/ spool files, sorted chronologically)
- *     Identification.json    ← Device identity (nested AS11 format)
- *     Identification.crc     ← CRC-32 of Identification.json
- *     SETTINGS/
- *       CurrentSettings.json ← Latest settings snapshot
+ *                              from .somnotrace/sessions/summaries/ spool files, sorted
+ * chronologically) Identification.json    ← Device identity (nested AS11 format) Identification.crc
+ * ← CRC-32 of Identification.json SETTINGS/ CurrentSettings.json ← Latest settings snapshot
  *       CurrentSettings.crc  ← CRC-32 of CurrentSettings.json
  *     DATALOG/
  *       YYYYMMDD/            ← Noon-based day folder
@@ -85,8 +83,10 @@
  * the day has no spool. noon_day is "YYYYMMDD". */
 esp_err_t edf_gen_summary_json(const char *noon_day, char **out_json);
 
-esp_err_t edf_gen_generate(const char *session_dir, const char *session_id,
-                           int64_t start_epoch_ms, int64_t end_epoch_ms,
+esp_err_t edf_gen_generate(const char *session_dir,
+                           const char *session_id,
+                           int64_t start_epoch_ms,
+                           int64_t end_epoch_ms,
                            int64_t clock_drift_ms);
 
 /* ── Split generation passes ───────────────────────────────────────────
@@ -103,17 +103,20 @@ esp_err_t edf_gen_generate(const char *session_dir, const char *session_id,
  * reflecting whichever session happened to be last.  Splitting the passes
  * makes the aggregation explicit: run PER_SESSION for every session, then
  * SHARED exactly once. */
-#define EDF_GEN_PER_SESSION   (1u << 0)
-#define EDF_GEN_SHARED        (1u << 1)
-#define EDF_GEN_ALL           (EDF_GEN_PER_SESSION | EDF_GEN_SHARED)
+#define EDF_GEN_PER_SESSION (1u << 0)
+#define EDF_GEN_SHARED (1u << 1)
+#define EDF_GEN_ALL (EDF_GEN_PER_SESSION | EDF_GEN_SHARED)
 
 /* As edf_gen_generate(), but writes into out_root and honours the pass
  * flags.  out_root must be an existing-or-creatable directory; pass
  * SD_SDCARD_DIR for the live export. */
 esp_err_t edf_gen_generate_ex(const char *out_root,
-                              const char *session_dir, const char *session_id,
-                              int64_t start_epoch_ms, int64_t end_epoch_ms,
-                              int64_t clock_drift_ms, uint32_t flags);
+                              const char *session_dir,
+                              const char *session_id,
+                              int64_t start_epoch_ms,
+                              int64_t end_epoch_ms,
+                              int64_t clock_drift_ms,
+                              uint32_t flags);
 
 /* Rebuild the export for exactly one noon-day, as a transaction.
  *
@@ -136,8 +139,7 @@ esp_err_t edf_gen_rebuild_day(const char *day_folder);
 /* Boot check: was a day rebuild interrupted while publishing?
  *
  * Publication retains the prior day until the new day is installed; shared
- * artifacts still require several file replacements, so reset can interrupt it.  Returns true and fills
- * out_day (8 chars + NUL) when such a day is found. The marker is retained until
- * a successful rebuild. Call once at boot, before anything reads the
- * export tree. */
+ * artifacts still require several file replacements, so reset can interrupt it.  Returns true and
+ * fills out_day (8 chars + NUL) when such a day is found. The marker is retained until a successful
+ * rebuild. Call once at boot, before anything reads the export tree. */
 bool edf_gen_take_interrupted_rebuild(char *out_day, size_t out_len);

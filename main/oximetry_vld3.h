@@ -57,7 +57,8 @@ typedef struct {
     uint8_t reserved;
 } ox_vld3_record_t;
 
-bool ox_vld3_parse_header(const uint8_t *data, size_t len, size_t source_size,
+bool ox_vld3_parse_header(const uint8_t *data,
+                          size_t len,
+                          size_t source_size,
                           ox_vld3_header_t *out);
-bool ox_vld3_parse_record(const uint8_t data[OX_VLD3_RECORD_LEN],
-                          ox_vld3_record_t *out);
+bool ox_vld3_parse_record(const uint8_t data[OX_VLD3_RECORD_LEN], ox_vld3_record_t *out);

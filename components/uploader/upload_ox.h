@@ -49,8 +49,10 @@ esp_err_t upload_ox_init(void);
 int upload_ox_scan(upload_ox_ref_t *out, int max_out);
 int upload_ox_reconcile(upload_ox_ref_t *out, int max_out, int max_days);
 int upload_ox_status(const upload_ox_ref_t *ref, int backend_slot);
-void upload_ox_mark(const upload_ox_ref_t *ref, int backend_slot,
-                    upload_unit_status_t status, const char *remote_id);
+void upload_ox_mark(const upload_ox_ref_t *ref,
+                    int backend_slot,
+                    upload_unit_status_t status,
+                    const char *remote_id);
 esp_err_t upload_ox_save(void);
 int upload_ox_pending(const upload_ox_ref_t *refs, int n_refs, int backend_slot);
 int upload_ox_cached_pending(int backend_slot);

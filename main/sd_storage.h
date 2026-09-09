@@ -27,7 +27,7 @@
 #include <stdint.h>
 #include "esp_err.h"
 
-#define SD_MOUNT_POINT   "/somnotrace"
+#define SD_MOUNT_POINT "/somnotrace"
 
 /* All SomnoTrace-managed data lives under a single dotted app-root folder on
  * the card (the FATFS mount point itself is /somnotrace). The subfolders are
@@ -36,26 +36,26 @@
  *   .somnotrace/logs/          rotated device logs
  *   .somnotrace/upload_state/  uploader persistence (was LittleFS)
  * The ResMed-compatible SDCARD/ export stays at the card root. */
-#define SD_APP_DIR           SD_MOUNT_POINT "/.somnotrace"
+#define SD_APP_DIR SD_MOUNT_POINT "/.somnotrace"
 
 /* ESP-native session data (raw streams, spool files, internal state) */
-#define SD_SESSIONS_DIR      SD_APP_DIR "/sessions"
-#define SD_STREAMS_DIR       SD_SESSIONS_DIR "/streams"
-#define SD_SUMMARIES_DIR     SD_SESSIONS_DIR "/summaries"
+#define SD_SESSIONS_DIR SD_APP_DIR "/sessions"
+#define SD_STREAMS_DIR SD_SESSIONS_DIR "/streams"
+#define SD_SUMMARIES_DIR SD_SESSIONS_DIR "/summaries"
 
 /* Rotated device logs */
-#define SD_LOG_DIR           SD_APP_DIR "/logs"
+#define SD_LOG_DIR SD_APP_DIR "/logs"
 
 /* Uploader persistent state (migrated off the LittleFS flash partition) */
-#define SD_UPLOAD_STATE_DIR  SD_APP_DIR "/upload_state"
+#define SD_UPLOAD_STATE_DIR SD_APP_DIR "/upload_state"
 
 /* Oximetry raw files from O2 Ring (Format A blobs, not EDF) */
-#define SD_OXYMETRY_DIR       SD_APP_DIR "/oximetry"
+#define SD_OXYMETRY_DIR SD_APP_DIR "/oximetry"
 
 /* ResMed-compatible export folder (self-contained, OSCAR-ready) */
-#define SD_SDCARD_DIR        SD_MOUNT_POINT "/SDCARD"
-#define SD_SDCARD_DATALOG    SD_SDCARD_DIR "/DATALOG"
-#define SD_SDCARD_SETTINGS   SD_SDCARD_DIR "/SETTINGS"
+#define SD_SDCARD_DIR SD_MOUNT_POINT "/SDCARD"
+#define SD_SDCARD_DATALOG SD_SDCARD_DIR "/DATALOG"
+#define SD_SDCARD_SETTINGS SD_SDCARD_DIR "/SETTINGS"
 
 /* Initialise SDMMC 4-bit mode and mount FATFS at /somnotrace.
  * Creates the .somnotrace/ and SDCARD/ directory trees if they don't exist.

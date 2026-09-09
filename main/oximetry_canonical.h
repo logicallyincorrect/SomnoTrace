@@ -36,23 +36,23 @@ extern "C" {
 /* The canonical tree is rooted below SD_OXYMETRY_DIR.  It intentionally does
  * not overlap the legacy oximeter_store.c files/ tree. */
 #define OXIMETRY_CANONICAL_MAX_COMPONENT 64
-#define OXIMETRY_CANONICAL_MAX_PATH      512
+#define OXIMETRY_CANONICAL_MAX_PATH 512
 #define OXIMETRY_CANONICAL_MAX_RECORDINGS 64
 #define OXIMETRY_CANONICAL_MAX_SOURCE_BYTES (64ULL * 1024ULL * 1024ULL)
-#define OXIMETRY_CANONICAL_MAX_JSON_BYTES   (16U * 1024U)
+#define OXIMETRY_CANONICAL_MAX_JSON_BYTES (16U * 1024U)
 
-#define OXIMETRY_CANONICAL_SNT_MAGIC       0x33544e53u /* little-endian "SNT3" */
-#define OXIMETRY_CANONICAL_SNT_VERSION     3u
-#define OXIMETRY_CANONICAL_SNT_HEADER_LEN  64u
-#define OXIMETRY_CANONICAL_SNT_MISSING     INT16_MIN
+#define OXIMETRY_CANONICAL_SNT_MAGIC 0x33544e53u /* little-endian "SNT3" */
+#define OXIMETRY_CANONICAL_SNT_VERSION 3u
+#define OXIMETRY_CANONICAL_SNT_HEADER_LEN 64u
+#define OXIMETRY_CANONICAL_SNT_MISSING INT16_MIN
 #define OXIMETRY_CANONICAL_VITALS_CHANNELS 5u
 
 /* Interleaved INT16 channels in vitals.snt.  The canonical status is a bit
  * mask: bit 0 means missing SpO2, bit 1 means missing pulse. */
-#define OXIMETRY_CANONICAL_VITALS_SPO2          0u
-#define OXIMETRY_CANONICAL_VITALS_PULSE         1u
-#define OXIMETRY_CANONICAL_VITALS_MOTION_FLAGS  2u
-#define OXIMETRY_CANONICAL_VITALS_STATUS        3u
+#define OXIMETRY_CANONICAL_VITALS_SPO2 0u
+#define OXIMETRY_CANONICAL_VITALS_PULSE 1u
+#define OXIMETRY_CANONICAL_VITALS_MOTION_FLAGS 2u
+#define OXIMETRY_CANONICAL_VITALS_STATUS 3u
 #define OXIMETRY_CANONICAL_VITALS_SOURCE_STATUS 4u
 
 /* Create .somnotrace/oximetry and its canonical children:
@@ -64,17 +64,17 @@ esp_err_t oximetry_canonical_ensure_dirs(void);
  * The source is copied byte-for-byte into the package; it is never rewritten.
  * device_id and recording_id are single safe path components. */
 esp_err_t oximetry_canonical_convert_format_a(const char *device_id,
-                                               const char *recording_id,
-                                               const char *source_path,
-                                               int64_t start_utc_ms);
+                                              const char *recording_id,
+                                              const char *source_path,
+                                              int64_t start_utc_ms);
 
 /* Convert one completed O2 Ring (Gen1) VLD3 file into a durable recording
  * package.  Vendor-layout metadata provides cadence; header and filename
  * timestamps are validated independently with provenance retained.  The source
  * is copied byte-for-byte. device_id and recording_id are safe path components. */
 esp_err_t oximetry_canonical_convert_vld3(const char *device_id,
-                                           const char *recording_id,
-                                           const char *source_path);
+                                          const char *recording_id,
+                                          const char *source_path);
 
 /* Reconcile interrupted staging/package work at boot.  Invalid or incomplete
  * entries are moved to quarantine.  Ready recordings are those with a valid
@@ -101,8 +101,7 @@ esp_err_t oximetry_canonical_resolve_track(const char *recording_id,
 esp_err_t oximetry_canonical_list_ready(cJSON **out);
 esp_err_t oximetry_canonical_list_ready_for_day(const char *day, cJSON **out);
 esp_err_t oximetry_canonical_list_days(cJSON **out);
-esp_err_t oximetry_canonical_get_manifest(const char *recording_id,
-                                          cJSON **out);
+esp_err_t oximetry_canonical_get_manifest(const char *recording_id, cJSON **out);
 
 /* Convenience JSON serialization.  The returned buffer is allocated by
  * cJSON and must be released with cJSON_free().  NULL means failure. */

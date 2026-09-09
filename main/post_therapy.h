@@ -67,9 +67,12 @@
  *                    spool staleness detection (ClockB comparison).
  *   spool_current  - output: true if the current day's spool is fresh.
  */
-esp_err_t post_therapy_collect(const char *session_dir, const char *file_prefix,
-                               int64_t start_epoch_ms, int64_t clock_drift_ms,
-                               int64_t end_epoch_ms, bool *spool_current);
+esp_err_t post_therapy_collect(const char *session_dir,
+                               const char *file_prefix,
+                               int64_t start_epoch_ms,
+                               int64_t clock_drift_ms,
+                               int64_t end_epoch_ms,
+                               bool *spool_current);
 
 /* Retry pulling the current day's Summary spool until fresh or timeout.
  *

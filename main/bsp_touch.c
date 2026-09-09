@@ -37,13 +37,13 @@
 static const char *TAG = "bsp_touch";
 
 /* ── Hardware Pins (Waveshare ESP32-S3-Touch-LCD-1.54) ────────────── */
-#define BSP_PIN_TP_RST      47
-#define BSP_PIN_TP_INT      48
+#define BSP_PIN_TP_RST 47
+#define BSP_PIN_TP_INT 48
 
 /* ── I2C Address ──────────────────────────────────────────────────── */
-#define CST816_ADDR         0x15
+#define CST816_ADDR 0x15
 
-#define NOTIF_TOUCH   (1 << 0)
+#define NOTIF_TOUCH (1 << 0)
 
 static bool s_has_touch = false;
 static TaskHandle_t s_touch_task = NULL;

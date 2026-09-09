@@ -53,7 +53,6 @@ typedef struct {
  * Timestamps are monotonic microseconds since boot, never wall-clock dates.
  * Counters saturate at UINT32_MAX. Unobserved operations remain unknown. */
 void controller_diagnostics_init(bool simulated);
-void controller_diagnostics_record(controller_operation_t operation,
-                                   esp_err_t result);
+void controller_diagnostics_record(controller_operation_t operation, esp_err_t result);
 void controller_diagnostics_get_snapshot(controller_diagnostics_snapshot_t *out);
 const char *controller_diagnostics_operation_name(controller_operation_t operation);

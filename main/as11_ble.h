@@ -29,13 +29,13 @@
 #include "cJSON.h"
 
 /* Pairing state machine states (returned by as11_ble_get_status). */
-#define AS11_STATUS_IDLE          "idle"
-#define AS11_STATUS_SCANNING      "scanning"
-#define AS11_STATUS_CONNECTING    "connecting"
-#define AS11_STATUS_WAIT_PASSKEY  "waiting_passkey"
-#define AS11_STATUS_CONFIRMING    "confirming"
-#define AS11_STATUS_PAIRED        "paired"
-#define AS11_STATUS_ERROR         "error"
+#define AS11_STATUS_IDLE "idle"
+#define AS11_STATUS_SCANNING "scanning"
+#define AS11_STATUS_CONNECTING "connecting"
+#define AS11_STATUS_WAIT_PASSKEY "waiting_passkey"
+#define AS11_STATUS_CONFIRMING "confirming"
+#define AS11_STATUS_PAIRED "paired"
+#define AS11_STATUS_ERROR "error"
 
 /* Initialise the NimBLE host and start the BLE host task.
  * Call once at boot, after netprov_init(). */
@@ -128,8 +128,10 @@ esp_err_t as11_ble_get_datetime(int64_t *out_epoch_ms);
  *   out_data    - receives malloc'd buffer with raw protobuf bytes
  *   out_len     - receives buffer length
  */
-esp_err_t as11_ble_spool_pull(const char *spool_type, const char *from_dt,
-                              uint8_t **out_data, size_t *out_len);
+esp_err_t as11_ble_spool_pull(const char *spool_type,
+                              const char *from_dt,
+                              uint8_t **out_data,
+                              size_t *out_len);
 
 /* Send a Get RPC for multiple variable names (encrypted).
  * Returns a cJSON result object (caller must cJSON_Delete) or NULL.

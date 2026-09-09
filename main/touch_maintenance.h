@@ -59,8 +59,9 @@ typedef struct {
 esp_err_t touch_maintenance_request(maintenance_action_t action, const char *argument);
 /* Returns a nonzero identity for an admitted job, including jobs that finish
  * before this call returns. A failed admission leaves job_id zero. */
-esp_err_t touch_maintenance_request_tracked(maintenance_action_t action, const char *argument,
-                                           uint32_t *job_id);
+esp_err_t touch_maintenance_request_tracked(maintenance_action_t action,
+                                            const char *argument,
+                                            uint32_t *job_id);
 /* Navigation only cancels read-only browsing. Mutations retain their owner. */
 void touch_maintenance_cancel_reads(void);
 void touch_maintenance_snapshot(maintenance_snapshot_t *out);

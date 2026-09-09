@@ -31,8 +31,8 @@ static TaskHandle_t s_source_owner;
 
 static void source_error(esp_err_t err)
 {
-    if (__atomic_load_n(&s_source_owner, __ATOMIC_ACQUIRE) ==
-            xTaskGetCurrentTaskHandle() && s_source_error == ESP_OK) {
+    if (__atomic_load_n(&s_source_owner, __ATOMIC_ACQUIRE) == xTaskGetCurrentTaskHandle() &&
+        s_source_error == ESP_OK) {
         s_source_error = err;
     }
 }
@@ -40,16 +40,14 @@ static void source_error(esp_err_t err)
 void edf_source_error_begin(void)
 {
     s_source_error = ESP_OK;
-    __atomic_store_n(&s_source_owner, xTaskGetCurrentTaskHandle(),
-                     __ATOMIC_RELEASE);
+    __atomic_store_n(&s_source_owner, xTaskGetCurrentTaskHandle(), __ATOMIC_RELEASE);
 }
 
 esp_err_t edf_source_error_end(void)
 {
     TaskHandle_t current = xTaskGetCurrentTaskHandle();
     esp_err_t result =
-        __atomic_load_n(&s_source_owner, __ATOMIC_ACQUIRE) == current
-            ? s_source_error : ESP_OK;
+        __atomic_load_n(&s_source_owner, __ATOMIC_ACQUIRE) == current ? s_source_error : ESP_OK;
     if (__atomic_load_n(&s_source_owner, __ATOMIC_ACQUIRE) == current) {
         __atomic_store_n(&s_source_owner, NULL, __ATOMIC_RELEASE);
     }
@@ -99,7 +97,8 @@ void edf_write_field(char *buf, int width, const char *text)
     memset(buf, ' ', width);
     if (text) {
         int len = strlen(text);
-        if (len > width) len = width;
+        if (len > width)
+            len = width;
         memcpy(buf, text, len);
     }
 }
@@ -130,32 +129,41 @@ esp_err_t edf_publish_atomic_path(const char *tmp_path, const char *path)
     }
     struct stat st;
     bool exists = stat(path, &st) == 0;
-    if (!exists && errno != ENOENT) return ESP_FAIL;
+    if (!exists && errno != ENOENT)
+        return ESP_FAIL;
     if (!exists) {
-        if (rename(backup, path) == 0) exists = true;
-        else if (errno != ENOENT) return ESP_FAIL;
+        if (rename(backup, path) == 0)
+            exists = true;
+        else if (errno != ENOENT)
+            return ESP_FAIL;
     }
     if (exists) {
-        if (unlink(backup) != 0 && errno != ENOENT) return ESP_FAIL;
-        if (rename(path, backup) != 0) return ESP_FAIL;
+        if (unlink(backup) != 0 && errno != ENOENT)
+            return ESP_FAIL;
+        if (rename(path, backup) != 0)
+            return ESP_FAIL;
     }
     if (rename(tmp_path, path) != 0) {
         int first_error = errno;
-        if (exists) (void)rename(backup, path);
+        if (exists)
+            (void)rename(backup, path);
         errno = first_error;
         return ESP_FAIL;
     }
-    if (exists) (void)unlink(backup);
+    if (exists)
+        (void)unlink(backup);
     return ESP_OK;
 }
 
 esp_err_t edf_finalize_atomic_file(FILE *f, const char *tmp_path, const char *path)
 {
     int saved_errno = 0;
-    if (fflush(f) != 0) saved_errno = errno ? errno : EIO;
+    if (fflush(f) != 0)
+        saved_errno = errno ? errno : EIO;
     if (!saved_errno && fsync(fileno(f)) != 0)
         saved_errno = errno ? errno : EIO;
-    if (fclose(f) != 0 && !saved_errno) saved_errno = errno ? errno : EIO;
+    if (fclose(f) != 0 && !saved_errno)
+        saved_errno = errno ? errno : EIO;
     if (!saved_errno && edf_publish_atomic_path(tmp_path, path) != ESP_OK)
         saved_errno = errno ? errno : EIO;
     if (saved_errno) {
@@ -169,8 +177,10 @@ esp_err_t edf_finalize_atomic_file(FILE *f, const char *tmp_path, const char *pa
 void edf_discard_atomic_file(FILE *f, const char *tmp_path)
 {
     int first_error = errno;
-    if (f) fclose(f);
-    if (tmp_path) unlink(tmp_path);
+    if (f)
+        fclose(f);
+    if (tmp_path)
+        unlink(tmp_path);
     errno = first_error;
 }
 
@@ -178,17 +188,20 @@ cJSON *edf_read_json_file(const char *path)
 {
     FILE *f = fopen(path, "rb");
     if (!f) {
-        if (errno != ENOENT) source_error(ESP_FAIL);
+        if (errno != ENOENT)
+            source_error(ESP_FAIL);
         return NULL;
     }
     long size = -1;
-    if (fseek(f, 0, SEEK_END) == 0) size = ftell(f);
+    if (fseek(f, 0, SEEK_END) == 0)
+        size = ftell(f);
     char *buf = NULL;
     if (size <= 0 || size > 1024 * 1024 || fseek(f, 0, SEEK_SET) != 0) {
         source_error(ESP_FAIL);
     } else {
         buf = malloc((size_t)size + 1);
-        if (!buf) source_error(ESP_ERR_NO_MEM);
+        if (!buf)
+            source_error(ESP_ERR_NO_MEM);
         else if (fread(buf, 1, (size_t)size, f) != (size_t)size) {
             source_error(ESP_FAIL);
             free(buf);
@@ -203,7 +216,8 @@ cJSON *edf_read_json_file(const char *path)
         buf = NULL;
     }
     cJSON *json = buf ? cJSON_Parse(buf) : NULL;
-    if (buf && !json) source_error(ESP_FAIL);
+    if (buf && !json)
+        source_error(ESP_FAIL);
     free(buf);
     return json;
 }
@@ -219,30 +233,37 @@ esp_err_t edf_write_json_file(const char *path, const cJSON *json)
     FILE *f = edf_open_atomic_file(path, tmp, sizeof(tmp));
     esp_err_t ret = ESP_FAIL;
     if (f) {
-        if (!edf_write_all(f, str, strlen(str))) edf_discard_atomic_file(f, tmp);
-        else ret = edf_finalize_atomic_file(f, tmp, path);
+        if (!edf_write_all(f, str, strlen(str)))
+            edf_discard_atomic_file(f, tmp);
+        else
+            ret = edf_finalize_atomic_file(f, tmp, path);
     }
     free(str);
-    if (ret != ESP_OK) source_error(ret);
+    if (ret != ESP_OK)
+        source_error(ret);
     return ret;
 }
 
 uint8_t *edf_read_bin_file(const char *path, size_t *out_len)
 {
-    if (out_len) *out_len = 0;
+    if (out_len)
+        *out_len = 0;
     FILE *f = fopen(path, "rb");
     if (!f) {
-        if (errno != ENOENT) source_error(ESP_FAIL);
+        if (errno != ENOENT)
+            source_error(ESP_FAIL);
         return NULL;
     }
     long size = -1;
-    if (fseek(f, 0, SEEK_END) == 0) size = ftell(f);
+    if (fseek(f, 0, SEEK_END) == 0)
+        size = ftell(f);
     uint8_t *buf = NULL;
     if (size < 0 || size > 1024 * 1024 || fseek(f, 0, SEEK_SET) != 0) {
         source_error(ESP_FAIL);
     } else if (size > 0) {
         buf = malloc((size_t)size);
-        if (!buf) source_error(ESP_ERR_NO_MEM);
+        if (!buf)
+            source_error(ESP_ERR_NO_MEM);
         else if (fread(buf, 1, (size_t)size, f) != (size_t)size) {
             source_error(ESP_FAIL);
             free(buf);
@@ -254,7 +275,8 @@ uint8_t *edf_read_bin_file(const char *path, size_t *out_len)
         free(buf);
         buf = NULL;
     }
-    if (buf && out_len) *out_len = (size_t)size;
+    if (buf && out_len)
+        *out_len = (size_t)size;
     return buf;
 }
 
@@ -262,12 +284,16 @@ uint8_t *edf_read_bin_file(const char *path, size_t *out_len)
  *  EDF Header Writer
  * ════════════════════════════════════════════════════════════════════ */
 
-int edf_write_header(FILE *f, const char *patient_id,
+int edf_write_header(FILE *f,
+                     const char *patient_id,
                      const char *recording_id,
-                     const char *start_date, const char *start_time,
-                     int record_count, const char *record_dur,
+                     const char *start_date,
+                     const char *start_time,
+                     int record_count,
+                     const char *record_dur,
                      const char *reserved,
-                     const edf_signal_def_t *signals, int n_signals)
+                     const edf_signal_def_t *signals,
+                     int n_signals)
 {
     int total_signals = n_signals + 1;
     int header_bytes = 256 + 256 * total_signals;
@@ -276,30 +302,29 @@ int edf_write_header(FILE *f, const char *patient_id,
     char hdr[256];
     memset(hdr, ' ', sizeof(hdr));
 
-    edf_write_field(hdr + 0, 8, "0");                    /* version */
-    edf_write_field(hdr + 8, 80, patient_id);            /* patient ID */
-    edf_write_field(hdr + 88, 80, recording_id);         /* recording ID */
-    edf_write_field(hdr + 168, 8, start_date);           /* start date */
-    edf_write_field(hdr + 176, 8, start_time);           /* start time */
+    edf_write_field(hdr + 0, 8, "0");            /* version */
+    edf_write_field(hdr + 8, 80, patient_id);    /* patient ID */
+    edf_write_field(hdr + 88, 80, recording_id); /* recording ID */
+    edf_write_field(hdr + 168, 8, start_date);   /* start date */
+    edf_write_field(hdr + 176, 8, start_time);   /* start time */
     char hb[16];
     snprintf(hb, sizeof(hb), "%d", header_bytes);
-    edf_write_field(hdr + 184, 8, hb);                   /* header bytes */
-    edf_write_field(hdr + 192, 44, reserved);            /* reserved */
+    edf_write_field(hdr + 184, 8, hb);        /* header bytes */
+    edf_write_field(hdr + 192, 44, reserved); /* reserved */
     char rc[16];
     snprintf(rc, sizeof(rc), "%d", record_count);
-    edf_write_field(hdr + 236, 8, rc);                   /* record count */
-    edf_write_field(hdr + 244, 8, record_dur);           /* record duration */
+    edf_write_field(hdr + 236, 8, rc);         /* record count */
+    edf_write_field(hdr + 244, 8, record_dur); /* record duration */
     char ns[16];
     snprintf(ns, sizeof(ns), "%d", total_signals);
-    edf_write_field(hdr + 252, 4, ns);                   /* signal count */
+    edf_write_field(hdr + 252, 4, ns); /* signal count */
 
     /* ── Per-signal header blocks (256 bytes per signal) ── */
     int total = total_signals;
     size_t sigblock_size = 256 * total;
     char *sigblock = malloc(sigblock_size);
     if (!sigblock) {
-        ESP_LOGE(TAG, "edf_write_header: malloc sigblock %u failed",
-                 (unsigned)sigblock_size);
+        ESP_LOGE(TAG, "edf_write_header: malloc sigblock %u failed", (unsigned)sigblock_size);
         return -1;
     }
     memset(sigblock, ' ', sigblock_size);
@@ -390,12 +415,12 @@ int edf_write_header(FILE *f, const char *patient_id,
     char pid[81];
     snprintf(pid, sizeof(pid), "X X X X %04X %04X", crc1, crc2);
     int plen = strlen(pid);
-    while (plen < 80) pid[plen++] = ' ';
+    while (plen < 80)
+        pid[plen++] = ' ';
     pid[80] = '\0';
     memcpy(hdr + 8, pid, 80);
 
-    bool written = edf_write_all(f, hdr, sizeof(hdr)) &&
-                   edf_write_all(f, sigblock, 256 * total);
+    bool written = edf_write_all(f, hdr, sizeof(hdr)) && edf_write_all(f, sigblock, 256 * total);
 
     free(sigblock);
     return written ? header_bytes : -1;
@@ -405,8 +430,20 @@ int edf_write_header(FILE *f, const char *patient_id,
  *  Identification.json and Identification.crc generation
  * ════════════════════════════════════════════════════════════════════ */
 
-esp_err_t edf_generate_identification_files(const char *edf_dir,
-                                            const char *ident_json_path)
+static const char *identification_string(const cJSON *object, const char *key)
+{
+    cJSON *value = cJSON_GetObjectItem(object, key);
+    if (value && cJSON_IsString(value))
+        return value->valuestring;
+    if (value && cJSON_IsNumber(value)) {
+        static char number[32];
+        snprintf(number, sizeof(number), "%d", value->valueint);
+        return number;
+    }
+    return "";
+}
+
+esp_err_t edf_generate_identification_files(const char *edf_dir, const char *ident_json_path)
 {
     cJSON *ident = edf_read_json_file(ident_json_path);
     if (!ident) {
@@ -414,61 +451,48 @@ esp_err_t edf_generate_identification_files(const char *edf_dir,
         return ESP_FAIL;
     }
 
-    const char *get_str(const cJSON *obj, const char *key) {
-        cJSON *j = cJSON_GetObjectItem(obj, key);
-        if (j && cJSON_IsString(j)) return j->valuestring;
-        if (j && cJSON_IsNumber(j)) {
-            static char num_buf[32];
-            snprintf(num_buf, sizeof(num_buf), "%d", j->valueint);
-            return num_buf;
-        }
-        return "";
-    }
-
     cJSON *product = cJSON_CreateObject();
-    cJSON_AddStringToObject(product, "UniversalIdentifier",
-        get_str(ident, "UniversalIdentifier"));
-    cJSON_AddStringToObject(product, "SerialNumber",
-        get_str(ident, "SerialNumber"));
+    cJSON_AddStringToObject(
+        product, "UniversalIdentifier", identification_string(ident, "UniversalIdentifier"));
+    cJSON_AddStringToObject(product, "SerialNumber", identification_string(ident, "SerialNumber"));
     cJSON_AddStringToObject(product, "SerialNumberVerificationCode", "");
-    cJSON_AddStringToObject(product, "ProductCode",
-        get_str(ident, "ProductCode"));
-    cJSON_AddStringToObject(product, "ProductName", get_str(ident, "ProductName"));
+    cJSON_AddStringToObject(product, "ProductCode", identification_string(ident, "ProductCode"));
+    cJSON_AddStringToObject(product, "ProductName", identification_string(ident, "ProductName"));
     cJSON_AddStringToObject(product, "FdaUniqueDeviceIdentifier", "");
-    cJSON_AddStringToObject(product, "ProductGeographicIdentifier",
-        get_str(ident, "ProductGeographicIdentifier"));
+    cJSON_AddStringToObject(product,
+                            "ProductGeographicIdentifier",
+                            identification_string(ident, "ProductGeographicIdentifier"));
 
     cJSON *hardware = cJSON_CreateObject();
-    cJSON_AddStringToObject(hardware, "HardwareIdentifier",
-        get_str(ident, "HardwareIdentifier"));
+    cJSON_AddStringToObject(
+        hardware, "HardwareIdentifier", identification_string(ident, "HardwareIdentifier"));
 
     cJSON *software = cJSON_CreateObject();
-    cJSON_AddStringToObject(software, "BootloaderIdentifier",
-        get_str(ident, "BootloaderIdentifier"));
-    cJSON_AddStringToObject(software, "ApplicationIdentifier",
-        get_str(ident, "ApplicationIdentifier"));
-    cJSON_AddStringToObject(software, "ConfigurationIdentifier",
-        get_str(ident, "ConfigurationIdentifier"));
+    cJSON_AddStringToObject(
+        software, "BootloaderIdentifier", identification_string(ident, "BootloaderIdentifier"));
+    cJSON_AddStringToObject(
+        software, "ApplicationIdentifier", identification_string(ident, "ApplicationIdentifier"));
+    cJSON_AddStringToObject(software,
+                            "ConfigurationIdentifier",
+                            identification_string(ident, "ConfigurationIdentifier"));
     {
         cJSON *v = cJSON_GetObjectItem(ident, "PlatformIdentifier");
-        cJSON_AddNumberToObject(software, "PlatformIdentifier",
-            v ? v->valuedouble : 0);
+        cJSON_AddNumberToObject(software, "PlatformIdentifier", v ? v->valuedouble : 0);
         v = cJSON_GetObjectItem(ident, "VariantIdentifier");
-        cJSON_AddNumberToObject(software, "VariantIdentifier",
-            v ? v->valuedouble : 0);
+        cJSON_AddNumberToObject(software, "VariantIdentifier", v ? v->valuedouble : 0);
         v = cJSON_GetObjectItem(ident, "RegionIdentifier");
-        cJSON_AddNumberToObject(software, "RegionIdentifier",
-            v ? v->valuedouble : 0);
+        cJSON_AddNumberToObject(software, "RegionIdentifier", v ? v->valuedouble : 0);
     }
-    cJSON_AddStringToObject(software, "ProfileVariationIdentifier",
-        get_str(ident, "ProfileVariantIdentifier"));
+    cJSON_AddStringToObject(software,
+                            "ProfileVariationIdentifier",
+                            identification_string(ident, "ProfileVariantIdentifier"));
     {
         cJSON *v = cJSON_GetObjectItem(ident, "DataVersionIdentifier");
-        cJSON_AddNumberToObject(software, "DataVersionIdentifier",
-            v ? v->valuedouble : 0);
+        cJSON_AddNumberToObject(software, "DataVersionIdentifier", v ? v->valuedouble : 0);
     }
-    cJSON_AddStringToObject(software, "DataModelVersionIdentifier",
-        get_str(ident, "DataModelVersionIdentifier"));
+    cJSON_AddStringToObject(software,
+                            "DataModelVersionIdentifier",
+                            identification_string(ident, "DataModelVersionIdentifier"));
 
     cJSON *profiles = cJSON_CreateObject();
     cJSON_AddItemToObject(profiles, "Product", product);
