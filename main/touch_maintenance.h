@@ -7,6 +7,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define MAINTENANCE_REQUEST_ARGUMENT_MAX (MAINTENANCE_NAME_MAX + 9)
+
 typedef enum {
     MAINT_NONE,
     MAINT_SCAN,

@@ -111,7 +111,7 @@ typedef struct {
     maintenance_action_t read_action;
     uint32_t view_generation, read_view_generation, read_job_id;
     uint32_t rendered_view_generation, rendered_read_job_id;
-    char read_argument[MAINTENANCE_NAME_MAX];
+    char read_argument[MAINTENANCE_REQUEST_ARGUMENT_MAX];
 #if CONFIG_SOMNOTRACE_BOARD_QEMU
     bool frame_marker_pending;
     int frame_scroll, frame_ota_stage;
@@ -356,7 +356,7 @@ static void event(lv_event_t *e)
         break;
     case BUTTON_OLDER:
         if (read_rows_current() && s->snapshot.count) {
-            char argument[MAINTENANCE_NAME_MAX];
+            char argument[MAINTENANCE_REQUEST_ARGUMENT_MAX];
             const char *last = s->snapshot.entries[s->snapshot.count - 1].name;
             if (s->view == VIEW_FILES)
                 snprintf(argument, sizeof(argument), "%s/%s", s->day, last);

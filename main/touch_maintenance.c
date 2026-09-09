@@ -42,7 +42,7 @@ void touch_maintenance_service_readiness(bool airsense, bool oxygen)
 }
 typedef struct {
     maintenance_snapshot_t value;
-    char argument[MAINTENANCE_NAME_MAX];
+    char argument[MAINTENANCE_REQUEST_ARGUMENT_MAX];
 } job_t;
 static void publish(maintenance_snapshot_t *value)
 {
@@ -183,7 +183,8 @@ static esp_err_t completed_day(const char *day, bool *complete)
     if (cancelled(NULL))
         return ESP_ERR_INVALID_STATE;
     char path[256];
-    snprintf(path, sizeof(path), "%s/%.8s", SD_STREAMS_DIR, day);
+    if (snprintf(path, sizeof(path), "%s/%.8s", SD_STREAMS_DIR, day) >= (int)sizeof(path))
+        return ESP_ERR_INVALID_SIZE;
     DIR *dir = opendir(path);
     if (!dir)
         return ESP_OK;
@@ -194,8 +195,12 @@ static esp_err_t completed_day(const char *day, bool *complete)
         size_t n = strlen(e->d_name);
         if (n < 14 || strcmp(e->d_name + n - 13, "_session.json"))
             continue;
-        char file_path[384];
-        snprintf(file_path, sizeof(file_path), "%s/%s", path, e->d_name);
+        char file_path[512];
+        if (snprintf(file_path, sizeof(file_path), "%s/%s", path, e->d_name) >=
+            (int)sizeof(file_path)) {
+            valid = false;
+            break;
+        }
         FILE *f = fopen(file_path, "r");
         if (!f) {
             valid = false;
@@ -778,8 +783,10 @@ esp_err_t touch_maintenance_request_tracked(maintenance_action_t action,
 {
     if (job_id)
         *job_id = 0;
+    size_t argument_limit =
+        action == MAINT_FILES ? MAINTENANCE_REQUEST_ARGUMENT_MAX : MAINTENANCE_NAME_MAX;
     if (action <= MAINT_NONE || action > MAINT_SAVE_DISPLAY ||
-        (argument && strlen(argument) >= MAINTENANCE_NAME_MAX))
+        (argument && strlen(argument) >= argument_limit))
         return ESP_ERR_INVALID_ARG;
     maintenance_snapshot_t *fresh = heap_caps_calloc(1, sizeof(*fresh), MALLOC_CAP_SPIRAM);
     job_t *job = heap_caps_calloc(1, sizeof(*job), MALLOC_CAP_SPIRAM);

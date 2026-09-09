@@ -47,7 +47,7 @@ static bool therapy, recording, pending, lease, fail_task, immediate_task;
 static unsigned fail_alloc, allocations, task_starts, reads, cancel_at_read, open_files, open_dirs;
 static void (*queued_task)(void *);
 static void *queued_argument;
-static char streams[256], datalog[256], ox_path[256], mount_path[256];
+static char streams[112], datalog[112], ox_path[112], mount_path[112];
 #define SD_STREAMS_DIR streams
 #define SD_SESSIONS_DIR streams
 #define SD_SDCARD_DATALOG datalog
@@ -227,6 +227,11 @@ int main(int argc,char **argv) {
     assert(u.read_job_id && read_result_current() && !u.snapshot.busy && u.snapshot.count==1);
     uint32_t id=99;assert(touch_maintenance_request_tracked(MAINT_NONE,NULL,&id)==ESP_ERR_INVALID_ARG && !id);
     s_next_job_id=UINT32_MAX;assert(!touch_maintenance_request_tracked(MAINT_SCAN,NULL,&id) && id==1);run_worker();
+    char cursor[MAINTENANCE_NAME_MAX], boundary[MAINTENANCE_REQUEST_ARGUMENT_MAX];
+    memset(cursor,'x',sizeof(cursor)-1);cursor[sizeof(cursor)-1]=0;
+    assert(snprintf(boundary,sizeof(boundary),"20260902/%s",cursor)==sizeof(boundary)-1);
+    assert(!touch_maintenance_request_tracked(MAINT_FILES,boundary,&id) && id);
+    assert(!strcmp(((job_t *)queued_argument)->value.cursor,cursor));run_worker();
     s_busy=s_read_job_active=true;
     maintenance_fs_totals_t totals={0};
     assert(maintenance_fs_walk(streams,MAINT_FS_COUNT,false,&totals,depart_during_walk,NULL)==ECANCELED);
