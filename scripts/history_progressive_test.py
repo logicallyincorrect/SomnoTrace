@@ -227,7 +227,8 @@ with tempfile.TemporaryDirectory(prefix='somno-history-progressive-') as temp:
     (path/'lvgl.h').write_text('#pragma once\ntypedef struct lv_obj_t lv_obj_t;\n')
     fixture = preamble + types + stubs + '\n'.join(function(x) for x in selected) + stats + function('history_controller_load_view') + bridge + helpers + main
     (path/'test.c').write_text(fixture)
-    args = ['cc','-std=c11','-Wall','-Wextra','-Werror','-DTOUCH_HISTORY_MODEL_TEST',
+    args = ['cc','-std=c11','-Wall','-Wextra','-Werror','-D_POSIX_C_SOURCE=200809L',
+            '-DTOUCH_HISTORY_MODEL_TEST',
         '-I'+str(path),'-I'+str(root/'scripts/test_include'),'-I'+str(root/'main'),
         str(path/'test.c'),str(root/'main/touch_history.c'),'-lm','-o',str(path/'test')]
     subprocess.run(args,check=True)

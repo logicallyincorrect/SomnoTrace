@@ -91,7 +91,8 @@ static int httpd_resp_send_chunk(httpd_req_t *r,const char *bytes,size_t n) {
     return 0;
 }
 static int httpd_req_async_handler_begin(httpd_req_t *r,httpd_req_t **out) {
-    if(async_fail)return 1;*out=r;session_async=true;return 0;
+    if(async_fail)return 1;
+    *out=r;session_async=true;return 0;
 }
 static int httpd_req_async_handler_complete(httpd_req_t *r) {(void)r;assert(!lease && session_async && closed>completed);session_async=false;++completed;return 0;}
 static int shutdown(int socket,int how) {assert(socket==3 && how==SHUT_RDWR && session_async && !lease);++closed;return 0;}

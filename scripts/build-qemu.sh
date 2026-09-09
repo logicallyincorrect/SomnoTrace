@@ -11,7 +11,7 @@ for ARG in "$@"; do
     fi
 done
 PROFILE="$(python3 "${SCRIPT_DIR}/qemu_targets.py" build "$@")"
-IFS=$'\t' read -r BOARD BUILD_DIR SDKCONFIG DEFAULTS BUILD_REQUEST CLEAN_REQUEST <<< "${PROFILE}"
+IFS=$'\t' read -r BOARD BUILD_DIR SDKCONFIG DEFAULTS _ CLEAN_REQUEST <<< "${PROFILE}"
 SOURCE_STATE="$(python3 "${SCRIPT_DIR}/qemu-artifacts.py" source-state --board "${BOARD}")"
 
 if [ "${CLEAN_REQUEST}" = "1" ]; then

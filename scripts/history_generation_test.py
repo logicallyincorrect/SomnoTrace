@@ -38,7 +38,9 @@ pre = r'''
 #define WRITEBUF_SIZE 8192
 #define LOG_DIR log_dir
 #define LOG_FILE_PREFIX "log."
-static char log_dir[256];
+/* The production LOG_DIR is a short compile-time literal. Keep the extracted
+ * harness bound equally small so GCC can prove the 64-byte log path fits. */
+static char log_dir[48];
 static int s_export_sem=1,s_lease_mutex=1,s_destructive,s_uploading;
 static unsigned releases,acquires,io_calls;
 static uint32_t s_content_generation=7, expected_epoch, minimum_epoch;
@@ -124,7 +126,8 @@ with tempfile.TemporaryDirectory(prefix='shg-', dir='/tmp') as temp:
     fixture += function('main/post_therapy.c','write_bin_atomic')
     fixture += '\n#define fopen log_open\n' + function('main/log_stream.c','log_flush_once') + main
     (path/'test.c').write_text(fixture)
-    subprocess.run(['cc','-std=c11','-Wall','-Wextra','-Werror','-DHISTORY_CACHE_HOST_TEST',
+    subprocess.run(['cc','-std=c11','-Wall','-Wextra','-Werror','-D_POSIX_C_SOURCE=200809L',
+        '-DHISTORY_CACHE_HOST_TEST',
         '-I'+str(root/'main'),'-I'+str(root/'scripts/test_include'),str(path/'test.c'),
         str(root/'main/history_cache.c'),'-lpthread','-o',str(path/'test')],check=True)
     subprocess.run([str(path/'test'),str(path)],check=True)

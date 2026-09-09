@@ -116,7 +116,7 @@ with tempfile.TemporaryDirectory(prefix='somno-history-stress-') as temp:
     fixture+=ns['bridge']+ns['helpers']+'\n'.join(function(n) for n in extra)
     fixture+=process+function('history_controller_worker')+ns['main'].split('int main(void)',1)[0]+main
     (path/'test.c').write_text(fixture)
-    subprocess.run(['cc','-std=c11','-Wall','-Wextra','-Werror','-g',
+    subprocess.run(['cc','-std=c11','-Wall','-Wextra','-Werror','-D_POSIX_C_SOURCE=200809L','-g',
         '-fsanitize=address,undefined','-fno-omit-frame-pointer','-DTOUCH_HISTORY_MODEL_TEST',
         '-I'+str(path),'-I'+str(root/'main'),'-I'+str(root/'scripts/test_include'),
         str(path/'test.c'),str(root/'main/touch_history.c'),'-lm','-o',str(path/'test')],check=True)

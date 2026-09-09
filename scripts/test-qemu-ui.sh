@@ -11,7 +11,7 @@ for ARG in "$@"; do
     fi
 done
 PROFILE="$(python3 "${SCRIPT_DIR}/qemu_targets.py" test "$@")"
-IFS=$'\t' read -r BOARD BUILD_DIR SDKCONFIG DEFAULTS BUILD_REQUEST CLEAN_REQUEST <<< "${PROFILE}"
+IFS=$'\t' read -r BOARD BUILD_DIR _ _ BUILD_REQUEST _ <<< "${PROFILE}"
 FLASH="${PROJECT_DIR}/${BUILD_DIR}/qemu_flash.bin"
 EFUSE="${PROJECT_DIR}/${BUILD_DIR}/qemu_efuse.bin"
 if [ "${BUILD_REQUEST}" = "1" ] || [ ! -f "${FLASH}" ] || [ ! -f "${EFUSE}" ]; then
