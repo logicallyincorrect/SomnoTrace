@@ -28,7 +28,8 @@ import hashlib, json, os, shlex, sys
 from pathlib import Path
 argv = sys.argv[1:]
 root = Path(next(arg[:-9] for arg in argv if arg.endswith(':/project')))
-args = argv[argv.index('/project/scripts/idf-command.sh') + 1:]
+image_index = next(i for i, arg in enumerate(argv) if arg.startswith('espressif/idf:'))
+args = argv[image_index + 1:]
 with open(os.environ['QEMU_TEST_CALLS'], 'a') as output:
     output.write(json.dumps(args) + '\n')
 if args[0] == 'idf.py':
@@ -46,7 +47,7 @@ if args[0] == 'idf.py':
             'target': 'esp32s3', 'project_path': '/project', 'build_dir': '/project/' + build,
             'config_file': '/project/' + config,
             'config_defaults': ';'.join('/project/' + name for name in defaults.split(';')),
-            'git_revision': 'v5.5.1-dirty', 'idf_path': '/opt/esp/idf', 'c_compiler': '/opt/esp/gcc'}))
+            'git_revision': 'v5.5.5-dirty', 'idf_path': '/opt/esp/idf', 'c_compiler': '/opt/esp/gcc'}))
     elif args[-1] == 'build':
         (folder / 'somnotrace.elf').write_bytes(('fixture-elf-' + build).encode())
     elif args[-1] != 'fullclean':
@@ -111,14 +112,10 @@ signal.pause()  # A real emulator stays alive after QMP disconnects.
 def exercise_variants(source_root, root, base, environment):
     scripts = root / "scripts"
     for name in ("build-qemu.sh", "run-qemu-ui.sh", "test-qemu-ui.sh", "qemu_targets.py",
-                 "qemu-artifacts.py", "qemu_boot_smoke.py", "qemu_runtime.py",
-                 "idf-command.sh", "idf-sdk-patches.py"):
+                 "qemu-artifacts.py", "qemu_boot_smoke.py", "qemu_runtime.py"):
         shutil.copy(source_root / "scripts" / name, scripts / name)
     for name in ("sdkconfig.defaults", "sdkconfig.qemu.defaults", "sdkconfig.qemu-154.defaults"):
         shutil.copy(source_root / name, root / name)
-    patch = root / "third_party/esp-idf-patches/fixture.c"
-    patch.parent.mkdir(parents=True)
-    patch.write_text("SDK async allocation unwind fixture\n")
     fake_bin = base / "bin"
     (fake_bin / "docker").write_text(DOCKER)
     emulator = fake_bin / "qemu-system-xtensa"
@@ -157,7 +154,7 @@ def exercise_variants(source_root, root, base, environment):
         receipt = artifacts.verify(board)
         assert (receipt["board"], receipt["width"], receipt["height"]) == (
             board, profile["width"], profile["height"])
-        assert receipt["sdk"]["git_revision"] == "v5.5.1-dirty"
+        assert receipt["sdk"]["git_revision"] == "v5.5.5-dirty"
         launch = json.loads(command(str(scripts / "run-qemu-ui.sh"), *options, env=env).splitlines()[-1])
         assert f"file={build}/qemu_flash.bin,if=mtd,format=raw" in launch["args"]
         assert launch["tmpdir"] == str(build)
@@ -245,8 +242,7 @@ def exercise_variants(source_root, root, base, environment):
         assert manifest.read_text() == original, "rejected record overwrote a good receipt"
         artifacts.verify(board)
 
-    for path in (root / "CMakeLists.txt", scripts / "idf.sh", scripts / "idf-command.sh",
-                 scripts / "idf-sdk-patches.py", patch):
+    for path in (root / "CMakeLists.txt", scripts / "idf.sh"):
         before = path.read_bytes()
         expected = artifacts.source_state("154")
         path.write_bytes(before + b"changed source")

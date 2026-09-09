@@ -1,0 +1,30 @@
+BasedOnStyle: LLVM
+Language: Cpp
+ColumnLimit: 100
+IndentWidth: 4
+ContinuationIndentWidth: 4
+UseTab: Never
+SortIncludes: Never
+BreakBeforeBraces: Custom
+AlwaysBreakAfterReturnType: None
+BraceWrapping:
+  AfterFunction: true
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterStruct: false
+  AfterUnion: false
+  BeforeElse: false
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+BinPackArguments: false
+BinPackParameters: false
+BreakConstructorInitializers: BeforeColon
+DerivePointerAlignment: false
+PointerAlignment: Right
+PenaltyReturnTypeOnItsOwnLine: 1000000
+ReflowComments: true
+SpaceBeforeParens: ControlStatements

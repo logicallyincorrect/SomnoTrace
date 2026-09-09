@@ -28,7 +28,7 @@ This document records the **hardware** the firmware targets and the
 
 | Tool | Version | How it's provided |
 |------|---------|-------------------|
-| **ESP-IDF** | **v5.5.1** (pinned) | Official `espressif/idf:v5.5.1` Docker image via `scripts/idf.sh` |
+| **ESP-IDF** | **v5.5.5** (pinned) | Official `espressif/idf:v5.5.5` Docker image via `scripts/idf.sh` |
 | Docker Engine | ≥ 20.10 | Only host dependency required |
 | Bash | ≥ 4 | To run the build scripts |
 | Git | any recent | Version stamping of build artifacts |

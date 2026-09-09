@@ -60,9 +60,9 @@ generate_face() {
 }
 
 generate_face "${WORK_DIR}/SpaceGrotesk-Medium.ttf" \
-    somnotrace_space_grotesk_medium 13 15 17 19 23 29 34
+    somnotrace_space_grotesk_medium 13 15 17 34
 generate_face "${WORK_DIR}/SpaceGrotesk-SemiBold.ttf" \
-    somnotrace_space_grotesk_semibold 13 15 17 19 23 29 32 34
+    somnotrace_space_grotesk_semibold 13 15 17 19 23 29 32
 generate_face "${SOURCE_DIR}/IBMPlexMono-Medium.ttf" \
     somnotrace_ibm_plex_mono_medium 11 13 15
 generate_face "${SOURCE_DIR}/IBMPlexMono-SemiBold.ttf" \

@@ -8,8 +8,8 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 GENERATED = ROOT / "assets" / "fonts" / "generated"
 
-SPACE_MEDIUM_SIZES = (13, 15, 17, 19, 23, 29, 34)
-SPACE_SEMIBOLD_SIZES = (13, 15, 17, 19, 23, 29, 32, 34)
+SPACE_MEDIUM_SIZES = (13, 15, 17, 34)
+SPACE_SEMIBOLD_SIZES = (13, 15, 17, 19, 23, 29, 32)
 MONO_MEDIUM_SIZES = (11, 13, 15)
 MONO_SEMIBOLD_SIZES = (11, 13, 15, 26, 29, 34)
 

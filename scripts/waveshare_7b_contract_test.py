@@ -23,8 +23,31 @@ def require(text: str, pattern: str, description: str) -> None:
         raise AssertionError(f"missing 7B contract: {description}")
 
 
+def function_body(text: str, name: str) -> str:
+    match = re.search(
+        rf"^\s*static\s+[^;{{}}]*\b{name}\s*\([^;{{}}]*\)\s*\{{",
+        text,
+        re.MULTILINE,
+    )
+    if not match:
+        raise AssertionError(f"missing 7B function: {name}")
+    depth = 1
+    cursor = match.end()
+    while cursor < len(text) and depth:
+        if text[cursor] == "{":
+            depth += 1
+        elif text[cursor] == "}":
+            depth -= 1
+        cursor += 1
+    if depth:
+        raise AssertionError(f"unterminated 7B function: {name}")
+    return text[match.end():cursor - 1]
+
+
 board = source("main/board_waveshare_7b.c")
 display = source("main/bsp_display_7b.c")
+handoff = source("main/touch_display_handoff.c")
+keyboard_maps = source("main/touch_keyboard_maps.c")
 storage = source("main/sd_storage.c")
 defaults = source("sdkconfig.7b.defaults")
 cmake = source("main/CMakeLists.txt")
@@ -62,7 +85,7 @@ expected_scalars = {
     r"\.de_gpio_num\s*=\s*GPIO_NUM_5\b": "DE GPIO5",
     r"\.pclk_gpio_num\s*=\s*GPIO_NUM_7\b": "PCLK GPIO7",
     r"\.num_fbs\s*=\s*2\b": "double framebuffer",
-    r"\.bounce_buffer_size_px\s*=\s*WAVESHARE_7B_H_RES\s*\*\s*10\b":
+    r"\.bounce_buffer_size_px\s*=\s*SOMNOTRACE_TOUCH_DISPLAY_WIDTH\s*\*\s*10\b":
         "cache-sized ten-line bounce buffer",
     r"\.flags\.fb_in_psram\s*=\s*true\b": "PSRAM framebuffers",
     r"\.flags\.pclk_active_neg\s*=\s*true\b": "negative PCLK edge",
@@ -82,8 +105,8 @@ rgb_bus = set(rgb_pins) | {3, 5, 7, 46}
 control_bus = {4, 8, 9, 11, 12, 13}
 assert not rgb_bus & control_bus, f"RGB/control GPIO collision: {rgb_bus & control_bus}"
 
-require(board, r"\.x_max\s*=\s*WAVESHARE_7B_H_RES", "GT911 X range")
-require(board, r"\.y_max\s*=\s*WAVESHARE_7B_V_RES", "GT911 Y range")
+require(board, r"\.x_max\s*=\s*SOMNOTRACE_TOUCH_DISPLAY_WIDTH", "GT911 X range")
+require(board, r"\.y_max\s*=\s*SOMNOTRACE_TOUCH_DISPLAY_HEIGHT", "GT911 Y range")
 require(board, r"\.int_gpio_num\s*=\s*GPIO_NUM_4", "GT911 interrupt GPIO4")
 require(board, r"IOX_TOUCH_RST,\s*false.*pdMS_TO_TICKS\(100\).*GPIO_NUM_4,\s*0.*pdMS_TO_TICKS\(100\).*IOX_TOUCH_RST,\s*true.*pdMS_TO_TICKS\(200\)",
         "Waveshare GT911 reset/address-selection timing")
@@ -100,7 +123,7 @@ require(board,
 require(display,
         r"physical_brightness.*?tenth_percent\s*\+\s*1U\)\s*/\s*2U",
         "7B legacy brightness range mapped to 1-100 percent")
-require(display, r'waveshare_7b_set_brightness\(100\)',
+require(display, r'rgb_display_transport_set_brightness_percent\(100\)',
         "steady full-brightness display initialization")
 require(native_maintenance,
         r'"%d%%"\s*,\s*\(cfg\.brightness\s*\+\s*1\)\s*/\s*2',
@@ -111,7 +134,7 @@ require(device_settings,
         r".*?DEFAULT_BRIGHTNESS\s+200",
         "7-inch default is 100 percent steady backlight")
 require(board,
-        r"waveshare_7b_set_panel_pclk\s*\(uint32_t\s+hz\).*?"
+        r"rgb_display_transport_set_pixel_clock\s*\(uint32_t\s+hz\).*?"
         r"hz\s*!=\s*18000000U\s*&&\s*hz\s*!=\s*30850000U.*?"
         r"esp_lcd_rgb_panel_set_pclk\(s_panel,\s*hz\)",
         "runtime PCLK diagnostic restricted to the two A/B clocks")
@@ -119,22 +142,24 @@ require(net_provision,
         r'strcmp\(action,\s*"display-pclk"\)\s*==\s*0.*?'
         r'hz_item->valuedouble\s*!=\s*18000000\.0.*?'
         r'hz_item->valuedouble\s*!=\s*30850000\.0.*?'
-        r'waveshare_7b_set_panel_pclk\(hz\)',
+        r'rgb_display_transport_set_pixel_clock\(hz\)',
         "non-persistent display PCLK action with a strict two-clock allowlist")
 require(net_provision, r'"boot_default_hz\\":30850000',
         "PCLK diagnostic reports the accepted boot clock")
 assert '"/api/diagnostics/display-pclk"' not in net_provision, \
        "PCLK diagnostic must reuse /api/actions without consuming a URI slot"
 
-require(display, r"\.on_frame_buf_complete\s*=\s*on_frame_complete", "frame-buffer handoff")
-require(display, r"display_driver\.hor_res\s*=\s*WAVESHARE_7B_H_RES", "LVGL width")
-require(display, r"display_driver\.ver_res\s*=\s*WAVESHARE_7B_V_RES", "LVGL height")
+require(display,
+        r"\.on_frame_buf_complete\s*=\s*touch_display_handoff_frame_complete",
+        "frame-buffer handoff")
+require(display, r"display_driver\.hor_res\s*=\s*SOMNOTRACE_TOUCH_DISPLAY_WIDTH", "LVGL width")
+require(display, r"display_driver\.ver_res\s*=\s*SOMNOTRACE_TOUCH_DISPLAY_HEIGHT", "LVGL height")
 require(display, r"esp_lcd_rgb_panel_get_frame_buffer\(s_panel,\s*2,\s*&fb1,\s*&fb2\)",
         "two panel-owned framebuffers")
 require(display, r"display_driver\.direct_mode\s*=\s*1", "dirty-region direct rendering")
-require(display, r"if\s*\(!lv_disp_flush_is_last\(drv\)\).*?lv_disp_flush_ready\(drv\).*?return",
+require(handoff, r"if\s*\(!lv_disp_flush_is_last\(driver\)\).*?lv_disp_flush_ready\(driver\).*?return false",
         "one panel handoff after the final dirty area")
-require(display,
+require(handoff,
         r"esp_lcd_panel_draw_bitmap.*?ulTaskNotifyTake\(pdTRUE,\s*0\).*?"
         r"ulTaskNotifyTake\(pdTRUE,\s*pdMS_TO_TICKS\(100\)\)",
         "discard stale completions after framebuffer selection")
@@ -234,8 +259,7 @@ for section_label in (
 
 # LVGL v8 paints dropdown and textarea copy from pad_top.  Keep the shared
 # single-line geometry explicit and independent of pre-layout object coords.
-field_style = display.split(
-    "static void style_manage_field(lv_obj_t *field)\n{", 1)[1].split("\n}\n", 1)[0]
+field_style = function_body(display, "style_manage_field")
 for pattern, description in (
     (r"lv_obj_get_style_height\(field,\s*LV_PART_MAIN\)",
      "configured field height used before first layout"),
@@ -246,14 +270,12 @@ for pattern, description in (
      "single-line bottom padding"),
 ):
     require(field_style, pattern, description)
-surface_style = display.split(
-    "static void style_manage_surface(lv_obj_t *field)\n{", 1)[1].split("\n}\n", 1)[0]
+surface_style = function_body(display, "style_manage_surface")
 require(surface_style,
         r"border_width\(field,\s*1,\s*0\).*?"
         r"border_width\(field,\s*1,\s*LV_STATE_FOCUSED\)",
         "focus ring keeps the content origin stable")
-textarea_style = display.split(
-    "static void style_manage_textarea(lv_obj_t *field)\n{", 1)[1].split("\n}\n", 1)[0]
+textarea_style = function_body(display, "style_manage_textarea")
 for pattern, description in (
     (r"pad_bottom\(field,\s*0,\s*LV_PART_MAIN\)",
      "one-line textarea cursor slack"),
@@ -308,7 +330,7 @@ require(display, r"build_system_section.*?build_maintenance_section\(section, MA
 # Keep every state on one line, vertically centre dots against that line, and
 # preserve the fixed screen-right edge plus an explicit chevron inset.
 for pattern, description in (
-    (r"status_label_width.*?lv_txt_get_size\(&size,\s*lv_label_get_text\(label\),\s*"
+    (r"status_label_width.*?lv_txt_get_size\s*\(\s*&size,\s*lv_label_get_text\(label\),\s*"
      r"FONT_BODY,\s*0,\s*0,\s*LV_COORD_MAX,\s*LV_TEXT_FLAG_NONE\).*?"
      r"return\s+LV_MAX\(size\.x,\s*1\)",
      "content-measured status labels"),
@@ -396,17 +418,10 @@ require(display, r"static\s+int\s+s_active_manage_section\s*=\s*-1",
 require(display,
         r"if\s*\(section\s*==\s*s_active_manage_section\)\s*return",
         "current Manage-section navigation no-op")
-active_page_start = display.index("static void set_active_page(int page)\n{")
-active_page_source = display[
-    active_page_start:display.index("static void nav_cb", active_page_start)
-]
-manage_section_start = display.index("static void set_manage_section(int section)\n{")
-manage_section_source = display[
-    manage_section_start:
-    display.index("static void manage_section_cb", manage_section_start)
-]
+active_page_source = function_body(display, "set_active_page")
+manage_section_source = function_body(display, "set_manage_section")
 require(active_page_source,
-        r"set_destination_surface\(s_nav_buttons\[i\]",
+        r"set_destination_surface\s*\(\s*s_nav_buttons\[i\]",
         "bottom navigation uses stable destination surfaces")
 require(active_page_source,
         r"portENTER_CRITICAL\(&s_state_lock\);\s*"
@@ -416,11 +431,11 @@ require(active_page_source,
         r"if\s*\(already_active\)\s*return;",
         "page navigation publishes and checks the active page under lock")
 require(active_page_source,
-        r"previous_page\s*==\s*1.*?touch_history_controller_set_active\("
+        r"previous_page\s*==\s*1.*?touch_history_controller_set_active\s*\("
         r".*?false\)",
         "leaving History cancels active controller work")
 require(active_page_source,
-        r"page\s*==\s*1.*?touch_history_controller_set_active\(.*?true\)",
+        r"page\s*==\s*1.*?touch_history_controller_set_active\s*\(.*?true\)",
         "entering History activates newest-first loading")
 for selection_source, description in (
     (active_page_source, "page navigation"),
@@ -435,7 +450,7 @@ require(native_maintenance,
         r'button\(s->root,\s*"Refresh".*?BUTTON_SCAN',
         "native storage refresh remains a distinct completed-click action")
 require(display,
-        r'xTaskCreatePinnedToCore\(lvgl_task,\s*"display_7b",\s*12288,\s*'
+        r'xTaskCreatePinnedToCore\s*\(\s*lvgl_task,\s*"display_7b",\s*12288,\s*'
         r"NULL,\s*5,\s*&s_lvgl_task,\s*1\)",
         "responsive priority-5 display task with measured stack headroom")
 
@@ -461,12 +476,7 @@ tray_scroll_source = display[
 ]
 assert "LV_OBJ_FLAG_SCROLLABLE" not in tray_scroll_source, \
        "fixed-height status tray must not scroll"
-secondary_start = display.index(
-    "static void refresh_secondary_pages(const ui_state_t *state, int active_tab)\n{"
-)
-secondary_source = display[
-    secondary_start:display.index("static void resync_flow_visual", secondary_start)
-]
+secondary_source = function_body(display, "refresh_secondary_pages")
 require(secondary_source,
         r"if\s*\(ble_started.*?end_ble_operation\(\);.*?"
         r"if\s*\(active_tab\s*!=\s*2\)\s*return;",
@@ -489,10 +499,7 @@ require(display,
         r"UI_STATUS_SCRIM_OPA\s+LV_OPA_60.*?"
         r"#else.*?UI_STATUS_SCRIM_OPA\s+LV_OPA_60",
         "status tray preserves a translucent view of its source screen")
-status_open_start = display.index("static void status_tray_open_cb(lv_event_t *event)\n{")
-status_open_source = display[
-    status_open_start:display.index("static void status_tray_route_cb", status_open_start)
-]
+status_open_source = function_body(display, "status_tray_open_cb")
 assert "lv_obj_move_foreground" not in status_open_source, \
        "opening status tray must not invalidate the screen through reordering"
 require(display,
@@ -731,11 +738,7 @@ require(history_ui,
         r"MALLOC_CAP_SPIRAM\s*\|\s*MALLOC_CAP_8BIT\)",
         "retained History snapshot lives in PSRAM")
 
-build_history_start = display.index("static void build_history_page(lv_obj_t *history)\n{")
-build_history_source = display[
-    build_history_start:
-    display.index("static lv_obj_t *make_manage_section", build_history_start)
-]
+build_history_source = function_body(display, "build_history_page")
 require(build_history_source,
         r"touch_history_ui_create\(\s*s_history_host,\s*&config,\s*"
         r"&s_history_ui\s*\)",
@@ -748,13 +751,7 @@ require(display,
         r"CONFIG_SOMNOTRACE_BOARD_QEMU.*?\.deterministic_preview\s*=\s*true",
         "QEMU exercises deterministic rich History data")
 
-history_changed_start = display.index(
-    "static void history_controller_changed(void *context)\n{"
-)
-history_changed_source = display[
-    history_changed_start:
-    display.index("static void history_route_card", history_changed_start)
-]
+history_changed_source = function_body(display, "history_controller_changed")
 assert "__atomic_store_n" in history_changed_source
 assert "lv_" not in history_changed_source and \
        "xTaskNotify" not in history_changed_source, \
@@ -821,7 +818,7 @@ for legacy in (
 
 require(display, r"s_keyboard_sheet.*?keyboard_sheet_action_cb",
         "explicit touch keyboard sheet with completion actions")
-require(display, r"s_text_keyboard_lower_map.*?\"q\".*?\"p\".*?LV_SYMBOL_BACKSPACE.*?LV_SYMBOL_UP.*?\"123\".*?\"@\".*?\"space\".*?\"-\".*?\"_\"",
+require(keyboard_maps, r"s_shell_lower_map.*?\"q\".*?\"p\".*?LV_SYMBOL_BACKSPACE.*?LV_SYMBOL_UP.*?\"123\".*?\"@\".*?\"space\".*?\"-\".*?\"_\"",
         "five-row handoff text keyboard")
 require(display, r"lv_obj_set_align\(s_keyboard,\s*LV_ALIGN_TOP_LEFT\)",
         "visible top-aligned keyboard geometry")

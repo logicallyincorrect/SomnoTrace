@@ -31,7 +31,9 @@ endif()
 if(CONFIG_SOMNOTRACE_BOARD_WAVESHARE_7B OR
    (CONFIG_SOMNOTRACE_BOARD_QEMU AND NOT CONFIG_SOMNOTRACE_QEMU_DISPLAY_154))
     list(APPEND SOMNOTRACE_BSP_SRCS
+        "touch_display_handoff.c"
         "touch_observation.c"
+        "touch_keyboard_maps.c"
         "first_run_setup_ui.c"
         "first_run_setup_controller.c"
         "touch_manage_config_ui.c"
@@ -45,9 +47,6 @@ if(CONFIG_SOMNOTRACE_BOARD_WAVESHARE_7B OR
         "../assets/fonts/generated/somnotrace_space_grotesk_medium_13.c"
         "../assets/fonts/generated/somnotrace_space_grotesk_medium_15.c"
         "../assets/fonts/generated/somnotrace_space_grotesk_medium_17.c"
-        "../assets/fonts/generated/somnotrace_space_grotesk_medium_19.c"
-        "../assets/fonts/generated/somnotrace_space_grotesk_medium_23.c"
-        "../assets/fonts/generated/somnotrace_space_grotesk_medium_29.c"
         "../assets/fonts/generated/somnotrace_space_grotesk_medium_34.c"
         "../assets/fonts/generated/somnotrace_space_grotesk_semibold_13.c"
         "../assets/fonts/generated/somnotrace_space_grotesk_semibold_15.c"
@@ -56,7 +55,6 @@ if(CONFIG_SOMNOTRACE_BOARD_WAVESHARE_7B OR
         "../assets/fonts/generated/somnotrace_space_grotesk_semibold_23.c"
         "../assets/fonts/generated/somnotrace_space_grotesk_semibold_29.c"
         "../assets/fonts/generated/somnotrace_space_grotesk_semibold_32.c"
-        "../assets/fonts/generated/somnotrace_space_grotesk_semibold_34.c"
         "../assets/fonts/generated/somnotrace_ibm_plex_mono_medium_11.c"
         "../assets/fonts/generated/somnotrace_ibm_plex_mono_medium_13.c"
         "../assets/fonts/generated/somnotrace_ibm_plex_mono_medium_15.c"
@@ -68,7 +66,7 @@ if(CONFIG_SOMNOTRACE_BOARD_WAVESHARE_7B OR
         "../assets/fonts/generated/somnotrace_ibm_plex_mono_semibold_34.c")
 endif()
 
-idf_component_register(SRCS ${SOMNOTRACE_MAIN_SRC} "firmware_target.c" ${SOMNOTRACE_BSP_SRCS} "net_provision.c" "net_config_model.c" "as11_ble.c"
+idf_component_register(SRCS ${SOMNOTRACE_MAIN_SRC} "firmware_target.c" "board_descriptor.c" "therapy_gate.c" ${SOMNOTRACE_BSP_SRCS} "net_provision.c" "net_config_model.c" "as11_ble.c"
                            "sd_storage.c" "maintenance_model.c" "maintenance_fs.c" "maintenance_release.c" "touch_maintenance.c" "controller_diagnostics.c" "session_writer.c" "time_sync.c"
                            "post_therapy.c" "edf_gen.c" "edf_header.c" "edf_waveform.c" "edf_annotations.c" "edf_summary.c" "log_stream.c" "device_settings.c"
                            "first_run_setup.c" "first_run_setup_model.c"
@@ -86,18 +84,6 @@ idf_component_register(SRCS ${SOMNOTRACE_MAIN_SRC} "firmware_target.c" ${SOMNOTR
 # Keep board identity even in compact previews that never link OTA services.
 # Compiler-level 'used' alone cannot pull an unreferenced archive member in.
 target_link_libraries(${COMPONENT_LIB} INTERFACE "-u somnotrace_firmware_target")
-
-# Download zones.json (IANA-to-POSIX timezone database) if not present.
-# Source: https://github.com/nayarsystems/posix_tz_db (MIT License)
-find_package(Python3 REQUIRED)
-add_custom_command(
-    OUTPUT "${CMAKE_CURRENT_LIST_DIR}/zones.json"
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/../scripts/gen_tz_db.py
-    DEPENDS ${CMAKE_CURRENT_LIST_DIR}/../scripts/gen_tz_db.py
-    COMMENT "Fetching timezone database (zones.json)"
-    VERBATIM)
-add_custom_target(tz_db DEPENDS "${CMAKE_CURRENT_LIST_DIR}/zones.json")
-add_dependencies(${COMPONENT_LIB} tz_db)
 
 target_add_binary_data(${COMPONENT_LIB} "portal.html" TEXT)
 target_add_binary_data(${COMPONENT_LIB} "zones.json" TEXT)

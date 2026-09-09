@@ -1,7 +1,11 @@
 #pragma once
 #include "esp_err.h"
 #include "lvgl.h"
-typedef enum { MAINT_UI_STORAGE, MAINT_UI_SYSTEM, MAINT_UI_ADVANCED } maintenance_ui_destination_t;
+typedef enum {
+    MAINT_UI_STORAGE,
+    MAINT_UI_SYSTEM,
+    MAINT_UI_ADVANCED
+} maintenance_ui_destination_t;
 typedef enum {
     MAINT_NAV_DEVICES,
     MAINT_NAV_CONNECTIVITY,
@@ -14,7 +18,8 @@ typedef struct {
     bool (*wake_available)(void);
     void (*restart)(void); /* shared shell's confirmed, therapy-fenced restart */
 } maintenance_ui_hooks_t;
-esp_err_t touch_maintenance_ui_show(lv_obj_t *parent, maintenance_ui_destination_t destination,
+esp_err_t touch_maintenance_ui_show(lv_obj_t *parent,
+                                    maintenance_ui_destination_t destination,
                                     const maintenance_ui_hooks_t *hooks);
 void touch_maintenance_ui_destroy(void);
 /* LVGL task only; polling copies bounded snapshots and never performs I/O. */

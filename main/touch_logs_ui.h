@@ -19,10 +19,10 @@
 extern "C" {
 #endif
 
-#define TOUCH_LOGS_UI_WIDTH          768U
-#define TOUCH_LOGS_UI_HEIGHT         450U
-#define TOUCH_LOGS_UI_VISIBLE_ROWS    10U
-#define TOUCH_LOGS_UI_QUERY_MAX        48U
+#define TOUCH_LOGS_UI_WIDTH 768U
+#define TOUCH_LOGS_UI_HEIGHT 450U
+#define TOUCH_LOGS_UI_VISIBLE_ROWS 10U
+#define TOUCH_LOGS_UI_QUERY_MAX 48U
 
 typedef enum {
     TOUCH_LOGS_UI_SAVE_IDLE = 0,
@@ -88,8 +88,7 @@ typedef struct {
  * lock.  create() is lazy and uses PSRAM only for its context; there is no
  * internal-RAM fallback.  show() renders a complete first frame before making
  * the 768 x 450 detail pane visible. */
-esp_err_t touch_logs_ui_create(
-    lv_obj_t *parent, const touch_logs_ui_controller_t *controller);
+esp_err_t touch_logs_ui_create(lv_obj_t *parent, const touch_logs_ui_controller_t *controller);
 void touch_logs_ui_destroy(void);
 esp_err_t touch_logs_ui_show(void);
 void touch_logs_ui_hide(void);

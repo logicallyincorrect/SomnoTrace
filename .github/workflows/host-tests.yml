@@ -23,16 +23,16 @@ permissions:
 jobs:
   host-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Install libcjson
         run: |
           sudo apt-get update -q
           sudo apt-get install -y --no-install-recommends libcjson-dev
-      - name: Run upstream host tests
+      - name: Run host behavior and architecture tests
         run: |
           set -o pipefail
-          bash scripts/run_host_tests.sh | tee host-tests.log
-          tail -1 host-tests.log | grep -qE '^host tests: [0-9]+ run, 0 failed, 0 skipped$' \
-            || { echo "::error::host tests failed or were skipped: $(tail -1 host-tests.log)"; exit 1; }
+          bash scripts/test-host.sh | tee host-tests.log
+          grep -qE '^host tests: [0-9]+ run, 0 failed, 0 skipped$' host-tests.log
+          grep -q '^All synthetic host tests passed$' host-tests.log

@@ -36,8 +36,8 @@
 #
 set -euo pipefail
 
-# Pinned ESP-IDF release. Override: IDF_TAG=v5.5 ./scripts/idf.sh ...
-IDF_TAG="${IDF_TAG:-v5.5.1}"
+# Pinned ESP-IDF release. Override: IDF_TAG=v6.1 ./scripts/idf.sh ...
+IDF_TAG="${IDF_TAG:-v5.5.5}"
 IMAGE="espressif/idf:${IDF_TAG}"
 
 # Project root (parent of this script's directory).
@@ -89,5 +89,4 @@ exec docker run \
     -v "${PROJECT_DIR}:/project" \
     -w /project \
     "$IMAGE" \
-    /bin/bash /project/scripts/idf-command.sh \
     "$@"

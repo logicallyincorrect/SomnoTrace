@@ -138,13 +138,14 @@ copyrightable material is ever determined to have been incorporated.
 - **Source:** https://github.com/nayarsystems/posix_tz_db
 - **Used for:** IANA-to-POSIX TZ string mapping (e.g. `Australia/Melbourne` →
   `AEST-10AEDT,M10.1.0,M4.1.0/3`) for timezone selection in the web UI.
-  The `zones.json` file is downloaded at build time and embedded into firmware
-  via `target_add_binary_data`, then served to the web UI via the `/api/tz`
-  endpoint. This allows timezone selection without internet connectivity
-  (e.g. in SoftAP setup mode).
+  The pinned `main/zones.json` file is embedded into firmware via
+  `target_add_binary_data`, then served to the web UI via the `/api/tz`
+  endpoint. This allows reproducible offline builds and timezone selection in
+  SoftAP setup mode.
 - **License:** MIT
-- **Notes:** `zones.json` is fetched by `scripts/gen_tz_db.py` at build time
-  and is git-ignored (generated artifact). The data is not modified.
+- **Notes:** Snapshot commit `93447c0ddac304ca6672a5fd905261c7e8905159`,
+  SHA-256 `b95662f059d0bf1408962272cb98da4820fa0e20c7582e0aca1d0613e33986ef`.
+  The data is not modified.
 
 ## uPlot
 
@@ -235,11 +236,6 @@ jurisdictions (e.g. the EU Software Directive, US DMCA s.1201(f), and
 interoperability provisions of Australia's Copyright Act 1968). This is not
 legal advice; obtain professional advice before any commercial distribution.
 
-## ESP-IDF HTTP asynchronous request cleanup
-
-The checked ESP-IDF v5.5.1 HTTP asynchronous request fixture under
-`third_party/esp-idf-patches/` derives from Espressif ESP-IDF and is licensed
-under Apache-2.0; the license and source identity are retained beside it.
 ## Waveshare 7B hardware reference
 
 The 7B pin map, controller sequence and RGB timing were checked against

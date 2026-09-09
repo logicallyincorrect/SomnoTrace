@@ -6,11 +6,11 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-source = (ROOT / "main/bsp_display_7b.c").read_text()
+source = (ROOT / "main/touch_display_handoff.c").read_text()
 
 
 def function(name):
-    match = re.search(rf"static void {name}\([^;]*?\)\s*\{{", source)
+    match = re.search(rf"(?:static void|bool) {name}\([^;]*?\)\s*\{{", source)
     assert match, name
     depth, end = 1, match.end()
     while depth:
@@ -29,8 +29,8 @@ fixture = r'''
 #define ESP_ERR_TIMEOUT 1
 #define CONTROLLER_PANEL_SUBMIT 0
 #define CONTROLLER_PANEL_HANDOFF 1
-#define WAVESHARE_7B_H_RES 1024
-#define WAVESHARE_7B_V_RES 600
+#define SOMNOTRACE_TOUCH_DISPLAY_WIDTH 1024
+#define SOMNOTRACE_TOUCH_DISPLAY_HEIGHT 600
 #define pdTRUE 1
 #define pdMS_TO_TICKS(n) (n)
 #define ESP_LOGE(...) ((void)0)
@@ -40,7 +40,7 @@ typedef void *esp_lcd_panel_handle_t;
 typedef uint16_t lv_color_t;
 typedef struct {void *user_data;} lv_disp_drv_t;
 typedef struct {int unused;} lv_area_t;
-static uint32_t s_flush_count, s_flush_timeouts;
+typedef struct {void *render_task; uint32_t frames, timeouts;} touch_display_handoff_t;
 static unsigned notifications, timeouts_left, restarts, retries, ready;
 static unsigned selected, scanned, submit_calls, handoff_errors;
 static bool inject_before_selection, inject_after_selection, last_area;
@@ -76,26 +76,27 @@ static void lv_disp_flush_ready(lv_disp_drv_t *drv) {
     ++ready;
 }
 '''
-fixture += function("submit_rgb_frame") + "\n" + function("flush_cb")
+fixture += function("submit_rgb_frame") + "\n" + function("touch_display_handoff_flush")
 fixture += r'''
 int main(void) {
-    lv_disp_drv_t drv = {0}; lv_area_t area = {0}; lv_color_t pixels = 0;
+    lv_disp_drv_t drv = {0}; lv_color_t pixels = 0;
     for (unsigned before = 0; before < 2; ++before)
     for (unsigned after = 0; after < 2; ++after)
     for (unsigned stale = 0; stale < 2; ++stale)
     for (unsigned missed = 0; missed < 4; ++missed)
     for (unsigned fail = 0; fail < 2; ++fail) {
         selected = scanned = ready = restarts = submit_calls = handoff_errors = 0;
-        s_flush_count = s_flush_timeouts = 0;
+        touch_display_handoff_t handoff = {0};
         inject_before_selection = before; inject_after_selection = after;
         notifications = stale; timeouts_left = missed; retries = fail; last_area = true;
-        flush_cb(&drv, &area, &pixels);
-        assert(ready == 1 && submit_calls == 1 + fail && s_flush_count == 1);
+        assert(touch_display_handoff_flush(&handoff, &drv, &pixels));
+        assert(ready == 1 && submit_calls == 1 + fail && handoff.frames == 1);
         assert(restarts == missed && handoff_errors == missed);
-        assert(s_flush_timeouts == missed + fail);
+        assert(handoff.timeouts == missed + fail);
     }
     last_area = false; ready = submit_calls = 0; selected = scanned = 0;
-    flush_cb(&drv, &area, &pixels);
+    touch_display_handoff_t handoff = {0};
+    assert(!touch_display_handoff_flush(&handoff, &drv, &pixels));
     assert(ready == 1 && submit_calls == 0);
     puts("RGB handoff: stale IRQs, submit races, missed frames and retries passed");
 }

@@ -9,13 +9,14 @@ ROOT = Path(__file__).resolve().parents[1]
 HEADER = (ROOT / "main/bsp_display.h").read_text(encoding="utf-8")
 SMALL = (ROOT / "main/bsp_display.c").read_text(encoding="utf-8")
 TOUCH = (ROOT / "main/bsp_display_7b.c").read_text(encoding="utf-8")
+GATE = (ROOT / "main/therapy_gate.c").read_text(encoding="utf-8")
 AS11 = (ROOT / "main/as11_ble.c").read_text(encoding="utf-8")
 NET = (ROOT / "main/net_provision.c").read_text(encoding="utf-8")
 
 
 def function_body(source: str, name: str) -> str:
     match = re.search(
-        rf"^[\w][\w\s*]*\b{name}\s*\([^;{{}}]*\)\s*\{{",
+        rf"^\s*[\w][\w\s*]*\b{name}\s*\([^;{{}}]*\)\s*\{{",
         source,
         re.MULTILINE,
     )
@@ -53,16 +54,23 @@ for display in (SMALL, TOUCH):
     begin = function_body(display, "bsp_display_try_begin_therapy_safe_maintenance")
     abort = function_body(display, "bsp_display_therapy_safe_maintenance_should_abort")
     end = function_body(display, "bsp_display_end_therapy_safe_maintenance")
-    assert "s_as11_notifications_pending == 0" in reserve
-    assert "s_as11_notifications_pending == 0" in commit
-    assert "s_as11_notifications_pending++" in queued
-    assert "s_as11_notifications_pending--" in processed
-    assert "s_as11_notifications_pending == 0" in begin
-    assert "s_therapy_start_claims == 0" in begin
-    assert "s_therapy_safe_maintenance = true" in begin
-    assert "s_therapy_start_claims > 0" in abort
-    assert "therapy_active" in abort or "s_state.therapy" in abort
-    assert "s_therapy_safe_maintenance = false" in end
+    assert "therapy_gate_try_reserve_restart(&s_therapy_gate)" in reserve
+    assert "therapy_gate_try_commit_restart(&s_therapy_gate)" in commit
+    assert "therapy_gate_note_notification_queued(&s_therapy_gate)" in queued
+    assert "therapy_gate_note_notification_processed(&s_therapy_gate)" in processed
+    assert "therapy_gate_try_begin_maintenance(&s_therapy_gate)" in begin
+    assert "therapy_gate_maintenance_should_abort(&s_therapy_gate)" in abort
+    assert "therapy_gate_end_maintenance(&s_therapy_gate)" in end
+
+gate_reserve = function_body(GATE, "therapy_gate_try_reserve_restart")
+gate_commit = function_body(GATE, "therapy_gate_try_commit_restart")
+gate_begin = function_body(GATE, "therapy_gate_try_begin_maintenance")
+gate_abort = function_body(GATE, "therapy_gate_maintenance_should_abort")
+for body in (gate_reserve, gate_commit, gate_begin):
+    assert "notifications_pending" in body
+assert "start_claims" in gate_reserve and "start_waiters" in gate_reserve
+assert "start_claims" in gate_begin and "start_waiters" in gate_begin
+assert "active" in gate_abort and "start_claims" in gate_abort
 
 gap = function_body(AS11, "gap_event")
 notify_case = gap[gap.index("case BLE_GAP_EVENT_NOTIFY_RX"):
@@ -104,13 +112,17 @@ print("therapy lifecycle race contract passed")
 # reservation before entering the existing therapy-aware reboot worker.
 for display in (SMALL, TOUCH):
     commit = function_body(display, "bsp_display_try_reserve_maintenance_commit")
-    for prerequisite in ("s_therapy_start_claims == 0", "s_therapy_start_waiters == 0",
-                         "s_as11_notifications_pending == 0", "s_therapy_safe_maintenance"):
-        assert prerequisite in commit
-    assert "s_therapy_safe_restart_reserving = true" in commit
-    assert "s_therapy_safe_maintenance = false" in commit
+    assert "therapy_gate_try_reserve_maintenance_commit(&s_therapy_gate)" in commit
+gate_commit = function_body(GATE, "therapy_gate_try_reserve_maintenance_commit")
+for prerequisite in ("start_claims", "start_waiters", "notifications_pending",
+                     "maintenance", "restart_reserving", "restart_committed"):
+    assert prerequisite in gate_commit
 abort = function_body(NET, "ota_native_should_abort")
 assert "p.cancel_requested" in abort and "bsp_display_therapy_safe_maintenance_should_abort()" in abort
 commit = function_body(NET, "ota_native_commit_begin")
 assert commit.index("bsp_display_try_reserve_maintenance_commit()") < commit.index("s_ota_progress.cancellable = false")
-assert "if (!allowed) bsp_display_cancel_therapy_safe_restart()" in commit
+assert re.search(
+    r"if\s*\(\s*!allowed\s*\)\s*"
+    r"bsp_display_cancel_therapy_safe_restart\s*\(\s*\)",
+    commit,
+)

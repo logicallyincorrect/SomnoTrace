@@ -9,6 +9,7 @@
 #include "maintenance_release.h"
 #include "sd_storage.h"
 #include "somnotrace_fonts.h"
+#include "touch_keyboard_maps.h"
 #include "touch_maintenance.h"
 #include <stdio.h>
 #include <stdarg.h>
@@ -121,8 +122,8 @@ typedef struct {
 static ui_t *s;
 static void render(void);
 static void event(lv_event_t *e);
-static lv_obj_t *label(lv_obj_t *parent, const char *text, int x, int y, int w,
-                       const lv_font_t *font, uint32_t color)
+static lv_obj_t *label(
+    lv_obj_t *parent, const char *text, int x, int y, int w, const lv_font_t *font, uint32_t color)
 {
     lv_obj_t *o = lv_label_create(parent);
     lv_obj_set_pos(o, x, y);
@@ -182,8 +183,7 @@ static bool is_read_action(maintenance_action_t action)
 }
 static bool read_result_current(void)
 {
-    return !s->read_pending && s->read_job_id &&
-           s->read_view_generation == s->view_generation &&
+    return !s->read_pending && s->read_job_id && s->read_view_generation == s->view_generation &&
            s->snapshot.job_id == s->read_job_id && s->snapshot.action == s->read_action;
 }
 static bool read_rows_current(void)
@@ -202,8 +202,8 @@ static void refresh_read_snapshot(void)
     if (s->read_pending && s->read_view_generation != s->view_generation)
         s->read_pending = false;
     if (s->read_pending && !s->snapshot.busy) {
-        esp_err_t result = touch_maintenance_request_tracked(
-            s->read_action, s->read_argument, &s->read_job_id);
+        esp_err_t result =
+            touch_maintenance_request_tracked(s->read_action, s->read_argument, &s->read_job_id);
         touch_maintenance_snapshot(&s->snapshot);
         /* A competing owner can win admission after our snapshot. Retain one
          * view-scoped intent; retry only after that owner has retired. */
@@ -212,8 +212,8 @@ static void refresh_read_snapshot(void)
             strlcpy(s->notice, "Working...", sizeof(s->notice));
         } else if (result != ESP_ERR_INVALID_STATE || !s->snapshot.busy) {
             s->read_pending = false;
-            snprintf(s->notice, sizeof(s->notice), "Request not started: %s",
-                     esp_err_to_name(result));
+            snprintf(
+                s->notice, sizeof(s->notice), "Request not started: %s", esp_err_to_name(result));
         }
         s->rebuild = true;
     }
@@ -322,7 +322,9 @@ static void event(lv_event_t *e)
             if (result == ESP_OK)
                 show(VIEW_OTA);
             else
-                snprintf(s->notice, sizeof(s->notice), "Install not started: %s",
+                snprintf(s->notice,
+                         sizeof(s->notice),
+                         "Install not started: %s",
                          esp_err_to_name(result));
         } else
             show(VIEW_FILE);
@@ -386,8 +388,8 @@ static void event(lv_event_t *e)
         if (result == ESP_OK)
             show(VIEW_OTA);
         else
-            snprintf(s->notice, sizeof(s->notice), "Install not started: %s",
-                     esp_err_to_name(result));
+            snprintf(
+                s->notice, sizeof(s->notice), "Install not started: %s", esp_err_to_name(result));
         break;
     }
     case BUTTON_SD:
@@ -403,8 +405,8 @@ static void event(lv_event_t *e)
         if (result == ESP_OK)
             show(VIEW_OTA);
         else
-            snprintf(s->notice, sizeof(s->notice), "Install not started: %s",
-                     esp_err_to_name(result));
+            snprintf(
+                s->notice, sizeof(s->notice), "Install not started: %s", esp_err_to_name(result));
         break;
     }
     case BUTTON_CANCEL_OTA:
@@ -526,9 +528,10 @@ static void display(void)
     lv_obj_set_pos(mode, 365, 137);
     lv_obj_set_size(mode, 340, 48);
     lv_dropdown_set_options(mode, "Live therapy detail\nOff during therapy\nOff except alerts");
-    lv_dropdown_set_selected(mode, cfg.backlight_mode == BACKLIGHT_MODE_OFF_THRP     ? 1
-                                   : cfg.backlight_mode == BACKLIGHT_MODE_ALWAYS_OFF ? 2
-                                                                                      : 0);
+    lv_dropdown_set_selected(mode,
+                             cfg.backlight_mode == BACKLIGHT_MODE_OFF_THRP     ? 1
+                             : cfg.backlight_mode == BACKLIGHT_MODE_ALWAYS_OFF ? 2
+                                                                               : 0);
     dropdown_style(mode);
     lv_obj_add_event_cb(mode, display_event, LV_EVENT_VALUE_CHANGED, (void *)3);
     lv_obj_add_event_cb(mode, dropdown_ready, LV_EVENT_READY, NULL);
@@ -537,7 +540,11 @@ static void display(void)
           "Touch wakes the screen; alerts can wake it. Fixed landscape.\n\nInformation-only Home, "
           "day/night theme and larger text are deferred.\nLive therapy detail is the available "
           "Home layout.",
-          0, 211, 710, BODY, DIM);
+          0,
+          211,
+          710,
+          BODY,
+          DIM);
 }
 static void render(void)
 {
@@ -551,10 +558,18 @@ static void render(void)
     s->hold_label = NULL;
     s->ota_label = NULL;
     memset(s->services, 0, sizeof(s->services));
-    const char *titles[] = {"Recorded files",      "Night files",     "File details",
-                            "System status",       "Firmware",        "Install from microSD",
-                            "Install from a URL",  "Firmware update", "Advanced",
-                            "Confirm maintenance", "Display",         "Controller error history",
+    const char *titles[] = {"Recorded files",
+                            "Night files",
+                            "File details",
+                            "System status",
+                            "Firmware",
+                            "Install from microSD",
+                            "Install from a URL",
+                            "Firmware update",
+                            "Advanced",
+                            "Confirm maintenance",
+                            "Display",
+                            "Controller error history",
                             "Release notes"};
     s->title = label(s->root, titles[s->view], 16, 10, 420, TITLE, INK);
     bool top = s->view == VIEW_STORAGE || s->view == VIEW_SYSTEM || s->view == VIEW_ADVANCED;
@@ -580,7 +595,8 @@ static void render(void)
         if (s->view == VIEW_STORAGE) {
             button(s->root, "Refresh", 642, 5, 110, 44, BUTTON_SCAN);
             if (s->snapshot.capacity_valid && s->snapshot.census_valid)
-                snprintf(text, sizeof(text),
+                snprintf(text,
+                         sizeof(text),
                          "%.2f / %.2f GiB free  |  %llu AirSense nights  |  %llu data files\n"
                          "Exact capacity: %llu / %llu bytes free",
                          s->snapshot.free_bytes / 1073741824.0,
@@ -595,14 +611,16 @@ static void render(void)
                         sizeof(text));
             label(s->body, text, 0, 0, 715, MONO, INK);
             if (s->snapshot.census_valid && s->snapshot.estimate_samples)
-                snprintf(text, sizeof(text),
-                         "About %llu AirSense-only nights: largest of %lu completed raw+EDF "
-                         "nights.\nExcludes shared metadata; actual use varies. O2 needs "
-                         "additional space.",
-                         (unsigned long long)maintenance_estimated_nights(
-                             s->snapshot.free_bytes, s->snapshot.largest_air_night,
-                             s->snapshot.estimate_samples),
-                         (unsigned long)s->snapshot.estimate_samples);
+                snprintf(
+                    text,
+                    sizeof(text),
+                    "About %llu AirSense-only nights: largest of %lu completed raw+EDF "
+                    "nights.\nExcludes shared metadata; actual use varies. O2 needs "
+                    "additional space.",
+                    (unsigned long long)maintenance_estimated_nights(s->snapshot.free_bytes,
+                                                                     s->snapshot.largest_air_night,
+                                                                     s->snapshot.estimate_samples),
+                    (unsigned long)s->snapshot.estimate_samples);
             else
                 strlcpy(text,
                         "Nights estimate unavailable: no representative AirSense-only sample.\nO2 "
@@ -610,32 +628,50 @@ static void render(void)
                         sizeof(text));
             label(s->body, text, 0, 42, 715, BODY, DIM);
         } else if (s->view == VIEW_FILES) {
-            snprintf(text, sizeof(text), "Night %s: actual raw session and generated EDF files",
-                     s->day);
+            snprintf(
+                text, sizeof(text), "Night %s: actual raw session and generated EDF files", s->day);
             label(s->body, text, 0, 0, 715, BODY, DIM);
         } else
             label(s->body,
                   "Select somnotrace-*.bin from the card root. Board identity is verified.\nStop "
                   "therapy before installing; duration depends on image size and card speed.",
-                  0, 0, 710, BODY, DIM);
+                  0,
+                  0,
+                  710,
+                  BODY,
+                  DIM);
         for (size_t i = 0; i < s->snapshot.count; i++) {
             char detail[100];
-            snprintf(detail, sizeof(detail), "%llu bytes%s",
+            snprintf(detail,
+                     sizeof(detail),
+                     "%llu bytes%s",
                      (unsigned long long)s->snapshot.entries[i].bytes,
                      s->view == VIEW_STORAGE ? " / raw + EDF" : "");
-            row((s->view == VIEW_STORAGE ? 90 : 54) + i * 54, s->snapshot.entries[i].name, detail,
-                BUTTON_ROW + i, s->snapshot.busy || (s->view == VIEW_IMAGES && blocked()));
+            row((s->view == VIEW_STORAGE ? 90 : 54) + i * 54,
+                s->snapshot.entries[i].name,
+                detail,
+                BUTTON_ROW + i,
+                s->snapshot.busy || (s->view == VIEW_IMAGES && blocked()));
         }
         if (!s->snapshot.count)
-            label(s->body, s->snapshot.busy ? "Reading card..." : "No matching files in this page.",
-                  0, 105, 700, TITLE, DIM);
+            label(s->body,
+                  s->snapshot.busy ? "Reading card..." : "No matching files in this page.",
+                  0,
+                  105,
+                  700,
+                  TITLE,
+                  DIM);
         button(s->root, "First", 412, 5, 104, 44, BUTTON_FIRST);
         disabled(button(s->root, "Next", 528, 5, 104, 44, BUTTON_OLDER),
                  !s->snapshot.has_more || s->snapshot.busy);
         break;
     case VIEW_FILE:
-        snprintf(text, sizeof(text), "%s\n\nExact size: %llu bytes\nNight: %s\n\n%s",
-                 s->selected.name, (unsigned long long)s->selected.bytes, s->day,
+        snprintf(text,
+                 sizeof(text),
+                 "%s\n\nExact size: %llu bytes\nNight: %s\n\n%s",
+                 s->selected.name,
+                 (unsigned long long)s->selected.bytes,
+                 s->day,
                  !strncmp(s->selected.name, "EDF/", 4)
                      ? "Generated EDF export. Source session files are retained separately."
                      : "Source session file. Recreating EDF does not delete this data.");
@@ -648,9 +684,15 @@ static void render(void)
         s->services[1] = row(232, "O2 Ring", "", BUTTON_NAV_DEVICES, false);
         s->services[2] = row(290, "Wi-Fi", "", BUTTON_NAV_WIFI, false);
         s->services[3] = row(348, "Upload scheduler", "", BUTTON_NAV_UPLOADS, false);
-        s->services[4] = row(406, "Touch and display controllers", "Observed errors since boot",
-                             BUTTON_ERRORS, false);
-        row(464, "Firmware", "Check release notes, update over Wi-Fi or from card", BUTTON_FIRMWARE,
+        s->services[4] = row(406,
+                             "Touch and display controllers",
+                             "Observed errors since boot",
+                             BUTTON_ERRORS,
+                             false);
+        row(464,
+            "Firmware",
+            "Check release notes, update over Wi-Fi or from card",
+            BUTTON_FIRMWARE,
             false);
         row(522, "Display", "Brightness, timeout and overnight behaviour", BUTTON_DISPLAY, false);
         break;
@@ -663,39 +705,61 @@ static void render(void)
                 localtime_r(&checked, &tm);
                 char timestamp[40];
                 strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &tm);
-                snprintf(text, sizeof(text), "Last check attempted %s%s", timestamp,
+                snprintf(text,
+                         sizeof(text),
+                         "Last check attempted %s%s",
+                         timestamp,
                          s->snapshot.release_valid ? "" : " - no release result");
             } else
-                snprintf(text, sizeof(text),
+                snprintf(text,
+                         sizeof(text),
                          "Last check attempted at uptime %lld s; wall clock unavailable",
                          (long long)s->snapshot.checked_uptime_us / 1000000);
         } else
             strlcpy(text, "Firmware has not been checked.", sizeof(text));
         label(s->body, text, 0, 0, 712, MONO, DIM);
         label(s->root, "Source: " MAINTENANCE_RELEASE_SOURCE, 16, 48, 410, MONO, DIM);
-        snprintf(text, sizeof(text), "Installed %s\nRelease %s%s", s->diagnostics.version,
+        snprintf(text,
+                 sizeof(text),
+                 "Installed %s\nRelease %s%s",
+                 s->diagnostics.version,
                  s->snapshot.release_valid ? s->snapshot.release : "unknown",
                  s->snapshot.release_valid && !s->snapshot.compatible_asset
                      ? " - no explicitly marked 7B asset"
                      : "");
         label(s->body, text, 0, 40, 712, TITLE, INK);
-        row(104, "Release notes",
+        row(104,
+            "Release notes",
             s->snapshot.release_valid ? s->snapshot.published : "Check a release first",
-            BUTTON_NOTES, !s->snapshot.release_valid);
-        row(162, "Update over Wi-Fi",
-            "Therapy must be stopped. Time estimate appears after byte progress.", BUTTON_UPDATE,
+            BUTTON_NOTES,
+            !s->snapshot.release_valid);
+        row(162,
+            "Update over Wi-Fi",
+            "Therapy must be stopped. Time estimate appears after byte progress.",
+            BUTTON_UPDATE,
             blocked() || !s->snapshot.compatible_asset);
-        row(220, "Install from microSD card", "Looks for somnotrace-*.bin in the card root",
-            BUTTON_SD, blocked());
-        row(278, "Install from a URL", "Advanced: HTTPS URL for a compatible 7B image", BUTTON_URL,
+        row(220,
+            "Install from microSD card",
+            "Looks for somnotrace-*.bin in the card root",
+            BUTTON_SD,
+            blocked());
+        row(278,
+            "Install from a URL",
+            "Advanced: HTTPS URL for a compatible 7B image",
+            BUTTON_URL,
             blocked());
         break;
     case VIEW_NOTES:
         label(s->body, s->snapshot.notes, 0, 0, 710, BODY, INK);
         break;
     case VIEW_URL:
-        label(s->body, "Advanced: HTTPS firmware URL. Image target must match this board.", 0, 0,
-              700, BODY, DIM);
+        label(s->body,
+              "Advanced: HTTPS firmware URL. Image target must match this board.",
+              0,
+              0,
+              700,
+              BODY,
+              DIM);
         s->url = lv_textarea_create(s->body);
         lv_obj_set_pos(s->url, 0, 32);
         lv_obj_set_size(s->url, 535, 54);
@@ -708,6 +772,8 @@ static void render(void)
         lv_obj_set_style_border_width(s->url, 0, 0);
         disabled(button(s->body, "Install", 550, 32, 158, 54, BUTTON_INSTALL_URL), blocked());
         s->keyboard = lv_keyboard_create(s->body);
+        touch_keyboard_set_mode(
+            s->keyboard, &TOUCH_KEYBOARD_LAYOUT_DEFAULT, LV_KEYBOARD_MODE_TEXT_LOWER);
         lv_obj_set_align(s->keyboard, LV_ALIGN_TOP_LEFT);
         lv_obj_set_pos(s->keyboard, 0, 100);
         lv_obj_set_size(s->keyboard, 710, 236);
@@ -736,25 +802,44 @@ static void render(void)
               "The download writes the inactive OTA slot. Cancel is available before\nboot "
               "selection begins. Keep power connected; a selected image restarts\nonly after "
               "therapy and storage are idle.",
-              0, 250, 710, BODY, DIM);
+              0,
+              250,
+              710,
+              BODY,
+              DIM);
         break;
     case VIEW_ADVANCED:
         label(s->body, "SAFE", 0, 0, 650, MONO, CYAN);
-        row(22, "Reset upload state", "Forget upload receipts; recording files are retained",
-            BUTTON_UPLOAD_RESET, blocked());
-        row(70, "Recreate EDF files",
-            "Transactional per-night rebuild; duration depends on retained data", BUTTON_RECREATE,
+        row(22,
+            "Reset upload state",
+            "Forget upload receipts; recording files are retained",
+            BUTTON_UPLOAD_RESET,
             blocked());
-        row(118, "Restart", "Confirmation required; blocked during therapy", BUTTON_RESTART,
+        row(70,
+            "Recreate EDF files",
+            "Transactional per-night rebuild; duration depends on retained data",
+            BUTTON_RECREATE,
+            blocked());
+        row(118,
+            "Restart",
+            "Confirmation required; blocked during therapy",
+            BUTTON_RESTART,
             blocked());
         label(s->body, "DESTRUCTIVE  /  Cannot be undone", 0, 174, 710, MONO, RED);
-        row(194, "Delete generated EDF files  /  Hold",
-            "Source sessions, O2 raw files, settings and pairing are retained", BUTTON_DELETE,
+        row(194,
+            "Delete generated EDF files  /  Hold",
+            "Source sessions, O2 raw files, settings and pairing are retained",
+            BUTTON_DELETE,
             blocked());
-        row(242, "Reset all data  /  Hold", "Every recording, every setting, every paired device",
-            BUTTON_RESET, blocked());
-        row(290, "Format the microSD card  /  Hold",
-            "Erase everything on the card; retain device settings and pairing", BUTTON_FORMAT,
+        row(242,
+            "Reset all data  /  Hold",
+            "Every recording, every setting, every paired device",
+            BUTTON_RESET,
+            blocked());
+        row(290,
+            "Format the microSD card  /  Hold",
+            "Erase everything on the card; retain device settings and pairing",
+            BUTTON_FORMAT,
             blocked());
         break;
     case VIEW_HOLD: {
@@ -763,10 +848,12 @@ static void render(void)
                                                                  : "Reset all data";
         label(s->body, name, 0, 0, 710, TITLE, RED);
         if (s->snapshot.census_valid)
-            snprintf(text, sizeof(text),
+            snprintf(text,
+                     sizeof(text),
                      "Latest scan: %llu AirSense nights, %llu data files, %llu generated "
                      "EDFs.\nO2 raw files: %llu. Per-night upload delivery count is unavailable.",
-                     (unsigned long long)s->snapshot.nights, (unsigned long long)s->snapshot.files,
+                     (unsigned long long)s->snapshot.nights,
+                     (unsigned long long)s->snapshot.files,
                      (unsigned long long)s->snapshot.generated_edfs,
                      (unsigned long long)s->snapshot.ox_files);
         else
@@ -787,7 +874,11 @@ static void render(void)
                 : "All managed recordings, card logs, upload receipts, device settings "
                   "and\nBluetooth pairing are removed. Wi-Fi, alerts, clock and display "
                   "settings\nreset. Unrelated card-root files stay. Restarts into first-run setup.",
-            0, 106, 710, BODY, DIM);
+            0,
+            106,
+            710,
+            BODY,
+            DIM);
         s->hold_button = button(s->body, "Hold continuously for 3 seconds", 0, 202, 510, 58, 0);
         lv_obj_add_event_cb(s->hold_button, hold_event, LV_EVENT_ALL, NULL);
         disabled(s->hold_button, blocked());
@@ -798,22 +889,30 @@ static void render(void)
         lv_bar_set_range(s->hold_bar, 0, MAINTENANCE_HOLD_MS);
         lv_obj_set_style_bg_color(s->hold_bar, lv_color_hex(CONTROL), LV_PART_MAIN);
         lv_obj_set_style_bg_color(s->hold_bar, lv_color_hex(RED), LV_PART_INDICATOR);
-        s->hold_label = label(s->body, "Release, cancellation or navigation resets the hold.", 0,
-                              292, 710, BODY, DIM);
+        s->hold_label = label(s->body,
+                              "Release, cancellation or navigation resets the hold.",
+                              0,
+                              292,
+                              710,
+                              BODY,
+                              DIM);
         break;
     }
     case VIEW_DISPLAY:
         display();
         break;
     case VIEW_ERRORS:
-        snprintf(text, sizeof(text),
+        snprintf(text,
+                 sizeof(text),
                  "Controller observations since boot: %s\nTimes are monotonic uptime. Unobserved "
                  "operations are unknown.\nNo task stack-health measurements are supplied.",
                  s->diagnostics.controllers.simulated ? "SIMULATED" : "physical driver results");
         label(s->body, text, 0, 0, 710, MONO, INK);
         for (size_t i = 0; i < CONTROLLER_OPERATION_COUNT; i++) {
             controller_operation_status_t *op = &s->diagnostics.controllers.operations[i];
-            snprintf(text, sizeof(text), "%s / %s / %lu errors since boot",
+            snprintf(text,
+                     sizeof(text),
+                     "%s / %s / %lu errors since boot",
                      controller_diagnostics_operation_name(i),
                      op->observed ? esp_err_to_name(op->last_result) : "unobserved",
                      (unsigned long)op->error_count);
@@ -821,12 +920,15 @@ static void render(void)
         }
         for (size_t i = 0; i < s->diagnostics.controllers.history_count; i++) {
             controller_error_episode_t *ep = &s->diagnostics.controllers.history[i];
-            snprintf(text, sizeof(text), "%lld..%lld ms  %s  %s x%lu",
-                     (long long)ep->first_us / 1000, (long long)ep->last_us / 1000,
+            snprintf(text,
+                     sizeof(text),
+                     "%lld..%lld ms  %s  %s x%lu",
+                     (long long)ep->first_us / 1000,
+                     (long long)ep->last_us / 1000,
                      controller_diagnostics_operation_name(ep->operation),
-                     esp_err_to_name(ep->result), (unsigned long)ep->occurrences);
-            label(s->body, text, 0, 88 + CONTROLLER_OPERATION_COUNT * 28 + i * 44,
-                  710, MONO, DIM);
+                     esp_err_to_name(ep->result),
+                     (unsigned long)ep->occurrences);
+            label(s->body, text, 0, 88 + CONTROLLER_OPERATION_COUNT * 28 + i * 44, 710, MONO, DIM);
         }
         break;
     }
@@ -834,9 +936,11 @@ static void render(void)
 }
 static bool subtree_interacting(lv_obj_t *object)
 {
-    if (lv_obj_has_state(object, LV_STATE_PRESSED) || lv_obj_is_scrolling(object)) return true;
+    if (lv_obj_has_state(object, LV_STATE_PRESSED) || lv_obj_is_scrolling(object))
+        return true;
     for (uint32_t i = 0; i < lv_obj_get_child_cnt(object); ++i)
-        if (subtree_interacting(lv_obj_get_child(object, i))) return true;
+        if (subtree_interacting(lv_obj_get_child(object, i)))
+            return true;
     return false;
 }
 
@@ -862,24 +966,30 @@ static void tick(lv_timer_t *timer)
         if (!allowed)
             maintenance_hold_reset(&s->hold);
         uint32_t elapsed = maintenance_hold_elapsed(&s->hold, lv_tick_get());
-        lv_bar_set_value(s->hold_bar, elapsed > MAINTENANCE_HOLD_MS ? MAINTENANCE_HOLD_MS : elapsed,
+        lv_bar_set_value(s->hold_bar,
+                         elapsed > MAINTENANCE_HOLD_MS ? MAINTENANCE_HOLD_MS : elapsed,
                          LV_ANIM_OFF);
         if (s->hold.pressed)
-            label_set_fmt_if_changed(
-                s->hold_label, "Keep holding: %lu ms remaining. Release to cancel.",
-                (unsigned long)(elapsed >= MAINTENANCE_HOLD_MS ? 0
-                                                               : MAINTENANCE_HOLD_MS - elapsed));
+            label_set_fmt_if_changed(s->hold_label,
+                                     "Keep holding: %lu ms remaining. Release to cancel.",
+                                     (unsigned long)(elapsed >= MAINTENANCE_HOLD_MS
+                                                         ? 0
+                                                         : MAINTENANCE_HOLD_MS - elapsed));
         else
             label_set_if_changed(s->hold_label,
-                              allowed ? "Release, cancellation or navigation resets the hold."
-                                      : "Unavailable while services, therapy or storage are busy.");
+                                 allowed
+                                     ? "Release, cancellation or navigation resets the hold."
+                                     : "Unavailable while services, therapy or storage are busy.");
     }
     if (s->ota_label) {
         maintenance_ota_snapshot(&s->ota);
         char text[640];
-        static const char *stage[] = {"Not started",     "Transferring to inactive slot",
-                                      "Verifying image", "Verifying / selecting boot image",
-                                      "Restart pending", "Failed",
+        static const char *stage[] = {"Not started",
+                                      "Transferring to inactive slot",
+                                      "Verifying image",
+                                      "Verifying / selecting boot image",
+                                      "Restart pending",
+                                      "Failed",
                                       "Cancelled"};
         const char *health =
             s->ota.boot_selected
@@ -891,20 +1001,32 @@ static void tick(lv_timer_t *timer)
                 s->ota.transferred > 0 && s->ota.transferred < s->ota.total
                     ? elapsed * (s->ota.total - s->ota.transferred) / s->ota.transferred / 1000000
                     : -1;
-            snprintf(text, sizeof(text), "%s\n%d / %d bytes%s\n%s\n%s", stage[s->ota.stage],
-                     s->ota.transferred, s->ota.total,
+            snprintf(text,
+                     sizeof(text),
+                     "%s\n%d / %d bytes%s\n%s\n%s",
+                     stage[s->ota.stage],
+                     s->ota.transferred,
+                     s->ota.total,
                      s->ota.active && eta >= 0 ? " - estimate based on observed transfer rate" : "",
-                     health, s->ota.error);
+                     health,
+                     s->ota.error);
             if (s->ota.active && eta >= 0) {
                 size_t n = strlen(text);
-                snprintf(text + n, sizeof(text) - n,
-                         "\nAbout %lld s of transfer remaining; verification time unknown.", eta);
+                snprintf(text + n,
+                         sizeof(text) - n,
+                         "\nAbout %lld s of transfer remaining; verification time unknown.",
+                         eta);
             }
-            lv_bar_set_value(s->ota_bar, (int)((int64_t)s->ota.transferred * 100 / s->ota.total),
-                             LV_ANIM_OFF);
+            lv_bar_set_value(
+                s->ota_bar, (int)((int64_t)s->ota.transferred * 100 / s->ota.total), LV_ANIM_OFF);
         } else
-            snprintf(text, sizeof(text), "%s\n%d bytes transferred; total size unknown\n%s\n%s",
-                     stage[s->ota.stage], s->ota.transferred, health, s->ota.error);
+            snprintf(text,
+                     sizeof(text),
+                     "%s\n%d bytes transferred; total size unknown\n%s\n%s",
+                     stage[s->ota.stage],
+                     s->ota.transferred,
+                     health,
+                     s->ota.error);
         if (s->ota.done && !s->ota.ok && s->ota.failed_stage < 8) {
             size_t n = strlen(text);
             snprintf(text + n, sizeof(text) - n, "\nStopped at: %s", stage[s->ota.failed_stage]);
@@ -932,14 +1054,17 @@ static void tick(lv_timer_t *timer)
                 lv_dropdown_set_selected(s->mode_dropdown,
                                          current.backlight_mode == BACKLIGHT_MODE_OFF_THRP     ? 1
                                          : current.backlight_mode == BACKLIGHT_MODE_ALWAYS_OFF ? 2
-                                                                                                : 0);
+                                                                                               : 0);
         }
         if (s->diag) {
             maintenance_diagnostics_t *d = &s->diagnostics;
             char capacity[96], signal[40];
             if (d->sd_capacity_valid)
-                snprintf(capacity, sizeof(capacity), "%llu / %llu bytes free",
-                         (unsigned long long)d->sd_free, (unsigned long long)d->sd_total);
+                snprintf(capacity,
+                         sizeof(capacity),
+                         "%llu / %llu bytes free",
+                         (unsigned long long)d->sd_free,
+                         (unsigned long long)d->sd_total);
             else
                 strlcpy(capacity, "unknown; no valid capacity sample", sizeof(capacity));
             if (d->rssi_valid)
@@ -951,18 +1076,28 @@ static void tick(lv_timer_t *timer)
                 "%s / %s / build %s\nInternal free/min/largest  %lu / %lu / %lu B\nPSRAM "
                 "free/min/largest     %lu / %lu / %lu B\nTasks %lu   Uptime %llu s   Card "
                 "%s\nTherapy %s / recording %s\nCapacity: %s",
-                d->version, d->target, d->build, (unsigned long)d->free_internal,
-                (unsigned long)d->min_internal, (unsigned long)d->largest_internal,
-                (unsigned long)d->free_psram, (unsigned long)d->min_psram,
-                (unsigned long)d->largest_psram, (unsigned long)d->tasks,
-                (unsigned long long)d->uptime_s, d->card_ready ? "mounted" : "unavailable",
-                d->therapy ? "active" : "inactive", d->recording ? "active" : "inactive",
+                d->version,
+                d->target,
+                d->build,
+                (unsigned long)d->free_internal,
+                (unsigned long)d->min_internal,
+                (unsigned long)d->largest_internal,
+                (unsigned long)d->free_psram,
+                (unsigned long)d->min_psram,
+                (unsigned long)d->largest_psram,
+                (unsigned long)d->tasks,
+                (unsigned long long)d->uptime_s,
+                d->card_ready ? "mounted" : "unavailable",
+                d->therapy ? "active" : "inactive",
+                d->recording ? "active" : "inactive",
                 capacity);
             label_set_if_changed(s->services[0], d->airsense);
             label_set_if_changed(s->services[1], d->oxygen);
-            label_set_fmt_if_changed(s->services[2], "%s / %s / %s",
-                                  d->wifi ? d->ssid : "Offline", d->wifi ? d->ip : "IP unavailable",
-                                  signal);
+            label_set_fmt_if_changed(s->services[2],
+                                     "%s / %s / %s",
+                                     d->wifi ? d->ssid : "Offline",
+                                     d->wifi ? d->ip : "IP unavailable",
+                                     signal);
             label_set_if_changed(s->services[3], d->uploads);
             const char *controller = "Open measured operations and error history";
             for (size_t i = 0; i < CONTROLLER_OPERATION_COUNT; i++) {
@@ -977,11 +1112,12 @@ static void tick(lv_timer_t *timer)
     }
     if (s->status)
         label_set_if_changed(s->status,
-                          s->snapshot.busy
-                              ? "Operation in progress; controls are disabled until completion."
-                              : s->notice);
+                             s->snapshot.busy
+                                 ? "Operation in progress; controls are disabled until completion."
+                                 : s->notice);
 }
-esp_err_t touch_maintenance_ui_show(lv_obj_t *parent, maintenance_ui_destination_t destination,
+esp_err_t touch_maintenance_ui_show(lv_obj_t *parent,
+                                    maintenance_ui_destination_t destination,
                                     const maintenance_ui_hooks_t *hooks)
 {
     if (s || !parent || !hooks)
@@ -1057,12 +1193,26 @@ void touch_maintenance_ui_frame_published(void)
     int scroll = lv_obj_get_scroll_y(s->body);
     int ota_stage = s->view == VIEW_OTA ? (int)s->ota.stage : -1;
     if (s->frame_marker_pending || scroll != s->frame_scroll || ota_stage != s->frame_ota_stage) {
-        static const char *names[] = {"storage", "files", "file", "system", "firmware",
-                                      "images", "url", "ota", "advanced", "hold", "display",
-                                      "controllers", "notes"};
-        ESP_LOGI("maintenance_ui", "QEMU maintenance frame view=%s scroll=%d revision=%lu busy=%d ota_stage=%d",
-                 names[s->view], scroll, (unsigned long)s->snapshot.revision,
-                 s->snapshot.busy, ota_stage);
+        static const char *names[] = {"storage",
+                                      "files",
+                                      "file",
+                                      "system",
+                                      "firmware",
+                                      "images",
+                                      "url",
+                                      "ota",
+                                      "advanced",
+                                      "hold",
+                                      "display",
+                                      "controllers",
+                                      "notes"};
+        ESP_LOGI("maintenance_ui",
+                 "QEMU maintenance frame view=%s scroll=%d revision=%lu busy=%d ota_stage=%d",
+                 names[s->view],
+                 scroll,
+                 (unsigned long)s->snapshot.revision,
+                 s->snapshot.busy,
+                 ota_stage);
         s->frame_marker_pending = false;
         s->frame_scroll = scroll;
         s->frame_ota_stage = ota_stage;

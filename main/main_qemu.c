@@ -24,8 +24,7 @@ static void seed_finished_setup_preview(void)
     if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
         /* QEMU's flash image is disposable.  Recover an incompatible retained
          * setup record so screenshots never depend on a previous preview. */
-        ESP_LOGW(TAG, "resetting incompatible QEMU setup state: %s",
-                 esp_err_to_name(err));
+        ESP_LOGW(TAG, "resetting incompatible QEMU setup state: %s", esp_err_to_name(err));
         ESP_ERROR_CHECK(first_run_setup_reset());
     }
 
@@ -42,9 +41,7 @@ static void seed_finished_setup_preview(void)
 
     first_run_setup_snapshot_t snapshot;
     first_run_setup_snapshot(&snapshot);
-    ESP_ERROR_CHECK(first_run_setup_is_finished(&snapshot.state)
-                        ? ESP_OK
-                        : ESP_ERR_INVALID_STATE);
+    ESP_ERROR_CHECK(first_run_setup_is_finished(&snapshot.state) ? ESP_OK : ESP_ERR_INVALID_STATE);
     ESP_LOGI(TAG, "deterministic setup preview ready (finished)");
 }
 
@@ -88,13 +85,13 @@ void app_main(void)
      * the preview never displays a moving circular-buffer seam. */
     float phase = 300.0f * 0.06f;
     while (true) {
-        if ((iteration % 20) == 0) touch_logs_qemu_tick();
+        if ((iteration % 20) == 0)
+            touch_logs_qemu_tick();
         float flow = 36.0f * sinf(phase) + 7.0f * sinf(phase * 2.3f);
         bsp_display_push_flow(flow);
         if ((iteration % 20) == 0) {
             bsp_display_push_leak(3.2f + 0.8f * sinf(phase * 0.3f));
-            bsp_display_push_metrics(8.6f + 0.4f * sinf(phase * 0.2f),
-                                     14.4f, 0.08f);
+            bsp_display_push_metrics(8.6f + 0.4f * sinf(phase * 0.2f), 14.4f, 0.08f);
         }
         phase += 0.06f;
         iteration++;

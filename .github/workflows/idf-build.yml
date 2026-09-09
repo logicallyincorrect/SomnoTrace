@@ -16,10 +16,11 @@ on:
       - "third_party/**"
       - "CMakeLists.txt"
       - "sdkconfig.defaults"
+      - "sdkconfig.7b.defaults"
       - "partitions.csv"
       - "scripts/idf.sh"
       - "scripts/build-dist.sh"
-      - "scripts/gen_tz_db.py"
+      - "scripts/build-7b.sh"
       - ".github/workflows/idf-build.yml"
   pull_request:
     paths:
@@ -28,10 +29,11 @@ on:
       - "third_party/**"
       - "CMakeLists.txt"
       - "sdkconfig.defaults"
+      - "sdkconfig.7b.defaults"
       - "partitions.csv"
       - "scripts/idf.sh"
       - "scripts/build-dist.sh"
-      - "scripts/gen_tz_db.py"
+      - "scripts/build-7b.sh"
       - ".github/workflows/idf-build.yml"
   workflow_dispatch:
 
@@ -42,6 +44,16 @@ jobs:
   idf-build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        profile:
+          - name: compact-154
+            command: ./scripts/idf.sh build
+            build_dir: build
+          - name: touch-7b
+            command: ./scripts/build-7b.sh
+            build_dir: build-7b
     steps:
       - uses: actions/checkout@v4
         with:
@@ -58,21 +70,21 @@ jobs:
         # go green before it was caught (see host-tests.yml).
         run: |
           set -o pipefail
-          ./scripts/idf.sh build 2>&1 | tee idf-build.log
+          ${{ matrix.profile.command }} 2>&1 | tee idf-build.log
 
       - name: Confirm an image was actually produced
         # A build step can exit 0 having produced nothing if the toolchain is ever invoked wrongly.
         # Name the artifact and the version the log claims, so a green run says what it built.
         run: |
-          test -f build/somnotrace.bin || {
-            echo "::error::idf.py build exited 0 but build/somnotrace.bin does not exist"; exit 1; }
-          echo "image: $(stat -c '%n %s bytes' build/somnotrace.bin)"
+          test -f "${{ matrix.profile.build_dir }}/somnotrace.bin" || {
+            echo "::error::build exited 0 but ${{ matrix.profile.build_dir }}/somnotrace.bin does not exist"; exit 1; }
+          echo "image: $(stat -c '%n %s bytes' "${{ matrix.profile.build_dir }}/somnotrace.bin")"
           grep -m1 'Firmware version:' idf-build.log || echo "::warning::no version line in the build log"
 
       - name: Upload the build log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idf-build-log
+          name: idf-build-${{ matrix.profile.name }}-log
           path: idf-build.log
           retention-days: 7

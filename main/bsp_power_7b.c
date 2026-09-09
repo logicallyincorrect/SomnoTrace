@@ -40,7 +40,8 @@ esp_err_t bsp_power_battery_monitor_start(void)
 
 void bsp_power_battery_get(bsp_battery_t *out)
 {
-    if (!out) return;
+    if (!out)
+        return;
     memset(out, 0, sizeof(*out));
     out->percent = -1;
     out->millivolts = -1;

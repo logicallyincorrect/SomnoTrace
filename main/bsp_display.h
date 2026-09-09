@@ -22,7 +22,6 @@
  * (https://github.com/ilyakruchinin)." See the NOTICE file for details.
  */
 
-
 #pragma once
 
 #include <stdbool.h>
@@ -86,8 +85,7 @@ void bsp_display_push_flow(float flow_lpm);
 void bsp_display_push_flow_gap(uint32_t samples);
 void bsp_display_push_leak(float leak_lpm);
 /* Live two-second metrics. Pass NAN for an unavailable value. */
-void bsp_display_push_metrics(float pressure_cmh2o, float respiratory_rate,
-                              float flow_limitation);
+void bsp_display_push_metrics(float pressure_cmh2o, float respiratory_rate, float flow_limitation);
 void bsp_display_set_therapy_start_time(int64_t start_us);
 bool bsp_display_is_therapy_active(void);
 

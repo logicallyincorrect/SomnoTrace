@@ -234,10 +234,10 @@ require(TOUCH_BSP, r"#define\s+TOUCH_FAILURE_THRESHOLD\s+3",
         "touch health changes only after a consecutive failure threshold")
 require(wake_input,
         r"CONFIG_SOMNOTRACE_BOARD_QEMU.*?return true;.*?"
-        r"waveshare_7b_touch_snapshot.*?touch_observation_healthy",
+        r"touch_input_snapshot.*?touch_observation_healthy",
         "wake input requires a fresh worker observation, including recovery after boot failure")
 assert "if (!s_touch)" not in wake_input
-require(touch_reader, r"waveshare_7b_touch_snapshot.*?touch_observation_pressed",
+require(touch_reader, r"touch_input_snapshot.*?touch_observation_pressed",
         "LVGL consumes a timestamped point without synchronous I2C")
 assert "esp_lcd_touch_read_data" not in touch_reader
 require(touch_reader,
@@ -273,6 +273,14 @@ require(TOUCH_BSP,
         r"therapy\s*&&\s*settings\.backlight_mode\s*==\s*BACKLIGHT_MODE_OFF_THRP.*?"
         r"bsp_display_set_backlight\(!off\)",
         "therapy screen-off modes request a physical backlight change")
+require(TOUCH_BSP,
+        r"bsp_display_apply_backlight_policy\(bool force_on\).*?"
+        r"s_backlight_force_on\s*=\s*force_on",
+        "ending a SoftAP visibility claim releases the touch-display force flag")
+require(COMPACT_BSP,
+        r"bsp_display_apply_backlight_policy\(bool force_on\).*?"
+        r"s_backlight_force_on\s*=\s*force_on",
+        "ending a SoftAP visibility claim releases the compact-display force flag")
 require(update_ui,
         r"if\s*\(\s*!screen_wake_input_available\(\)\s*&&\s*!backlight\s*\)"
         r".*?bsp_display_set_backlight\(true\).*?"
@@ -325,7 +333,7 @@ require(TOUCH_BSP, r"#define\s+BACKLIGHT_RETRY_US\s+250000",
 require(backlight_apply,
         r"if\s*\(now_us\s*<\s*retry_after_us\)\s*return;.*?"
         r"esp_err_t\s+backlight_result;.*?"
-        r"waveshare_7b_reassert_visible\(\).*?"
+        r"rgb_display_transport_reassert_visible\(\).*?"
         r"if\s*\(backlight_result\s*!=\s*ESP_OK\).*?"
         r"s_backlight_write_errors\+\+",
         "backlight writes are checked, rate-limited, and diagnosed")
@@ -339,7 +347,7 @@ require(backlight_apply,
         "failed wakes retry while failed optional sleeps fail open")
 require(backlight_apply,
         r"esp_err_t\s+brightness_result\s*=\s*ESP_OK.*?"
-        r"waveshare_7b_set_brightness.*?"
+        r"rgb_display_transport_set_brightness_percent.*?"
         r"if\s*\(backlight_result == ESP_OK && brightness_result != ESP_OK\).*?"
         r"s_backlight_write_errors\+\+",
         "wake-time brightness restoration is checked")
@@ -350,7 +358,7 @@ require(backlight_apply,
         r"s_backlight_retry_after_us\s*=\s*0",
         "authoritative backlight state changes only after hardware success")
 require(TOUCH_BOARD,
-        r"waveshare_7b_set_backlight\(bool\s+on\).*?"
+        r"rgb_display_transport_set_backlight\(bool\s+on\).*?"
         r"iox_output\(IOX_BACKLIGHT,\s*on\)",
         "logical screen off hard-disables the panel backlight through EXIO2")
 require(MAINTENANCE_UI,

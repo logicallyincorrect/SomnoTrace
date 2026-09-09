@@ -27,12 +27,15 @@ kconfig = source("main/Kconfig.projbuild")
 component = source("main/idf_component.yml")
 board = source("main/board_qemu.c")
 display = source("main/bsp_display_7b.c")
+handoff = source("main/touch_display_handoff.c")
+keyboard_maps = source("main/touch_keyboard_maps.c")
 logs_ui = source("main/touch_logs_ui.c")
 maintenance_ui = source("main/touch_maintenance_ui.c")
 config_ui = source("main/touch_manage_config_ui.c")
 history_ui = source("main/touch_history_ui.c")
 history_controller = source("main/touch_history_controller.c")
 firmware_target = source("main/firmware_target.c")
+board_descriptor = source("main/board_descriptor.h")
 demo = source("main/main_qemu.c")
 defaults = source("sdkconfig.qemu.defaults")
 setup = source("scripts/setup-qemu-macos.sh")
@@ -66,13 +69,13 @@ assert target("154")["ready_log"] == "240x240 original-board UI preview ready"
 for unit in ("main_qemu.c", "board_qemu.c", "bsp_display_7b.c"):
     assert f'"{unit}"' in cmake, f"QEMU build omits {unit}"
 assert "espressif/esp_lcd_qemu_rgb" in component
-require(board, r"\.width\s*=\s*WAVESHARE_7B_H_RES", "native panel width")
-require(board, r"\.height\s*=\s*WAVESHARE_7B_V_RES", "native panel height")
+require(board, r"\.width\s*=\s*SOMNOTRACE_TOUCH_DISPLAY_WIDTH", "native panel width")
+require(board, r"\.height\s*=\s*SOMNOTRACE_TOUCH_DISPLAY_HEIGHT", "native panel height")
 require(board, r"QEMU_RGB_TOUCH_POSITION", "QEMU touch MMIO bridge")
 require(board, r"was_pressed\s*&&\s*!\*pressed.*?QEMU touch release sampled",
         "observable guest release edge for deterministic scripted taps")
-require(display, r"display_driver\.hor_res\s*=\s*WAVESHARE_7B_H_RES", "LVGL width")
-require(display, r"display_driver\.ver_res\s*=\s*WAVESHARE_7B_V_RES", "LVGL height")
+require(display, r"display_driver\.hor_res\s*=\s*SOMNOTRACE_TOUCH_DISPLAY_WIDTH", "LVGL width")
+require(display, r"display_driver\.ver_res\s*=\s*SOMNOTRACE_TOUCH_DISPLAY_HEIGHT", "LVGL height")
 assert "LV_OPA_COVER" in display
 require(display, r"board_qemu_touch_read", "LVGL QEMU touch reader")
 require(display, r"s_qemu_requested_tab", "display-task-owned page switching")
@@ -90,12 +93,12 @@ require(display,
         r"glow\.round_start\s*=\s*0;.*?glow\.round_end\s*=\s*0;.*?"
         r"trace\.round_start\s*=\s*0;.*?trace\.round_end\s*=\s*0;",
         "bead-free live graph strokes")
-require(display, r"esp_lcd_rgb_qemu_get_frame_buffer\(s_panel,\s*&qemu_vram\).*?fb1\s*=\s*\(lv_color_t\s*\*\)qemu_vram\s*\+.*?WAVESHARE_7B_H_RES\s*\*\s*WAVESHARE_7B_V_RES",
+require(display, r"esp_lcd_rgb_qemu_get_frame_buffer\(s_panel,\s*&qemu_vram\).*?fb1\s*=\s*\(lv_color_t\s*\*\)qemu_vram\s*\+.*?SOMNOTRACE_TOUCH_DISPLAY_WIDTH\s*\*\s*SOMNOTRACE_TOUCH_DISPLAY_HEIGHT",
         "second-half QEMU VRAM draw buffer")
 assert "display_driver.full_refresh" not in display
 require(display, r"display_driver\.direct_mode\s*=\s*1;",
         "persistent dirty-region composition")
-require(display, r"CONFIG_SOMNOTRACE_BOARD_QEMU.*?if\s*\(!lv_disp_flush_is_last\(drv\)\).*?lv_disp_flush_ready\(drv\).*?return;.*?0,\s*0,\s*WAVESHARE_7B_H_RES,\s*WAVESHARE_7B_V_RES,\s*pixels",
+require(handoff, r"if\s*\(!lv_disp_flush_is_last\(driver\)\).*?lv_disp_flush_ready\(driver\).*?return false;.*?CONFIG_SOMNOTRACE_BOARD_QEMU.*?0,\s*0,\s*SOMNOTRACE_TOUCH_DISPLAY_WIDTH,\s*SOMNOTRACE_TOUCH_DISPLAY_HEIGHT,\s*pixels",
         "single completed QEMU composition handoff")
 require(display, r"QEMU UI first frame published",
         "initial-frame input synchronization")
@@ -192,7 +195,7 @@ for section_label in (
 # The QEMU build exercises the same content-sized header status capsule as the
 # panel. Protect its one-line geometry, centre alignment, and right-side inset.
 for pattern, description in (
-    (r"status_label_width.*?lv_txt_get_size\(&size,\s*lv_label_get_text\(label\),\s*"
+    (r"status_label_width.*?lv_txt_get_size\s*\(\s*&size,\s*lv_label_get_text\(label\),\s*"
      r"FONT_BODY,\s*0,\s*0,\s*LV_COORD_MAX,\s*LV_TEXT_FLAG_NONE\).*?"
      r"return\s+LV_MAX\(size\.x,\s*1\)",
      "content-measured status labels"),
@@ -400,7 +403,7 @@ for contract, description in (
     assert contract in capture_smoke, f"capture smoke omits {description}"
 require(display, r"s_keyboard_sheet.*?keyboard_sheet_action_cb",
         "explicit touch keyboard sheet with completion actions")
-require(display, r"s_text_keyboard_lower_map.*?\"q\".*?\"p\".*?LV_SYMBOL_BACKSPACE.*?LV_SYMBOL_UP.*?\"123\".*?\"@\".*?\"space\".*?\"-\".*?\"_\"",
+require(keyboard_maps, r"s_shell_lower_map.*?\"q\".*?\"p\".*?LV_SYMBOL_BACKSPACE.*?LV_SYMBOL_UP.*?\"123\".*?\"@\".*?\"space\".*?\"-\".*?\"_\"",
         "five-row handoff text keyboard")
 require(display, r"lv_obj_remove_event_cb\(s_keyboard,\s*lv_keyboard_def_event_cb\).*?keyboard_cb",
         "custom functional keyboard legends")
@@ -458,6 +461,7 @@ for path in ("main/main_qemu.c", "main/main_qemu_154.c"):
     for feature in forbidden:
         assert feature not in preview, (path, feature)
 for identity in ("waveshare-7b", "waveshare-154", "qemu-ui", "qemu-154"):
-    assert f'"{identity}"' in firmware_target
+    assert f'"{identity}"' in board_descriptor
+assert "SOMNOTRACE_FIRMWARE_TARGET_ID" in firmware_target
 
 print("QEMU UI contract passed")

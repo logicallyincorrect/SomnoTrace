@@ -1,0 +1,321 @@
+#include "touch_keyboard_maps.h"
+
+#define KB_BUTTON(width) (LV_BTNMATRIX_CTRL_POPOVER | (width))
+
+/* Keep a local copy of LVGL 8's default keyboard. LVGL does not expose its
+ * defaults, and lv_keyboard_set_map() replaces global mode slots. */
+static const char *s_default_lower_map[] = {"1#",
+                                            "q",
+                                            "w",
+                                            "e",
+                                            "r",
+                                            "t",
+                                            "y",
+                                            "u",
+                                            "i",
+                                            "o",
+                                            "p",
+                                            LV_SYMBOL_BACKSPACE,
+                                            "\n",
+                                            "ABC",
+                                            "a",
+                                            "s",
+                                            "d",
+                                            "f",
+                                            "g",
+                                            "h",
+                                            "j",
+                                            "k",
+                                            "l",
+                                            LV_SYMBOL_NEW_LINE,
+                                            "\n",
+                                            "_",
+                                            "-",
+                                            "z",
+                                            "x",
+                                            "c",
+                                            "v",
+                                            "b",
+                                            "n",
+                                            "m",
+                                            ".",
+                                            ",",
+                                            ":",
+                                            "\n",
+                                            LV_SYMBOL_KEYBOARD,
+                                            LV_SYMBOL_LEFT,
+                                            " ",
+                                            LV_SYMBOL_RIGHT,
+                                            LV_SYMBOL_OK,
+                                            ""};
+
+static const char *s_default_upper_map[] = {"1#",
+                                            "Q",
+                                            "W",
+                                            "E",
+                                            "R",
+                                            "T",
+                                            "Y",
+                                            "U",
+                                            "I",
+                                            "O",
+                                            "P",
+                                            LV_SYMBOL_BACKSPACE,
+                                            "\n",
+                                            "abc",
+                                            "A",
+                                            "S",
+                                            "D",
+                                            "F",
+                                            "G",
+                                            "H",
+                                            "J",
+                                            "K",
+                                            "L",
+                                            LV_SYMBOL_NEW_LINE,
+                                            "\n",
+                                            "_",
+                                            "-",
+                                            "Z",
+                                            "X",
+                                            "C",
+                                            "V",
+                                            "B",
+                                            "N",
+                                            "M",
+                                            ".",
+                                            ",",
+                                            ":",
+                                            "\n",
+                                            LV_SYMBOL_KEYBOARD,
+                                            LV_SYMBOL_LEFT,
+                                            " ",
+                                            LV_SYMBOL_RIGHT,
+                                            LV_SYMBOL_OK,
+                                            ""};
+
+static const lv_btnmatrix_ctrl_t s_default_lower_ctrl[] = {LV_KEYBOARD_CTRL_BTN_FLAGS | 5,
+                                                           KB_BUTTON(4),
+                                                           KB_BUTTON(4),
+                                                           KB_BUTTON(4),
+                                                           KB_BUTTON(4),
+                                                           KB_BUTTON(4),
+                                                           KB_BUTTON(4),
+                                                           KB_BUTTON(4),
+                                                           KB_BUTTON(4),
+                                                           KB_BUTTON(4),
+                                                           KB_BUTTON(4),
+                                                           LV_BTNMATRIX_CTRL_CHECKED | 7,
+                                                           LV_KEYBOARD_CTRL_BTN_FLAGS | 6,
+                                                           KB_BUTTON(3),
+                                                           KB_BUTTON(3),
+                                                           KB_BUTTON(3),
+                                                           KB_BUTTON(3),
+                                                           KB_BUTTON(3),
+                                                           KB_BUTTON(3),
+                                                           KB_BUTTON(3),
+                                                           KB_BUTTON(3),
+                                                           KB_BUTTON(3),
+                                                           LV_BTNMATRIX_CTRL_CHECKED | 7,
+                                                           LV_BTNMATRIX_CTRL_CHECKED | KB_BUTTON(1),
+                                                           LV_BTNMATRIX_CTRL_CHECKED | KB_BUTTON(1),
+                                                           KB_BUTTON(1),
+                                                           KB_BUTTON(1),
+                                                           KB_BUTTON(1),
+                                                           KB_BUTTON(1),
+                                                           KB_BUTTON(1),
+                                                           KB_BUTTON(1),
+                                                           KB_BUTTON(1),
+                                                           LV_BTNMATRIX_CTRL_CHECKED | KB_BUTTON(1),
+                                                           LV_BTNMATRIX_CTRL_CHECKED | KB_BUTTON(1),
+                                                           LV_BTNMATRIX_CTRL_CHECKED | KB_BUTTON(1),
+                                                           LV_KEYBOARD_CTRL_BTN_FLAGS | 2,
+                                                           LV_BTNMATRIX_CTRL_CHECKED | 2,
+                                                           6,
+                                                           LV_BTNMATRIX_CTRL_CHECKED | 2,
+                                                           LV_KEYBOARD_CTRL_BTN_FLAGS | 2};
+
+static const char *s_default_special_map[] = {"1",
+                                              "2",
+                                              "3",
+                                              "4",
+                                              "5",
+                                              "6",
+                                              "7",
+                                              "8",
+                                              "9",
+                                              "0",
+                                              LV_SYMBOL_BACKSPACE,
+                                              "\n",
+                                              "abc",
+                                              "+",
+                                              "&",
+                                              "/",
+                                              "*",
+                                              "=",
+                                              "%",
+                                              "!",
+                                              "?",
+                                              "#",
+                                              "<",
+                                              ">",
+                                              "\n",
+                                              "\\",
+                                              "@",
+                                              "$",
+                                              "(",
+                                              ")",
+                                              "{",
+                                              "}",
+                                              "[",
+                                              "]",
+                                              ";",
+                                              "\"",
+                                              "'",
+                                              "\n",
+                                              LV_SYMBOL_KEYBOARD,
+                                              LV_SYMBOL_LEFT,
+                                              " ",
+                                              LV_SYMBOL_RIGHT,
+                                              LV_SYMBOL_OK,
+                                              ""};
+
+static const lv_btnmatrix_ctrl_t s_default_special_ctrl[] = {KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             LV_BTNMATRIX_CTRL_CHECKED | 2,
+                                                             LV_KEYBOARD_CTRL_BTN_FLAGS | 2,
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             KB_BUTTON(1),
+                                                             LV_KEYBOARD_CTRL_BTN_FLAGS | 2,
+                                                             LV_BTNMATRIX_CTRL_CHECKED | 2,
+                                                             6,
+                                                             LV_BTNMATRIX_CTRL_CHECKED | 2,
+                                                             LV_KEYBOARD_CTRL_BTN_FLAGS | 2};
+
+static const char *s_default_number_map[] = {
+    "1", "2", "3", LV_SYMBOL_KEYBOARD,  "\n", "4",   "5", "6", LV_SYMBOL_OK,   "\n",
+    "7", "8", "9", LV_SYMBOL_BACKSPACE, "\n", "+/-", "0", ".", LV_SYMBOL_LEFT, LV_SYMBOL_RIGHT,
+    ""};
+
+static const lv_btnmatrix_ctrl_t s_default_number_ctrl[] = {1,
+                                                            1,
+                                                            1,
+                                                            LV_KEYBOARD_CTRL_BTN_FLAGS | 2,
+                                                            1,
+                                                            1,
+                                                            1,
+                                                            LV_KEYBOARD_CTRL_BTN_FLAGS | 2,
+                                                            1,
+                                                            1,
+                                                            1,
+                                                            2,
+                                                            1,
+                                                            1,
+                                                            1,
+                                                            1,
+                                                            1};
+
+static const char *s_shell_number_map[] = {
+    "1", "2", "3", LV_SYMBOL_BACKSPACE, "\n", "4", "5", "6", "Clear", "\n", "7", "8", "9", "0", ""};
+
+static const lv_btnmatrix_ctrl_t s_shell_number_ctrl[] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+
+static const char *s_shell_lower_map[] = {
+    "1",  "2",          "3",   "4",  "5", "6",     "7", "8",
+    "9",  "0",          "\n",  "q",  "w", "e",     "r", "t",
+    "y",  "u",          "i",   "o",  "p", "\n",    "a", "s",
+    "d",  "f",          "g",   "h",  "j", "k",     "l", LV_SYMBOL_BACKSPACE,
+    "\n", LV_SYMBOL_UP, "z",   "x",  "c", "v",     "b", "n",
+    "m",  ".",          "123", "\n", "@", "space", "-", "_",
+    ""};
+
+static const char *s_shell_upper_map[] = {
+    "1",  "2",          "3",   "4",  "5", "6",     "7", "8",
+    "9",  "0",          "\n",  "Q",  "W", "E",     "R", "T",
+    "Y",  "U",          "I",   "O",  "P", "\n",    "A", "S",
+    "D",  "F",          "G",   "H",  "J", "K",     "L", LV_SYMBOL_BACKSPACE,
+    "\n", LV_SYMBOL_UP, "Z",   "X",  "C", "V",     "B", "N",
+    "M",  ".",          "123", "\n", "@", "space", "-", "_",
+    ""};
+
+static const lv_btnmatrix_ctrl_t s_shell_text_ctrl[] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                                                        1, 1, 1, 1, 1, 5, 5, 5, 5, 5, 5, 5, 5, 5, 8,
+                                                        7, 5, 5, 5, 5, 5, 5, 5, 5, 7, 1, 5, 1, 1};
+
+const touch_keyboard_layout_t TOUCH_KEYBOARD_LAYOUT_DEFAULT = {
+    .lower_map = s_default_lower_map,
+    .lower_ctrl = s_default_lower_ctrl,
+    .upper_map = s_default_upper_map,
+    .upper_ctrl = s_default_lower_ctrl,
+    .special_map = s_default_special_map,
+    .special_ctrl = s_default_special_ctrl,
+    .number_map = s_default_number_map,
+    .number_ctrl = s_default_number_ctrl,
+};
+
+const touch_keyboard_layout_t TOUCH_KEYBOARD_LAYOUT_SHELL = {
+    .lower_map = s_shell_lower_map,
+    .lower_ctrl = s_shell_text_ctrl,
+    .upper_map = s_shell_upper_map,
+    .upper_ctrl = s_shell_text_ctrl,
+    .special_map = s_default_special_map,
+    .special_ctrl = s_default_special_ctrl,
+    .number_map = s_shell_number_map,
+    .number_ctrl = s_shell_number_ctrl,
+};
+
+void touch_keyboard_apply_layout(lv_obj_t *keyboard, const touch_keyboard_layout_t *layout)
+{
+    if (!keyboard || !layout)
+        return;
+    if (layout->lower_map)
+        lv_keyboard_set_map(
+            keyboard, LV_KEYBOARD_MODE_TEXT_LOWER, layout->lower_map, layout->lower_ctrl);
+    if (layout->upper_map)
+        lv_keyboard_set_map(
+            keyboard, LV_KEYBOARD_MODE_TEXT_UPPER, layout->upper_map, layout->upper_ctrl);
+    if (layout->special_map)
+        lv_keyboard_set_map(
+            keyboard, LV_KEYBOARD_MODE_SPECIAL, layout->special_map, layout->special_ctrl);
+    if (layout->number_map)
+        lv_keyboard_set_map(
+            keyboard, LV_KEYBOARD_MODE_NUMBER, layout->number_map, layout->number_ctrl);
+}
+
+void touch_keyboard_set_mode(lv_obj_t *keyboard,
+                             const touch_keyboard_layout_t *layout,
+                             lv_keyboard_mode_t mode)
+{
+    touch_keyboard_apply_layout(keyboard, layout);
+    lv_keyboard_set_mode(keyboard, mode);
+}

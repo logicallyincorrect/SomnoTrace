@@ -9,7 +9,13 @@ from prepare_host_lvgl import prepare_lvgl
 LVGL_INPUT = prepare_lvgl()
 def function(path, name):
     source = (ROOT / path).read_text()
-    match = re.search(r'^(?:static )?(?:void|bool|uint8_t|esp_err_t) ' + name + r'\([^;]*?\)\s*\{', source, re.M)
+    match = re.search(
+        r'^\s*(?:static\s+)?(?:void|bool|uint8_t|esp_err_t)\s+'
+        + name
+        + r'\s*\([^;]*?\)\s*\{',
+        source,
+        re.M,
+    )
     assert match, name
     depth, end = 1, match.end()
     while depth:
@@ -142,7 +148,7 @@ static void vTaskDelay(unsigned time) {
     assert(time==100 || time==200);
 }
 '''
-for name in ['iox_write','iox_output','waveshare_7b_recovery_brightness','reassert_visible_locked','waveshare_7b_reassert_visible','touch_read_register','touch_read_frame','assert_touch_reset','recover_touch','service_touch_visibility','request_visible','queue_touch_wake_check','service_touch_off_reset','touch_task','waveshare_7b_start_touch']:
+for name in ['iox_write','iox_output','rgb_display_transport_set_recovery_brightness','reassert_visible_locked','rgb_display_transport_reassert_visible','touch_read_register','touch_read_frame','assert_touch_reset','recover_touch','service_touch_visibility','request_visible','queue_touch_wake_check','service_touch_off_reset','touch_task','touch_input_start']:
     board += function('main/board_waveshare_7b.c', name)
 board += r'''
 static void reset_visibility(void) {
@@ -172,13 +178,13 @@ static void pending_failed_write(void) {
 int main(void) {
     for(unsigned failure=0;failure<=3;++failure) {
         s_output=0x99;writes=0;fail_at=failure;
-        waveshare_7b_recovery_brightness(33);
-        int result=waveshare_7b_reassert_visible();
+        rgb_display_transport_set_recovery_brightness(33);
+        int result=rgb_display_transport_reassert_visible();
         assert((result!=0)==(failure!=0));assert(writes==3);
         assert(regs[0]==2 && values[0]==255 && regs[1]==5 && values[1]==170);
         assert(regs[2]==3 && values[2]==0xdd); /* USB, SD and reset preserved */
     }
-    lock_fail=1;writes=0;assert(waveshare_7b_reassert_visible()==ESP_ERR_TIMEOUT && !writes);lock_fail=0;
+    lock_fail=1;writes=0;assert(rgb_display_transport_reassert_visible()==ESP_ERR_TIMEOUT && !writes);lock_fail=0;
     bool frame,pressed;uint16_t x,y;
     status_byte=0;assert(!touch_read_frame(&frame,&pressed,&x,&y) && !frame);
     status_byte=0x81;assert(!touch_read_frame(&frame,&pressed,&x,&y));
@@ -198,10 +204,10 @@ int main(void) {
     /* No legacy vendor object after boot NACK: one retained worker repairs
      * reset/INT and publishes fresh input. Repeated start cannot duplicate it. */
     assert(!s_touch);task_oom=true;
-    assert(waveshare_7b_start_touch()==ESP_ERR_NO_MEM && device_removes==1 && !s_touch_device);
-    task_oom=false;assert(waveshare_7b_start_touch()==ESP_OK);
+    assert(touch_input_start()==ESP_ERR_NO_MEM && device_removes==1 && !s_touch_device);
+    task_oom=false;assert(touch_input_start()==ESP_OK);
     assert(task_creates==2 && device_creates==2);
-    assert(waveshare_7b_start_touch()==ESP_OK && task_creates==2 && device_creates==2);
+    assert(touch_input_start()==ESP_OK && task_creates==2 && device_creates==2);
     fail_at=0;writes=0;modes=0;status_byte=0x81;running_task=true;
     if(!setjmp(task_exit)) created_task(NULL);
     assert(published.recovery_attempts==1 && published.valid && published.pressed);
@@ -292,8 +298,8 @@ bsp = common + r'''
 #include "device_settings.h"
 #define POLICY_PEEK_TIMEOUT_S 60
 #define CONFIG_SOMNOTRACE_BOARD_QEMU 0
-#define WAVESHARE_7B_H_RES 1024
-#define WAVESHARE_7B_V_RES 600
+#define SOMNOTRACE_TOUCH_DISPLAY_WIDTH 1024
+#define SOMNOTRACE_TOUCH_DISPLAY_HEIGHT 600
 #define TOUCH_FAILURE_THRESHOLD 3
 #define BACKLIGHT_RETRY_US 250000
 #define LV_OBJ_FLAG_HIDDEN 1
@@ -340,7 +346,7 @@ static bool s_backlight=true,s_backlight_known=true,s_backlight_requested=true;
 static bool s_wake_gesture_pending,s_touch_was_pressed,s_backlight_force_on,s_setup_backlight_force_on,s_temporarily_awake;
 static struct {bool therapy,notice_critical;} s_state;
 static bool screen_wake_input_available(void) {return true;}
-static uint32_t s_touch_seen_visibility,s_touch_seen_continuity,s_backlight_revision,s_touch_read_errors,s_backlight_write_errors;
+static uint32_t s_touch_seen_visibility,s_touch_seen_continuity,s_backlight_revision,s_backlight_write_errors;
 static uint8_t s_touch_consecutive_errors,s_brightness=66;
 static uint16_t s_last_touch_x,s_last_touch_y;
 static int64_t s_last_touch_activity_us,s_backlight_retry_after_us,now,s_last_display_service_us,s_last_off_request_us;
@@ -348,14 +354,14 @@ static int s_wake_overlay=1,power_error,brightness_error;
 static unsigned power_calls,brightness_calls;static bool hidden=true;
 static touch_observation_t observation;
 static int64_t esp_timer_get_time(void) {return now;}
-static void waveshare_7b_touch_snapshot(touch_observation_t *out) {*out=observation;}
+static void touch_input_snapshot(touch_observation_t *out) {*out=observation;}
 void bsp_display_set_notice(const char *s) {(void)s;}
 static void lv_obj_add_flag(int o,int f) {(void)o;(void)f;hidden=true;}
 static void lv_obj_clear_flag(int o,int f) {(void)o;(void)f;hidden=false;}
 static void lv_obj_move_foreground(int o) {(void)o;}
-static int waveshare_7b_reassert_visible(void) {++power_calls;return power_error;}
-static int waveshare_7b_set_backlight(bool on) {assert(!on);++power_calls;return power_error;}
-static int waveshare_7b_set_brightness(unsigned p) {assert(p==33);++brightness_calls;return brightness_error;}
+static int rgb_display_transport_reassert_visible(void) {++power_calls;return power_error;}
+static int rgb_display_transport_set_backlight(bool on) {assert(!on);++power_calls;return power_error;}
+static int rgb_display_transport_set_brightness_percent(unsigned p) {assert(p==33);++brightness_calls;return brightness_error;}
 '''
 bsp += function(LVGL_INPUT, 'lv_indev_wait_release')
 bsp += function(LVGL_INPUT, 'indev_proc_release')

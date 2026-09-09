@@ -20,7 +20,7 @@ AS11_HEADER = (ROOT / "main/as11_ble.h").read_text(encoding="utf-8")
 
 def function_body(name: str, source: str = SOURCE) -> str:
     match = re.search(
-        rf"^[\w][\w\s*]*\b{name}\s*\([^;{{}}]*\)\s*\{{",
+        rf"^[ \t]*[\w][\w\s*]*\b{name}\s*\([^;{{}}]*\)\s*\{{",
         source,
         re.MULTILINE,
     )
@@ -41,7 +41,7 @@ def function_body(name: str, source: str = SOURCE) -> str:
 
 def function_span(name: str, source: str = SOURCE) -> tuple[int, int]:
     match = re.search(
-        rf"^[\w][\w\s*]*\b{name}\s*\([^;{{}}]*\)\s*\{{",
+        rf"^[ \t]*[\w][\w\s*]*\b{name}\s*\([^;{{}}]*\)\s*\{{",
         source,
         re.MULTILINE,
     )
@@ -63,7 +63,7 @@ def function_span(name: str, source: str = SOURCE) -> tuple[int, int]:
 # The binary is streamed into either 4 MiB slot; it is never staged in RAM.
 assert re.search(r"app0,\s+app,\s+ota_0,\s+0x10000,\s+0x400000", PARTITIONS)
 assert re.search(r"app1,\s+app,\s+ota_1,\s+0x410000,\s+0x400000", PARTITIONS)
-assert "#define OTA_MAX_SIZE     (0x400000)" in SOURCE
+assert re.search(r"^#define\s+OTA_MAX_SIZE\s+\(0x400000\)", SOURCE, re.MULTILINE)
 
 # Admission uses exactly the byte-addressable internal heap used by ordinary
 # FreeRTOS task stacks, and considers fragmentation as well as aggregate free.
@@ -336,11 +336,11 @@ assert "bool bsp_display_try_commit_therapy_safe_restart(void);" in DISPLAY_HEAD
 assert "void bsp_display_cancel_therapy_safe_restart(void);" in DISPLAY_HEADER
 assert "bool bsp_display_reserve_therapy_start(void);" in DISPLAY_HEADER
 assert "void bsp_display_release_therapy_start(void);" in DISPLAY_HEADER
-for display, enter, leave, active_state in (
+for display, enter, leave in (
     (DISPLAY_SMALL, "xSemaphoreTake(s_state_mutex, portMAX_DELAY)",
-     "xSemaphoreGive(s_state_mutex)", "s_mode == DISP_MODE_GRAPH"),
+     "xSemaphoreGive(s_state_mutex)"),
     (DISPLAY_7B, "portENTER_CRITICAL(&s_state_lock)",
-     "portEXIT_CRITICAL(&s_state_lock)", "!s_state.therapy"),
+     "portEXIT_CRITICAL(&s_state_lock)"),
 ):
     setter = function_body("bsp_display_set_therapy_active", display)
     reserve = function_body("bsp_display_try_reserve_therapy_safe_restart", display)
@@ -349,27 +349,24 @@ for display, enter, leave, active_state in (
     start_reserve = function_body("bsp_display_reserve_therapy_start", display)
     start_release = function_body("bsp_display_release_therapy_start", display)
     assert enter in setter and leave in setter
-    assert "s_therapy_safe_restart_reserving" in setter
-    assert "s_therapy_start_waiters++" in setter
+    assert "therapy_gate_restart_is_reserving(&s_therapy_gate)" in setter
+    assert "therapy_gate_note_start_waiter(&s_therapy_gate)" in setter
+    assert "therapy_gate_remove_start_waiter(&s_therapy_gate)" in setter
     assert "vTaskDelay(1)" in setter
-    assert "active && s_therapy_safe_restart_committed" in setter
+    assert "therapy_gate_try_set_active(&s_therapy_gate, active)" in setter
     assert "return false" in setter
     assert enter in reserve and leave in reserve
-    assert active_state in reserve
-    assert "s_therapy_start_claims == 0" in reserve
-    assert "s_therapy_start_waiters == 0" in reserve
-    assert "s_therapy_safe_restart_reserving = true" in reserve
+    assert "therapy_gate_try_reserve_restart(&s_therapy_gate)" in reserve
     assert enter in commit and leave in commit
-    assert "s_therapy_safe_restart_reserving" in commit
-    assert "s_therapy_start_waiters == 0" in commit
-    assert commit.index("s_therapy_safe_restart_committed = true") < commit.index(leave)
+    assert "therapy_gate_try_commit_restart(&s_therapy_gate)" in commit
+    assert commit.index("therapy_gate_try_commit_restart") < commit.index(leave)
     assert enter in cancel and leave in cancel
-    assert "s_therapy_safe_restart_reserving = false" in cancel
+    assert "therapy_gate_cancel_restart(&s_therapy_gate)" in cancel
     assert enter in start_reserve and leave in start_reserve
-    assert "s_therapy_start_waiters++" in start_reserve
-    assert "s_therapy_start_claims++" in start_reserve
+    assert "therapy_gate_note_start_waiter(&s_therapy_gate)" in start_reserve
+    assert "therapy_gate_try_reserve_start(&s_therapy_gate)" in start_reserve
     assert enter in start_release and leave in start_release
-    assert "s_therapy_start_claims--" in start_release
+    assert "therapy_gate_release_start(&s_therapy_gate)" in start_release
     for gate_body in (reserve, commit, cancel, start_reserve, start_release):
         assert "sd_storage_" not in gate_body and "esp_restart" not in gate_body
 

@@ -26,8 +26,7 @@ def source_state(board="7b"):
     for raw in sorted(set(paths.split(b"\0")) - {b""}):
         name = raw.decode()
         if not (name.startswith(("main/", "components/", "third_party/", "assets/"))
-                or name in ("CMakeLists.txt", "dependencies.lock", "scripts/idf.sh",
-                            "scripts/idf-command.sh", "scripts/idf-sdk-patches.py")
+                or name in ("CMakeLists.txt", "dependencies.lock", "scripts/idf.sh")
                 or name.startswith(("sdkconfig", "partitions"))):
             continue
         path = ROOT / name

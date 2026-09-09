@@ -22,7 +22,6 @@
  * (https://github.com/ilyakruchinin)." See the NOTICE file for details.
  */
 
-
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -49,39 +48,41 @@
 #endif
 #include "device_settings.h"
 #include "psram_task.h"
+#include "therapy_gate.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 
-#define LCD_H_RES           240
-#define LCD_V_RES           240
+#define LCD_H_RES 240
+#define LCD_V_RES 240
 
 #if !CONFIG_SOMNOTRACE_QEMU_DISPLAY_154
-#define LCD_PIN_SCLK        38
-#define LCD_PIN_MOSI        39
-#define LCD_PIN_DC          45
-#define LCD_PIN_CS          21
-#define LCD_PIN_RST         40
-#define LCD_PIN_BL          46
+#define LCD_PIN_SCLK 38
+#define LCD_PIN_MOSI 39
+#define LCD_PIN_DC 45
+#define LCD_PIN_CS 21
+#define LCD_PIN_RST 40
+#define LCD_PIN_BL 46
 
-#define LCD_PIXEL_CLOCK_HZ  (15000000)  /* 15 MHz target (80 MHz APB / 6 = 13.33 MHz, 75 ns cycle; ST7789 spec: >=66 ns) */
-#define LCD_SPI_HOST        SPI2_HOST
-#define LCD_CMD_BITS        8
-#define LCD_PARAM_BITS      8
-#define LCD_INVERT_COLOR    true
+#define LCD_PIXEL_CLOCK_HZ                                                                         \
+    (15000000) /* 15 MHz target (80 MHz APB / 6 = 13.33 MHz, 75 ns cycle; ST7789 spec: >=66 ns) */
+#define LCD_SPI_HOST SPI2_HOST
+#define LCD_CMD_BITS 8
+#define LCD_PARAM_BITS 8
+#define LCD_INVERT_COLOR true
 
 /* LEDC PWM for backlight dimming */
-#define BL_LEDC_TIMER       LEDC_TIMER_0
-#define BL_LEDC_CHANNEL     LEDC_CHANNEL_0
-#define BL_LEDC_FREQ_HZ     5000
-#define BL_LEDC_RESOLUTION  LEDC_TIMER_10_BIT  /* 0-1023 duty */
-#define BL_DUTY_MAX         ((1 << 10) - 1)    /* 1023 */
+#define BL_LEDC_TIMER LEDC_TIMER_0
+#define BL_LEDC_CHANNEL LEDC_CHANNEL_0
+#define BL_LEDC_FREQ_HZ 5000
+#define BL_LEDC_RESOLUTION LEDC_TIMER_10_BIT /* 0-1023 duty */
+#define BL_DUTY_MAX ((1 << 10) - 1)          /* 1023 */
 
 #endif
 
-static uint8_t s_brightness = 100;  /* current brightness (tenth-percent: 1=0.1%, 200=20%) */
-static bool s_backlight_on = true;  /* backlight hardware state */
-static bool s_backlight_force_on = false;  /* SoftAP/portal: keep backlight on */
+static uint8_t s_brightness = 100;        /* current brightness (tenth-percent: 1=0.1%, 200=20%) */
+static bool s_backlight_on = true;        /* backlight hardware state */
+static bool s_backlight_force_on = false; /* SoftAP/portal: keep backlight on */
 static esp_timer_handle_t s_wake_timer = NULL;
 static bool s_temporarily_awake = false;
 
@@ -91,7 +92,8 @@ static void (*s_setup_callback)(void) = NULL;
 /* Forward declarations */
 static inline uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b);
 static void fb_clear(uint16_t color);
-static int fb_draw_string_aa(int x, int y, const font_info_t *font, const char *str, uint16_t color);
+static int fb_draw_string_aa(
+    int x, int y, const font_info_t *font, const char *str, uint16_t color);
 static void fb_draw_wifi_indicator(int x, int y, bool connected);
 static void fb_draw_ble_indicator(int x, int y);
 static void render_graph(void);
@@ -107,9 +109,10 @@ static esp_lcd_panel_io_handle_t s_io = NULL;
 static uint16_t *s_fb = NULL;
 static bool s_wifi_connected = false;
 static bool s_as11_paired = false;
-static uint16_t s_rotation = 0;  /* current LCD rotation in degrees */
-static volatile bool s_rotation_pending = false;  /* set_rotation requested, deferred to render task */
-static uint16_t s_pending_rotation_deg = 0;       /* requested rotation (valid when s_rotation_pending) */
+static uint16_t s_rotation = 0; /* current LCD rotation in degrees */
+static volatile bool s_rotation_pending =
+    false;                                  /* set_rotation requested, deferred to render task */
+static uint16_t s_pending_rotation_deg = 0; /* requested rotation (valid when s_rotation_pending) */
 
 /* Strip blit: the framebuffer lives in PSRAM (not DMA-capable), so it is
  * pushed to the panel in chunks via small internal DMA-capable buffers.
@@ -119,7 +122,7 @@ static uint16_t s_pending_rotation_deg = 0;       /* requested rotation (valid w
 #if !CONFIG_SOMNOTRACE_QEMU_DISPLAY_154
 #define LCD_STRIP_ROWS 40
 #define LCD_STRIP_BUFS 2
-static uint16_t *s_strip[LCD_STRIP_BUFS] = { NULL, NULL };
+static uint16_t *s_strip[LCD_STRIP_BUFS] = {NULL, NULL};
 static SemaphoreHandle_t s_flush_done = NULL;
 #endif
 static volatile bool s_flush_stuck = false;
@@ -140,40 +143,35 @@ typedef enum {
     DISP_MODE_INFO,
 } disp_mode_t;
 
-#define FLOW_BUF_SIZE      240   /* one flow sample per pixel column */
-#define MAX_STATUS_LINES   4
-#define STATUS_TITLE_LEN   32
-#define STATUS_LINE_LEN    48
+#define FLOW_BUF_SIZE 240 /* one flow sample per pixel column */
+#define MAX_STATUS_LINES 4
+#define STATUS_TITLE_LEN 32
+#define STATUS_LINE_LEN 48
 
 #define DISPLAY_TASK_STACK 4096
-#define GRAPH_FRAME_MS     80    /* 12.5 Hz live graph cadence: 2 flow samples (2 px) per frame */
-#define STATUS_FRAME_MS    1000  /* status refresh cadence (live RSSI) */
+#define GRAPH_FRAME_MS 80    /* 12.5 Hz live graph cadence: 2 flow samples (2 px) per frame */
+#define STATUS_FRAME_MS 1000 /* status refresh cadence (live RSSI) */
 
 /* ── Flow graph layout (static, non-adaptive) ───────────────────────────
  * GRAPH_FULL_SCALE is the fixed full-scale deflection (L/min) from the zero
  * line to the top/bottom of the plot. It is intentionally static so the view
  * does not jitter; values beyond it clip at the plot edge (the "hard cut").
  * Adjust this single constant to match the device's flow range. */
-#define GRAPH_FULL_SCALE   150.0f
-#define GRAPH_AXIS_W       34    /* left scale-axis gutter width (px) */
-#define GRAPH_PLOT_X0      GRAPH_AXIS_W
-#define GRAPH_PLOT_TOP     16
-#define GRAPH_PLOT_BOT     224
-#define GRAPH_PLOT_W       (LCD_H_RES - GRAPH_AXIS_W)
+#define GRAPH_FULL_SCALE 150.0f
+#define GRAPH_AXIS_W 34 /* left scale-axis gutter width (px) */
+#define GRAPH_PLOT_X0 GRAPH_AXIS_W
+#define GRAPH_PLOT_TOP 16
+#define GRAPH_PLOT_BOT 224
+#define GRAPH_PLOT_W (LCD_H_RES - GRAPH_AXIS_W)
 
-static SemaphoreHandle_t s_state_mutex = NULL;  /* protects all shared state below */
+static SemaphoreHandle_t s_state_mutex = NULL; /* protects all shared state below */
 static disp_mode_t s_mode = DISP_MODE_STATUS;
-static bool s_status_dirty = true;              /* status content changed, force redraw */
+static therapy_gate_t s_therapy_gate = THERAPY_GATE_INITIALIZER;
+static bool s_status_dirty = true; /* status content changed, force redraw */
 
-/* Two-phase restart gate, protected by s_state_mutex together with s_mode.
+/* Therapy lifecycle gate, protected by s_state_mutex.
  * Start waiters make the final commit fail; the restart owner releases its SD
  * lease before cancelling the reservation and waking them. */
-static bool s_therapy_safe_restart_reserving;
-static bool s_therapy_safe_restart_committed;
-static unsigned s_therapy_start_waiters;
-static unsigned s_therapy_start_claims;
-static unsigned s_as11_notifications_pending;
-static bool s_therapy_safe_maintenance;
 
 #if CONFIG_SOMNOTRACE_QEMU_DISPLAY_154
 /* Scene changes use the public state APIs. Suppress intermediate renders and
@@ -182,15 +180,18 @@ static bool s_qemu_scene_seeding;
 static uint32_t s_qemu_scene_generation;
 static uint8_t s_qemu_scene;
 static const char *const s_qemu_scene_names[] = {
-    "status", "flow", "info", "notice",
+    "status",
+    "flow",
+    "info",
+    "notice",
 };
-#define QEMU_DEMO_WALL_TIME 1788698040  /* 2026-09-06 12:34 UTC */
+#define QEMU_DEMO_WALL_TIME 1788698040 /* 2026-09-06 12:34 UTC */
 #define QEMU_DEMO_NOW_US (42 * 60 * 1000000LL + 1)
 #endif
 /* Status-screen content (copied from callers) */
 static char s_status_title[STATUS_TITLE_LEN];
 static char s_status_lines[MAX_STATUS_LINES][STATUS_LINE_LEN];
-static int  s_status_nlines = 0;
+static int s_status_nlines = 0;
 
 /* Persistent notice banner rendered at the bottom of the status screen in
  * warning colours.  Independent of the status lines above so transient
@@ -198,33 +199,33 @@ static int  s_status_nlines = 0;
 static char s_notice[STATUS_LINE_LEN] = "";
 
 /* Battery indicator state */
-static int  s_batt_percent = -1;   /* -1 = unknown/not set */
+static int s_batt_percent = -1; /* -1 = unknown/not set */
 static bool s_batt_charging = false;
 static bool s_batt_valid = false;
 
 /* Live flow ring buffer for the therapy graph (PSRAM). */
 static float *s_flow_buf;
-static float *s_flow_local;   /* render-task snapshot */
-static float *s_flow_yf;      /* render-task y coordinates */
-static int    s_flow_head = 0;
-static int    s_flow_count = 0;
+static float *s_flow_local; /* render-task snapshot */
+static float *s_flow_yf;    /* render-task y coordinates */
+static int s_flow_head = 0;
+static int s_flow_count = 0;
 
 static volatile int64_t s_last_render_us = 0;
 static esp_timer_handle_t s_display_supervisor_timer = NULL;
 
 /* Info panel state */
-static float    s_leak_lpm = 0.0f;       /* latest leak rate (L/min) */
-static double   s_leak_sum = 0.0;        /* accumulated leak sum for session average */
-static uint32_t s_leak_count = 0;        /* count of accumulated leak samples */
-static int64_t  s_therapy_start_us = 0;  /* monotonic time of TherapyStart */
+static float s_leak_lpm = 0.0f;        /* latest leak rate (L/min) */
+static double s_leak_sum = 0.0;        /* accumulated leak sum for session average */
+static uint32_t s_leak_count = 0;      /* count of accumulated leak samples */
+static int64_t s_therapy_start_us = 0; /* monotonic time of TherapyStart */
 
 /* ── Public state-mutating API (never draws; render task handles drawing) ── */
 
 bool bsp_display_set_therapy_active(bool active)
 {
     if (!s_state_mutex) {
-        ESP_LOGW(TAG, "set_therapy_active(%s) called before init — ignored",
-                 active ? "true" : "false");
+        ESP_LOGW(
+            TAG, "set_therapy_active(%s) called before init — ignored", active ? "true" : "false");
         /* Display failure must not suppress therapy recording. OTA restart
          * reservation remains unavailable while the mutex is absent. */
         return true;
@@ -236,16 +237,19 @@ bool bsp_display_set_therapy_active(bool active)
     bool waiting_for_restart = false;
     for (;;) {
         xSemaphoreTake(s_state_mutex, portMAX_DELAY);
-        if (!active || !s_therapy_safe_restart_reserving) break;
+        if (!active || !therapy_gate_restart_is_reserving(&s_therapy_gate))
+            break;
         if (!waiting_for_restart) {
-            s_therapy_start_waiters++;
+            therapy_gate_note_start_waiter(&s_therapy_gate);
             waiting_for_restart = true;
         }
         xSemaphoreGive(s_state_mutex);
         vTaskDelay(1);
     }
-    if (waiting_for_restart) s_therapy_start_waiters--;
-    if (active && s_therapy_safe_restart_committed) {
+    if (waiting_for_restart)
+        therapy_gate_remove_start_waiter(&s_therapy_gate);
+    bool therapy_changed = therapy_gate_is_active(&s_therapy_gate) != active;
+    if (!therapy_gate_try_set_active(&s_therapy_gate, active)) {
         xSemaphoreGive(s_state_mutex);
         ESP_LOGW(TAG, "therapy start refused: restart already committed");
         return false;
@@ -261,26 +265,30 @@ bool bsp_display_set_therapy_active(bool active)
     } else {
         new_mode = DISP_MODE_STATUS;
     }
-    if (s_mode != new_mode) {
+    if (s_mode != new_mode || therapy_changed) {
         s_mode = new_mode;
         if (active) {
             s_flow_head = 0;
             s_flow_count = 0;
             s_leak_sum = 0.0;
             s_leak_count = 0;
-            ESP_LOGI(TAG, "therapy mode enabled: %s (display_task=%s)",
-                     new_mode == DISP_MODE_INFO ? "info" :
-                     new_mode == DISP_MODE_STATUS ? "status" : "graph",
+            ESP_LOGI(TAG,
+                     "therapy mode enabled: %s (display_task=%s)",
+                     new_mode == DISP_MODE_INFO     ? "info"
+                     : new_mode == DISP_MODE_STATUS ? "status"
+                                                    : "graph",
                      s_display_task ? "alive" : "NULL");
         } else {
-            s_status_dirty = true;  /* force immediate status redraw */
+            s_status_dirty = true; /* force immediate status redraw */
             ESP_LOGI(TAG, "therapy mode disabled");
         }
     } else {
-        ESP_LOGD(TAG, "set_therapy_active(%s) — mode already %s, no-op",
+        ESP_LOGD(TAG,
+                 "set_therapy_active(%s) — mode already %s, no-op",
                  active ? "true" : "false",
-                 s_mode == DISP_MODE_GRAPH ? "GRAPH" :
-                 s_mode == DISP_MODE_INFO ? "INFO" : "STATUS");
+                 s_mode == DISP_MODE_GRAPH  ? "GRAPH"
+                 : s_mode == DISP_MODE_INFO ? "INFO"
+                                            : "STATUS");
     }
     xSemaphoreGive(s_state_mutex);
 
@@ -296,109 +304,96 @@ bool bsp_display_set_therapy_active(bool active)
     }
 
     /* Wake the render task so the mode change is reflected immediately. */
-    if (s_display_task) xTaskNotifyGive(s_display_task);
+    if (s_display_task)
+        xTaskNotifyGive(s_display_task);
     return true;
 }
 
 bool bsp_display_try_reserve_therapy_safe_restart(void)
 {
-    if (!s_state_mutex) return false;
+    if (!s_state_mutex)
+        return false;
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
-    bool therapy_active = (s_mode == DISP_MODE_GRAPH || s_mode == DISP_MODE_INFO);
-    bool reserved = !therapy_active && s_therapy_start_claims == 0 &&
-                    s_therapy_start_waiters == 0 &&
-                    s_as11_notifications_pending == 0 &&
-                    !s_therapy_safe_maintenance &&
-                    !s_therapy_safe_restart_reserving &&
-                    !s_therapy_safe_restart_committed;
-    if (reserved) s_therapy_safe_restart_reserving = true;
+    bool reserved = therapy_gate_try_reserve_restart(&s_therapy_gate);
     xSemaphoreGive(s_state_mutex);
     return reserved;
 }
 
 bool bsp_display_try_commit_therapy_safe_restart(void)
 {
-    if (!s_state_mutex) return false;
+    if (!s_state_mutex)
+        return false;
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
-    bool therapy_active = (s_mode == DISP_MODE_GRAPH || s_mode == DISP_MODE_INFO);
-    bool committed = s_therapy_safe_restart_reserving && !therapy_active &&
-                     s_therapy_start_waiters == 0 &&
-                     s_as11_notifications_pending == 0;
-    if (committed) {
-        s_therapy_safe_restart_reserving = false;
-        s_therapy_safe_restart_committed = true;
-    }
+    bool committed = therapy_gate_try_commit_restart(&s_therapy_gate);
     xSemaphoreGive(s_state_mutex);
     return committed;
 }
 
 void bsp_display_cancel_therapy_safe_restart(void)
 {
-    if (!s_state_mutex) return;
+    if (!s_state_mutex)
+        return;
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
-    if (!s_therapy_safe_restart_committed) {
-        s_therapy_safe_restart_reserving = false;
-    }
+    therapy_gate_cancel_restart(&s_therapy_gate);
     xSemaphoreGive(s_state_mutex);
 }
 
 bool bsp_display_reserve_therapy_start(void)
 {
-    if (!s_state_mutex) return true;
+    if (!s_state_mutex)
+        return true;
     bool waiting_for_restart = false;
     for (;;) {
         xSemaphoreTake(s_state_mutex, portMAX_DELAY);
-        if (!s_therapy_safe_restart_reserving) break;
+        if (!therapy_gate_restart_is_reserving(&s_therapy_gate))
+            break;
         if (!waiting_for_restart) {
-            s_therapy_start_waiters++;
+            therapy_gate_note_start_waiter(&s_therapy_gate);
             waiting_for_restart = true;
         }
         xSemaphoreGive(s_state_mutex);
         vTaskDelay(1);
     }
-    if (waiting_for_restart) s_therapy_start_waiters--;
-    bool reserved = !s_therapy_safe_restart_committed;
-    if (reserved) s_therapy_start_claims++;
+    if (waiting_for_restart)
+        therapy_gate_remove_start_waiter(&s_therapy_gate);
+    bool reserved = therapy_gate_try_reserve_start(&s_therapy_gate);
     xSemaphoreGive(s_state_mutex);
     return reserved;
 }
 
 void bsp_display_release_therapy_start(void)
 {
-    if (!s_state_mutex) return;
+    if (!s_state_mutex)
+        return;
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
-    if (s_therapy_start_claims > 0) s_therapy_start_claims--;
+    therapy_gate_release_start(&s_therapy_gate);
     xSemaphoreGive(s_state_mutex);
 }
 
 void bsp_display_note_as11_notification_queued(void)
 {
-    if (!s_state_mutex) return;
+    if (!s_state_mutex)
+        return;
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
-    s_as11_notifications_pending++;
+    therapy_gate_note_notification_queued(&s_therapy_gate);
     xSemaphoreGive(s_state_mutex);
 }
 
 void bsp_display_note_as11_notification_processed(void)
 {
-    if (!s_state_mutex) return;
+    if (!s_state_mutex)
+        return;
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
-    if (s_as11_notifications_pending > 0) s_as11_notifications_pending--;
+    therapy_gate_note_notification_processed(&s_therapy_gate);
     xSemaphoreGive(s_state_mutex);
 }
 
 bool bsp_display_try_begin_therapy_safe_maintenance(void)
 {
-    if (!s_state_mutex) return false;
+    if (!s_state_mutex)
+        return false;
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
-    bool therapy_active = (s_mode == DISP_MODE_GRAPH || s_mode == DISP_MODE_INFO);
-    bool begun = !therapy_active && s_therapy_start_claims == 0 &&
-                 s_therapy_start_waiters == 0 &&
-                 s_as11_notifications_pending == 0 &&
-                 !s_therapy_safe_maintenance &&
-                 !s_therapy_safe_restart_reserving &&
-                 !s_therapy_safe_restart_committed;
-    if (begun) s_therapy_safe_maintenance = true;
+    bool begun = therapy_gate_try_begin_maintenance(&s_therapy_gate);
     xSemaphoreGive(s_state_mutex);
     return begun;
 }
@@ -409,87 +404,86 @@ bool bsp_display_try_begin_therapy_safe_maintenance(void)
  * allowing queued starts to publish before the ordinary deferred reboot loop. */
 bool bsp_display_try_reserve_maintenance_commit(void)
 {
-    if (!s_state_mutex) return false;
+    if (!s_state_mutex)
+        return false;
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
-    bool reserved = s_therapy_safe_maintenance &&
-        !(s_mode == DISP_MODE_GRAPH || s_mode == DISP_MODE_INFO) &&
-        s_therapy_start_claims == 0 && s_therapy_start_waiters == 0 &&
-        s_as11_notifications_pending == 0 && !s_therapy_safe_restart_reserving &&
-        !s_therapy_safe_restart_committed;
-    if (reserved) {
-        s_therapy_safe_maintenance = false;
-        s_therapy_safe_restart_reserving = true;
-    }
+    bool reserved = therapy_gate_try_reserve_maintenance_commit(&s_therapy_gate);
     xSemaphoreGive(s_state_mutex);
     return reserved;
 }
 
 bool bsp_display_therapy_safe_maintenance_should_abort(void)
 {
-    if (!s_state_mutex) return true;
+    if (!s_state_mutex)
+        return true;
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
-    bool therapy_active = (s_mode == DISP_MODE_GRAPH || s_mode == DISP_MODE_INFO);
-    bool abort = !s_therapy_safe_maintenance || therapy_active ||
-                 s_therapy_start_claims > 0 || s_therapy_start_waiters > 0;
+    bool abort = therapy_gate_maintenance_should_abort(&s_therapy_gate);
     xSemaphoreGive(s_state_mutex);
     return abort;
 }
 
 void bsp_display_end_therapy_safe_maintenance(void)
 {
-    if (!s_state_mutex) return;
+    if (!s_state_mutex)
+        return;
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
-    s_therapy_safe_maintenance = false;
+    therapy_gate_end_maintenance(&s_therapy_gate);
     xSemaphoreGive(s_state_mutex);
 }
 
-
-
 bool bsp_display_is_therapy_active(void)
 {
-    if (!s_state_mutex) return false;
+    if (!s_state_mutex)
+        return false;
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
-    bool active = (s_mode == DISP_MODE_GRAPH || s_mode == DISP_MODE_INFO);
+    bool active = therapy_gate_is_active(&s_therapy_gate);
     xSemaphoreGive(s_state_mutex);
     return active;
 }
 
 void bsp_display_push_flow(float flow_lpm)
 {
-    if (!s_state_mutex) return;
+    if (!s_state_mutex)
+        return;
     bool notify = false;
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
     if (s_mode == DISP_MODE_GRAPH && s_flow_buf) {
         s_flow_buf[s_flow_head] = flow_lpm;
         s_flow_head = (s_flow_head + 1) % FLOW_BUF_SIZE;
-        if (s_flow_count < FLOW_BUF_SIZE) s_flow_count++;
+        if (s_flow_count < FLOW_BUF_SIZE)
+            s_flow_count++;
         notify = true;
     }
     xSemaphoreGive(s_state_mutex);
     /* In Graph Mode, wake display_task on incoming flow data */
-    if (notify && s_display_task) xTaskNotifyGive(s_display_task);
+    if (notify && s_display_task)
+        xTaskNotifyGive(s_display_task);
 }
-
 
 void bsp_display_push_flow_gap(uint32_t samples)
 {
-    if (!s_state_mutex) return;
-    if (samples > FLOW_BUF_SIZE) samples = FLOW_BUF_SIZE;
+    if (!s_state_mutex)
+        return;
+    if (samples > FLOW_BUF_SIZE)
+        samples = FLOW_BUF_SIZE;
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
     if (s_mode == DISP_MODE_GRAPH && s_flow_buf) {
         for (uint32_t i = 0; i < samples; ++i) {
             s_flow_buf[s_flow_head] = NAN;
             s_flow_head = (s_flow_head + 1) % FLOW_BUF_SIZE;
-            if (s_flow_count < FLOW_BUF_SIZE) ++s_flow_count;
+            if (s_flow_count < FLOW_BUF_SIZE)
+                ++s_flow_count;
         }
     }
     xSemaphoreGive(s_state_mutex);
-    if (s_display_task) xTaskNotifyGive(s_display_task);
+    if (s_display_task)
+        xTaskNotifyGive(s_display_task);
 }
 
 void bsp_display_push_leak(float leak_lpm)
 {
-    if (!s_state_mutex) return;
+    if (!s_state_mutex)
+        return;
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
     s_leak_lpm = leak_lpm;
     s_leak_sum += leak_lpm;
@@ -501,7 +495,8 @@ void bsp_display_push_leak(float leak_lpm)
 
 void bsp_display_set_therapy_start_time(int64_t start_us)
 {
-    if (!s_state_mutex) return;
+    if (!s_state_mutex)
+        return;
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
     s_therapy_start_us = start_us;
     s_leak_sum = 0.0;
@@ -516,9 +511,12 @@ static bool IRAM_ATTR lcd_color_done_cb(esp_lcd_panel_io_handle_t io,
                                         esp_lcd_panel_io_event_data_t *edata,
                                         void *user_ctx)
 {
-    (void)io; (void)edata; (void)user_ctx;
+    (void)io;
+    (void)edata;
+    (void)user_ctx;
     BaseType_t hp = pdFALSE;
-    if (s_flush_done) xSemaphoreGiveFromISR(s_flush_done, &hp);
+    if (s_flush_done)
+        xSemaphoreGiveFromISR(s_flush_done, &hp);
     return hp == pdTRUE;
 }
 #endif
@@ -539,13 +537,15 @@ static bool IRAM_ATTR lcd_color_done_cb(esp_lcd_panel_io_handle_t io,
 static void lcd_panel_hw_recover(void)
 {
 #if !CONFIG_SOMNOTRACE_QEMU_DISPLAY_154
-    if (!s_panel) return;
+    if (!s_panel)
+        return;
 
     /* Wait briefly for any in-flight SPI DMA transactions to finish before
      * toggling the hardware reset pin, then drain the completion semaphore. */
     vTaskDelay(pdMS_TO_TICKS(10));
     if (s_flush_done) {
-        while (xSemaphoreTake(s_flush_done, 0) == pdTRUE) { }
+        while (xSemaphoreTake(s_flush_done, 0) == pdTRUE) {
+        }
     }
 
     esp_lcd_panel_reset(s_panel);
@@ -580,19 +580,20 @@ static void apply_panel_rotation(uint16_t degrees)
      * the original framebuffer in software when it converts RGB565. */
     (void)degrees;
 #else
-    if (!s_panel) return;
+    if (!s_panel)
+        return;
     bool quarter_turn = false;
 
     switch (degrees) {
-        case 0:
-        case 180:
-            break;
-        case 90:   /* clockwise 90° */
-        case 270:  /* clockwise 270° */
-            quarter_turn = true;
-            break;
-        default:
-            return;
+    case 0:
+    case 180:
+        break;
+    case 90:  /* clockwise 90° */
+    case 270: /* clockwise 270° */
+        quarter_turn = true;
+        break;
+    default:
+        return;
     }
 
     esp_lcd_panel_swap_xy(s_panel, quarter_turn);
@@ -603,11 +604,14 @@ static void apply_panel_rotation(uint16_t degrees)
 void bsp_display_set_rotation(uint16_t degrees)
 {
     switch (degrees) {
-        case 0: case 90: case 180: case 270:
-            break;
-        default:
-            ESP_LOGW(TAG, "set_rotation: invalid %u", (unsigned)degrees);
-            return;
+    case 0:
+    case 90:
+    case 180:
+    case 270:
+        break;
+    default:
+        ESP_LOGW(TAG, "set_rotation: invalid %u", (unsigned)degrees);
+        return;
     }
 
     /* Defer the actual SPI panel write to the display task.  Calling
@@ -629,12 +633,14 @@ void bsp_display_set_rotation(uint16_t degrees)
     }
 
     ESP_LOGI(TAG, "rotation set to %u°", (unsigned)degrees);
-    if (s_display_task) xTaskNotifyGive(s_display_task);
+    if (s_display_task)
+        xTaskNotifyGive(s_display_task);
 }
 
 static void lcd_flush(void)
 {
-    if (!s_panel || !s_fb) return;
+    if (!s_panel || !s_fb)
+        return;
 
 #if CONFIG_SOMNOTRACE_QEMU_DISPLAY_154
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
@@ -651,7 +657,8 @@ static void lcd_flush(void)
     int bi = 0;
     for (int y0 = 0; y0 < LCD_V_RES; y0 += LCD_STRIP_ROWS) {
         int rows = LCD_V_RES - y0;
-        if (rows > LCD_STRIP_ROWS) rows = LCD_STRIP_ROWS;
+        if (rows > LCD_STRIP_ROWS)
+            rows = LCD_STRIP_ROWS;
 
         /* Wait for previous strip DMA to complete BEFORE queueing this one.
          * This guarantees num_trans_inflight is 0 when esp_lcd_panel_draw_bitmap()
@@ -685,8 +692,7 @@ static void lcd_flush(void)
                 }
             }
         } else {
-            memcpy(buf, &s_fb[y0 * LCD_H_RES],
-                   (size_t)rows * LCD_H_RES * sizeof(uint16_t));
+            memcpy(buf, &s_fb[y0 * LCD_H_RES], (size_t)rows * LCD_H_RES * sizeof(uint16_t));
         }
 
         esp_lcd_panel_draw_bitmap(s_panel, 0, y0, LCD_H_RES, y0 + rows, buf);
@@ -713,7 +719,8 @@ static inline uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b)
 static inline uint32_t utf8_decode(const char **s)
 {
     const uint8_t *p = (const uint8_t *)*s;
-    if (!p || !*p) return 0;
+    if (!p || !*p)
+        return 0;
 
     uint32_t c = *p;
     if (c < 0x80) {
@@ -802,8 +809,10 @@ static inline void unpack_rgb565(uint16_t color, uint8_t *r, uint8_t *g, uint8_t
 
 static inline uint16_t blend_pixels(uint16_t bg_color, uint16_t fg_color, uint8_t alpha)
 {
-    if (alpha == 0) return bg_color;
-    if (alpha == 15) return fg_color;
+    if (alpha == 0)
+        return bg_color;
+    if (alpha == 15)
+        return fg_color;
 
     uint8_t bg_r, bg_g, bg_b;
     uint8_t fg_r, fg_g, fg_b;
@@ -818,19 +827,23 @@ static inline uint16_t blend_pixels(uint16_t bg_color, uint16_t fg_color, uint8_
     return rgb565(blended_r, blended_g, blended_b);
 }
 
-static void fb_draw_char_aa(int x, int y, const font_info_t *font, const font_glyph_t *glyph, uint16_t color)
+static void fb_draw_char_aa(
+    int x, int y, const font_info_t *font, const font_glyph_t *glyph, uint16_t color)
 {
-    if (glyph->width == 0 || glyph->height == 0) return;
+    if (glyph->width == 0 || glyph->height == 0)
+        return;
 
     uint32_t offset = glyph->bitmap_offset;
 
     for (int row = 0; row < glyph->height; row++) {
         int target_y = y + glyph->bearing_y + row;
-        if (target_y < 0 || target_y >= LCD_V_RES) continue;
+        if (target_y < 0 || target_y >= LCD_V_RES)
+            continue;
 
         for (int col = 0; col < glyph->width; col++) {
             int target_x = x + glyph->bearing_x + col;
-            if (target_x < 0 || target_x >= LCD_H_RES) continue;
+            if (target_x < 0 || target_x >= LCD_H_RES)
+                continue;
 
             uint32_t pixel_idx = row * glyph->width + col;
             uint32_t byte_idx = offset + (pixel_idx / 2);
@@ -856,7 +869,8 @@ static int fb_draw_string_aa(int x, int y, const font_info_t *font, const char *
     const char *p = str;
     while (*p) {
         uint32_t cp = utf8_decode(&p);
-        if (cp == 0) break;
+        if (cp == 0)
+            break;
         const font_glyph_t *glyph = find_glyph(font, cp);
         if (glyph) {
             fb_draw_char_aa(cx, y, font, glyph, color);
@@ -872,7 +886,8 @@ static int str_width_aa(const font_info_t *font, const char *str)
     const char *p = str;
     while (*p) {
         uint32_t cp = utf8_decode(&p);
-        if (cp == 0) break;
+        if (cp == 0)
+            break;
         const font_glyph_t *glyph = find_glyph(font, cp);
         if (glyph)
             width += glyph->advance;
@@ -882,10 +897,11 @@ static int str_width_aa(const font_info_t *font, const char *str)
 
 /* ── 2× scaled text rendering for the info panel ────────────────────── */
 
-static void fb_draw_char_aa_2x(int x, int y, const font_info_t *font,
-                               const font_glyph_t *glyph, uint16_t color)
+static void fb_draw_char_aa_2x(
+    int x, int y, const font_info_t *font, const font_glyph_t *glyph, uint16_t color)
 {
-    if (glyph->width == 0 || glyph->height == 0) return;
+    if (glyph->width == 0 || glyph->height == 0)
+        return;
 
     uint32_t offset = glyph->bitmap_offset;
 
@@ -906,10 +922,12 @@ static void fb_draw_char_aa_2x(int x, int y, const font_info_t *font,
             if (alpha > 0) {
                 for (int dy = 0; dy < 2; dy++) {
                     int ty = base_y + dy;
-                    if (ty < 0 || ty >= LCD_V_RES) continue;
+                    if (ty < 0 || ty >= LCD_V_RES)
+                        continue;
                     for (int dx = 0; dx < 2; dx++) {
                         int tx = base_x + dx;
-                        if (tx < 0 || tx >= LCD_H_RES) continue;
+                        if (tx < 0 || tx >= LCD_H_RES)
+                            continue;
                         s_fb[ty * LCD_H_RES + tx] =
                             blend_pixels(s_fb[ty * LCD_H_RES + tx], color, alpha);
                     }
@@ -919,14 +937,15 @@ static void fb_draw_char_aa_2x(int x, int y, const font_info_t *font,
     }
 }
 
-static int fb_draw_string_aa_2x(int x, int y, const font_info_t *font,
-                                const char *str, uint16_t color)
+static int fb_draw_string_aa_2x(
+    int x, int y, const font_info_t *font, const char *str, uint16_t color)
 {
     int cx = x;
     const char *p = str;
     while (*p) {
         uint32_t cp = utf8_decode(&p);
-        if (cp == 0) break;
+        if (cp == 0)
+            break;
         const font_glyph_t *glyph = find_glyph(font, cp);
         if (glyph) {
             fb_draw_char_aa_2x(cx, y, font, glyph, color);
@@ -944,12 +963,15 @@ static int str_width_aa_2x(const font_info_t *font, const char *str)
 static void display_supervisor_cb(void *arg)
 {
     (void)arg;
-    if (!s_display_task) return;
+    if (!s_display_task)
+        return;
     int64_t last = s_last_render_us;
-    if (last == 0) return;
+    if (last == 0)
+        return;
     int64_t elapsed = esp_timer_get_time() - last;
     if (elapsed > 3500000) { /* > 3.5 seconds with no render */
-        ESP_LOGW(TAG, "display supervisor: no frame rendered in %lld ms — waking display_task",
+        ESP_LOGW(TAG,
+                 "display supervisor: no frame rendered in %lld ms — waking display_task",
                  (long long)(elapsed / 1000));
         s_flush_stuck = true;
         xTaskNotifyGive(s_display_task);
@@ -966,14 +988,16 @@ static void display_buffers_free(void)
     s_flow_local = NULL;
     heap_caps_free(s_flow_yf);
     s_flow_yf = NULL;
-    if (s_state_mutex) vSemaphoreDelete(s_state_mutex);
+    if (s_state_mutex)
+        vSemaphoreDelete(s_state_mutex);
     s_state_mutex = NULL;
 #if !CONFIG_SOMNOTRACE_QEMU_DISPLAY_154
     for (int i = 0; i < LCD_STRIP_BUFS; ++i) {
         heap_caps_free(s_strip[i]);
         s_strip[i] = NULL;
     }
-    if (s_flush_done) vSemaphoreDelete(s_flush_done);
+    if (s_flush_done)
+        vSemaphoreDelete(s_flush_done);
     s_flush_done = NULL;
 #endif
 }
@@ -982,24 +1006,29 @@ static esp_err_t display_buffers_init(void)
     s_fb = heap_caps_malloc(LCD_H_RES * LCD_V_RES * sizeof(uint16_t), MALLOC_CAP_SPIRAM);
     if (!s_fb)
         s_fb = heap_caps_malloc(LCD_H_RES * LCD_V_RES * sizeof(uint16_t), MALLOC_CAP_DMA);
-    if (!s_fb) goto no_mem;
+    if (!s_fb)
+        goto no_mem;
 
     s_flow_buf = heap_caps_calloc(FLOW_BUF_SIZE, sizeof(float), MALLOC_CAP_SPIRAM);
     s_flow_local = heap_caps_malloc(FLOW_BUF_SIZE * sizeof(float), MALLOC_CAP_SPIRAM);
     s_flow_yf = heap_caps_malloc(LCD_H_RES * sizeof(float), MALLOC_CAP_SPIRAM);
-    if (!s_flow_buf || !s_flow_local || !s_flow_yf) goto no_mem;
+    if (!s_flow_buf || !s_flow_local || !s_flow_yf)
+        goto no_mem;
 
 #if !CONFIG_SOMNOTRACE_QEMU_DISPLAY_154
     for (int i = 0; i < LCD_STRIP_BUFS; ++i) {
-        s_strip[i] = heap_caps_malloc(LCD_H_RES * LCD_STRIP_ROWS * sizeof(uint16_t),
-                                      MALLOC_CAP_DMA);
-        if (!s_strip[i]) goto no_mem;
+        s_strip[i] =
+            heap_caps_malloc(LCD_H_RES * LCD_STRIP_ROWS * sizeof(uint16_t), MALLOC_CAP_DMA);
+        if (!s_strip[i])
+            goto no_mem;
     }
     s_flush_done = xSemaphoreCreateCounting(LCD_STRIP_BUFS, 0);
-    if (!s_flush_done) goto no_mem;
+    if (!s_flush_done)
+        goto no_mem;
 #endif
     s_state_mutex = xSemaphoreCreateMutex();
-    if (!s_state_mutex) goto no_mem;
+    if (!s_state_mutex)
+        goto no_mem;
     return ESP_OK;
 
 no_mem:
@@ -1011,7 +1040,8 @@ no_mem:
 esp_err_t bsp_display_init(void)
 {
     esp_err_t err = display_buffers_init();
-    if (err != ESP_OK) return err;
+    if (err != ESP_OK)
+        return err;
 #if CONFIG_SOMNOTRACE_QEMU_DISPLAY_154
     ESP_ERROR_CHECK(board_qemu_154_init(&s_panel));
 #else
@@ -1084,7 +1114,8 @@ esp_err_t bsp_display_init(void)
 
     /* Start the single-owner render task after every resource exists. Only this
      * task ever touches the framebuffer or the LCD panel. */
-    s_display_task = psram_task_create(display_task, "display", DISPLAY_TASK_STACK, NULL, 4, tskNO_AFFINITY, NULL, NULL);
+    s_display_task = psram_task_create(
+        display_task, "display", DISPLAY_TASK_STACK, NULL, 4, tskNO_AFFINITY, NULL, NULL);
     if (!s_display_task) {
         esp_lcd_panel_del(s_panel);
         s_panel = NULL;
@@ -1126,7 +1157,8 @@ void bsp_display_set_wifi_connected(bool connected)
     s_wifi_connected = connected;
     s_status_dirty = true;
     xSemaphoreGive(s_state_mutex);
-    if (s_display_task) xTaskNotifyGive(s_display_task);
+    if (s_display_task)
+        xTaskNotifyGive(s_display_task);
 }
 
 void bsp_display_set_as11_paired(bool paired)
@@ -1139,12 +1171,14 @@ void bsp_display_set_as11_paired(bool paired)
     s_as11_paired = paired;
     s_status_dirty = true;
     xSemaphoreGive(s_state_mutex);
-    if (s_display_task) xTaskNotifyGive(s_display_task);
+    if (s_display_task)
+        xTaskNotifyGive(s_display_task);
 }
 
 void bsp_display_set_battery(int percent, bool charging, bool valid)
 {
-    if (!s_state_mutex) return;
+    if (!s_state_mutex)
+        return;
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
     if (s_batt_percent == percent && s_batt_charging == charging && s_batt_valid == valid) {
         xSemaphoreGive(s_state_mutex);
@@ -1155,20 +1189,23 @@ void bsp_display_set_battery(int percent, bool charging, bool valid)
     s_batt_valid = valid;
     s_status_dirty = true;
     xSemaphoreGive(s_state_mutex);
-    if (s_display_task) xTaskNotifyGive(s_display_task);
+    if (s_display_task)
+        xTaskNotifyGive(s_display_task);
 }
 
 /* ── Backlight control ─────────────────────────────────────────────── */
 
 void bsp_display_set_brightness(uint8_t percent)
 {
-    if (percent < 1) percent = 1;
-    if (percent > 200) percent = 200;
+    if (percent < 1)
+        percent = 1;
+    if (percent > 200)
+        percent = 200;
     s_brightness = percent;
 #if !CONFIG_SOMNOTRACE_QEMU_DISPLAY_154
     if (s_backlight_on) {
         /* percent is in tenth-percent units (1=0.1%), so divide by 1000 */
-        uint32_t duty = (uint32_t)(percent) * BL_DUTY_MAX / 1000;
+        uint32_t duty = (uint32_t)(percent)*BL_DUTY_MAX / 1000;
         ledc_set_duty(LEDC_LOW_SPEED_MODE, BL_LEDC_CHANNEL, duty);
         ledc_update_duty(LEDC_LOW_SPEED_MODE, BL_LEDC_CHANNEL);
     }
@@ -1178,19 +1215,23 @@ void bsp_display_set_brightness(uint8_t percent)
 void bsp_display_set_backlight(bool on)
 {
 #if CONFIG_SOMNOTRACE_QEMU_DISPLAY_154
-    if (s_state_mutex) xSemaphoreTake(s_state_mutex, portMAX_DELAY);
+    if (s_state_mutex)
+        xSemaphoreTake(s_state_mutex, portMAX_DELAY);
     if (on != s_backlight_on) {
         s_backlight_on = on;
         ++s_qemu_scene_generation;
         s_status_dirty = true;
     }
-    if (s_state_mutex) xSemaphoreGive(s_state_mutex);
-    if (s_display_task) xTaskNotifyGive(s_display_task);
+    if (s_state_mutex)
+        xSemaphoreGive(s_state_mutex);
+    if (s_display_task)
+        xTaskNotifyGive(s_display_task);
 #else
-    if (on == s_backlight_on) return;
+    if (on == s_backlight_on)
+        return;
     s_backlight_on = on;
     if (on) {
-        uint32_t duty = (uint32_t)(s_brightness) * BL_DUTY_MAX / 1000;
+        uint32_t duty = (uint32_t)(s_brightness)*BL_DUTY_MAX / 1000;
         ledc_set_duty(LEDC_LOW_SPEED_MODE, BL_LEDC_CHANNEL, duty);
         ledc_update_duty(LEDC_LOW_SPEED_MODE, BL_LEDC_CHANNEL);
     } else {
@@ -1220,14 +1261,8 @@ uint8_t bsp_display_get_brightness(void)
 
 void bsp_display_apply_backlight_policy(bool force_on)
 {
+    s_backlight_force_on = force_on;
     if (force_on) {
-        s_backlight_force_on = true;
-        bsp_display_set_backlight(true);
-        return;
-    }
-
-    /* If force-on is active (SoftAP), keep backlight on regardless of mode */
-    if (s_backlight_force_on) {
         bsp_display_set_backlight(true);
         return;
     }
@@ -1267,14 +1302,12 @@ static void wake_timer_cb(void *arg)
 
 void bsp_display_wake_temporary(uint32_t duration_sec)
 {
-    if (duration_sec == 0) return;
+    if (duration_sec == 0)
+        return;
 
     if (!s_wake_timer) {
         esp_timer_create_args_t timer_args = {
-            .callback = wake_timer_cb,
-            .arg = NULL,
-            .name = "lcd_wake_tmr"
-        };
+            .callback = wake_timer_cb, .arg = NULL, .name = "lcd_wake_tmr"};
         esp_err_t err = esp_timer_create(&timer_args, &s_wake_timer);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "failed to create wake timer: %s", esp_err_to_name(err));
@@ -1307,9 +1340,11 @@ void bsp_display_cancel_temporary_wake(void)
 static void fb_fill_rect(int x, int y, int w, int h, uint16_t color)
 {
     for (int row = y; row < y + h; row++) {
-        if (row < 0 || row >= LCD_V_RES) continue;
+        if (row < 0 || row >= LCD_V_RES)
+            continue;
         for (int col = x; col < x + w; col++) {
-            if (col < 0 || col >= LCD_H_RES) continue;
+            if (col < 0 || col >= LCD_H_RES)
+                continue;
             s_fb[row * LCD_H_RES + col] = color;
         }
     }
@@ -1340,15 +1375,16 @@ static inline uint16_t blend565(uint16_t dst_sw, uint16_t src_sw, uint8_t a)
 
 static inline void fb_blend(int x, int y, uint16_t color_sw, uint8_t a)
 {
-    if (a == 0 || x < 0 || x >= LCD_H_RES || y < 0 || y >= LCD_V_RES) return;
+    if (a == 0 || x < 0 || x >= LCD_H_RES || y < 0 || y >= LCD_V_RES)
+        return;
     uint16_t *p = &s_fb[y * LCD_H_RES + x];
     *p = blend565(*p, color_sw, a);
 }
 
 /* Antialiased line of given thickness, drawn via per-pixel distance coverage
  * and alpha-blended at up to max_alpha. Round end caps. */
-static void fb_draw_line_aa(float x0, float y0, float x1, float y1,
-                            float thick, uint16_t color, uint8_t max_alpha)
+static void fb_draw_line_aa(
+    float x0, float y0, float x1, float y1, float thick, uint16_t color, uint8_t max_alpha)
 {
     float half = thick * 0.5f;
     int ix0 = (int)floorf(fminf(x0, x1) - half - 1.0f);
@@ -1360,18 +1396,24 @@ static void fb_draw_line_aa(float x0, float y0, float x1, float y1,
     float len2 = dx * dx + dy * dy;
 
     for (int y = iy0; y <= iy1; y++) {
-        if (y < 0 || y >= LCD_V_RES) continue;
+        if (y < 0 || y >= LCD_V_RES)
+            continue;
         for (int x = ix0; x <= ix1; x++) {
-            if (x < 0 || x >= LCD_H_RES) continue;
+            if (x < 0 || x >= LCD_H_RES)
+                continue;
             float t = len2 > 0.0f ? ((x - x0) * dx + (y - y0) * dy) / len2 : 0.0f;
-            if (t < 0.0f) t = 0.0f;
-            if (t > 1.0f) t = 1.0f;
+            if (t < 0.0f)
+                t = 0.0f;
+            if (t > 1.0f)
+                t = 1.0f;
             float cx = x0 + t * dx, cy = y0 + t * dy;
             float ex = x - cx, ey = y - cy;
             float dist = sqrtf(ex * ex + ey * ey);
-            float cov = half + 0.5f - dist;   /* coverage in px */
-            if (cov <= 0.0f) continue;
-            if (cov > 1.0f) cov = 1.0f;
+            float cov = half + 0.5f - dist; /* coverage in px */
+            if (cov <= 0.0f)
+                continue;
+            if (cov > 1.0f)
+                cov = 1.0f;
             fb_blend(x, y, color, (uint8_t)(cov * max_alpha));
         }
     }
@@ -1381,20 +1423,20 @@ void bsp_display_show_number(uint32_t value)
 {
     char buf[12];
     snprintf(buf, sizeof(buf), "%lu", (unsigned long)value);
-    const char *lines[] = { buf };
+    const char *lines[] = {buf};
     bsp_display_show_lines(NULL, lines, 1);
 }
 
 static uint16_t get_wifi_rssi_color(int rssi)
 {
     if (rssi >= -60) {
-        return rgb565(0, 255, 120);   // Excellent: green
+        return rgb565(0, 255, 120); // Excellent: green
     } else if (rssi >= -70) {
-        return rgb565(100, 255, 100);  // Good: vibrant light green
+        return rgb565(100, 255, 100); // Good: vibrant light green
     } else if (rssi >= -80) {
-        return rgb565(255, 220, 0);   // Fair: yellow
+        return rgb565(255, 220, 0); // Fair: yellow
     } else {
-        return rgb565(255, 50, 50);   // Poor: red
+        return rgb565(255, 50, 50); // Poor: red
     }
 }
 
@@ -1405,7 +1447,7 @@ static void fb_draw_wifi_indicator(int x, int y, bool connected)
     }
 
 #if CONFIG_SOMNOTRACE_QEMU_DISPLAY_154
-    int rssi = -55;  /* deterministic fixture; never starts or queries Wi-Fi */
+    int rssi = -55; /* deterministic fixture; never starts or queries Wi-Fi */
 #else
     int rssi = -128;
     if (esp_wifi_sta_get_rssi(&rssi) != ESP_OK) {
@@ -1414,10 +1456,14 @@ static void fb_draw_wifi_indicator(int x, int y, bool connected)
 #endif
 
     int active_bars = 0;
-    if (rssi >= -60) active_bars = 4;
-    else if (rssi >= -70) active_bars = 3;
-    else if (rssi >= -80) active_bars = 2;
-    else if (rssi >= -90) active_bars = 1;
+    if (rssi >= -60)
+        active_bars = 4;
+    else if (rssi >= -70)
+        active_bars = 3;
+    else if (rssi >= -80)
+        active_bars = 2;
+    else if (rssi >= -90)
+        active_bars = 1;
 
     uint16_t inactive_col = rgb565(60, 60, 60);
     uint16_t active_col = get_wifi_rssi_color(rssi);
@@ -1432,7 +1478,8 @@ static void fb_draw_wifi_indicator(int x, int y, bool connected)
 
 void bsp_display_show_lines(const char *title, const char *const *lines, int n_lines)
 {
-    if (!s_state_mutex) return;
+    if (!s_state_mutex)
+        return;
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
 
     if (title) {
@@ -1442,8 +1489,10 @@ void bsp_display_show_lines(const char *title, const char *const *lines, int n_l
         s_status_title[0] = '\0';
     }
 
-    if (n_lines < 0) n_lines = 0;
-    if (n_lines > MAX_STATUS_LINES) n_lines = MAX_STATUS_LINES;
+    if (n_lines < 0)
+        n_lines = 0;
+    if (n_lines > MAX_STATUS_LINES)
+        n_lines = MAX_STATUS_LINES;
     s_status_nlines = n_lines;
     for (int i = 0; i < n_lines; i++) {
         if (lines[i]) {
@@ -1456,7 +1505,8 @@ void bsp_display_show_lines(const char *title, const char *const *lines, int n_l
 
     s_status_dirty = true;
     xSemaphoreGive(s_state_mutex);
-    if (s_display_task) xTaskNotifyGive(s_display_task);
+    if (s_display_task)
+        xTaskNotifyGive(s_display_task);
 }
 
 /* ── Render helpers — called ONLY by display_task ───────────────────── */
@@ -1467,17 +1517,18 @@ void bsp_display_show_lines(const char *title, const char *const *lines, int n_l
  * blocked for long. */
 static void render_graph(void)
 {
-    if (!s_panel || !s_fb || !s_flow_buf || !s_flow_local || !s_flow_yf) return;
+    if (!s_panel || !s_fb || !s_flow_buf || !s_flow_local || !s_flow_yf)
+        return;
 
-    const uint16_t bg        = rgb565(9, 11, 18);
-    const uint16_t grid_col  = rgb565(28, 32, 46);
-    const uint16_t zero_col  = rgb565(70, 78, 102);
-    const uint16_t axis_col  = rgb565(40, 46, 64);
-    const uint16_t flow_col  = rgb565(54, 247, 160);   /* sharp mint line */
-    const uint16_t glow_col  = rgb565(20, 205, 132);   /* soft glow */
-    const uint16_t fill_col  = rgb565(28, 150, 104);   /* area under curve */
+    const uint16_t bg = rgb565(9, 11, 18);
+    const uint16_t grid_col = rgb565(28, 32, 46);
+    const uint16_t zero_col = rgb565(70, 78, 102);
+    const uint16_t axis_col = rgb565(40, 46, 64);
+    const uint16_t flow_col = rgb565(54, 247, 160); /* sharp mint line */
+    const uint16_t glow_col = rgb565(20, 205, 132); /* soft glow */
+    const uint16_t fill_col = rgb565(28, 150, 104); /* area under curve */
     const uint16_t label_col = rgb565(122, 134, 158);
-    const uint16_t unit_col  = rgb565(86, 96, 120);
+    const uint16_t unit_col = rgb565(86, 96, 120);
 
     int n, head;
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
@@ -1488,17 +1539,19 @@ static void render_graph(void)
 
     fb_clear(bg);
 
-    const int mid_y  = (GRAPH_PLOT_TOP + GRAPH_PLOT_BOT) / 2;
+    const int mid_y = (GRAPH_PLOT_TOP + GRAPH_PLOT_BOT) / 2;
     const int half_h = (GRAPH_PLOT_BOT - GRAPH_PLOT_TOP) / 2;
-    const float scale = (float)half_h / GRAPH_FULL_SCALE;  /* px per L/min */
+    const float scale = (float)half_h / GRAPH_FULL_SCALE; /* px per L/min */
 
     /* ── Grid + left scale axis ──────────────────────────────────────── */
-    const int tick_step = 50;  /* L/min between labelled ticks */
+    const int tick_step = 50; /* L/min between labelled ticks */
     int nticks = (int)(GRAPH_FULL_SCALE / tick_step);
-    if (nticks < 1) nticks = 1;
+    if (nticks < 1)
+        nticks = 1;
     for (int t = -nticks; t <= nticks; t++) {
         int gy = mid_y + (int)lroundf(t * tick_step * scale);
-        if (gy < GRAPH_PLOT_TOP || gy > GRAPH_PLOT_BOT) continue;
+        if (gy < GRAPH_PLOT_TOP || gy > GRAPH_PLOT_BOT)
+            continue;
         if (t == 0) {
             for (int x = GRAPH_PLOT_X0; x < LCD_H_RES; x++)
                 s_fb[gy * LCD_H_RES + x] = zero_col;
@@ -1510,7 +1563,8 @@ static void render_graph(void)
         snprintf(tb, sizeof(tb), "%d", t < 0 ? -t * tick_step : t * tick_step);
         int tw = str_width_aa(&roboto_body, tb);
         int tx = GRAPH_AXIS_W - 4 - tw;
-        if (tx < 1) tx = 1;
+        if (tx < 1)
+            tx = 1;
         fb_draw_string_aa(tx, gy - roboto_body.height / 2, &roboto_body, tb, label_col);
     }
 
@@ -1526,23 +1580,27 @@ static void render_graph(void)
 
     /* ── Waveform (static scale, right-aligned newest sample) ────────── */
     int m = n;
-    if (m > GRAPH_PLOT_W) m = GRAPH_PLOT_W;
+    if (m > GRAPH_PLOT_W)
+        m = GRAPH_PLOT_W;
     int start = (head - m + FLOW_BUF_SIZE) % FLOW_BUF_SIZE;
     int xbase = LCD_H_RES - m;
 
     float *yf = s_flow_yf;
     for (int j = 0; j < m; j++) {
         float val = s_flow_local[(start + j) % FLOW_BUF_SIZE];
-        float y = mid_y - val * scale;  /* positive flow (inhale) → up */
-        if (y < GRAPH_PLOT_TOP) y = GRAPH_PLOT_TOP;   /* static hard cut */
-        if (y > GRAPH_PLOT_BOT) y = GRAPH_PLOT_BOT;
+        float y = mid_y - val * scale; /* positive flow (inhale) → up */
+        if (y < GRAPH_PLOT_TOP)
+            y = GRAPH_PLOT_TOP; /* static hard cut */
+        if (y > GRAPH_PLOT_BOT)
+            y = GRAPH_PLOT_BOT;
         yf[xbase + j] = y;
     }
 
     /* Translucent area fill between the curve and the zero line. */
     for (int j = 0; j < m; j++) {
         int x = xbase + j;
-        if (!isfinite(yf[x])) continue;
+        if (!isfinite(yf[x]))
+            continue;
         int y0 = (int)(yf[x] < mid_y ? yf[x] : mid_y);
         int y1 = (int)(yf[x] < mid_y ? mid_y : yf[x]);
         for (int y = y0; y <= y1; y++)
@@ -1552,12 +1610,14 @@ static void render_graph(void)
     /* Soft glow pass, then the sharp antialiased line on top. */
     for (int j = 1; j < m; j++) {
         int x = xbase + j;
-        if (!isfinite(yf[x - 1]) || !isfinite(yf[x])) continue;
+        if (!isfinite(yf[x - 1]) || !isfinite(yf[x]))
+            continue;
         fb_draw_line_aa(x - 1, yf[x - 1], x, yf[x], 4.5f, glow_col, 45);
     }
     for (int j = 1; j < m; j++) {
         int x = xbase + j;
-        if (!isfinite(yf[x - 1]) || !isfinite(yf[x])) continue;
+        if (!isfinite(yf[x - 1]) || !isfinite(yf[x]))
+            continue;
         fb_draw_line_aa(x - 1, yf[x - 1], x, yf[x], 2.0f, flow_col, 255);
     }
 
@@ -1568,27 +1628,27 @@ static void render_graph(void)
 static inline uint16_t leak_val_color(float leak)
 {
     if (leak < 12.0f)
-        return rgb565(50, 245, 90);    /* green - low / good seal */
+        return rgb565(50, 245, 90); /* green - low / good seal */
     else if (leak < 24.0f)
-        return rgb565(255, 225, 0);    /* yellow - moderate */
+        return rgb565(255, 225, 0); /* yellow - moderate */
     else if (leak < 36.0f)
-        return rgb565(255, 135, 0);    /* orange - high */
+        return rgb565(255, 135, 0); /* orange - high */
     else
-        return rgb565(255, 60, 60);     /* red - excessive / large leak */
+        return rgb565(255, 60, 60); /* red - excessive / large leak */
 }
 
 /* ── Info panel: leak rates (CUR | AVG) + session runtime ─────────────
  *
- * Top half:   Single header line: "CUR" (left accent), "Leak (L/min)" (center gray), "AVG" (right accent)
- *             Left column: Current leak in roboto_title 2× scale (~66px tall)
- *             Right column: Session average leak in roboto_title 2× scale (~66px tall)
- *             Vertical divider line at x = 120.
- * Bottom half: "Session runtime" header in roboto_body (slate gray),
- *              then elapsed time "H:MM" in roboto_title at 2× scale (~66px tall).
+ * Top half:   Single header line: "CUR" (left accent), "Leak (L/min)" (center gray), "AVG" (right
+ * accent) Left column: Current leak in roboto_title 2× scale (~66px tall) Right column: Session
+ * average leak in roboto_title 2× scale (~66px tall) Vertical divider line at x = 120. Bottom half:
+ * "Session runtime" header in roboto_body (slate gray), then elapsed time "H:MM" in roboto_title at
+ * 2× scale (~66px tall).
  */
 static void render_info(void)
 {
-    if (!s_panel || !s_fb) return;
+    if (!s_panel || !s_fb)
+        return;
 
     float leak_lpm;
     double leak_sum;
@@ -1602,10 +1662,10 @@ static void render_info(void)
     start_us = s_therapy_start_us;
     xSemaphoreGive(s_state_mutex);
 
-    const uint16_t bg        = rgb565(9, 11, 18);
-    const uint16_t hdr_col   = rgb565(122, 134, 158);
-    const uint16_t label_col = rgb565(100, 190, 240);  /* cyan accent for CUR & AVG */
-    const uint16_t div_col   = rgb565(28, 32, 46);
+    const uint16_t bg = rgb565(9, 11, 18);
+    const uint16_t hdr_col = rgb565(122, 134, 158);
+    const uint16_t label_col = rgb565(100, 190, 240); /* cyan accent for CUR & AVG */
+    const uint16_t div_col = rgb565(28, 32, 46);
 
     fb_clear(bg);
 
@@ -1618,7 +1678,8 @@ static void render_info(void)
     const char *leak_hdr = "Leak (L/min)";
     int hdr_w = str_width_aa(&roboto_body, leak_hdr);
     int hdr_x = (LCD_H_RES - hdr_w) / 2;
-    if (hdr_x < 4) hdr_x = 4;
+    if (hdr_x < 4)
+        hdr_x = 4;
     fb_draw_string_aa(hdr_x, 10, &roboto_body, leak_hdr, hdr_col);
 
     /* "AVG" label at right margin */
@@ -1636,7 +1697,8 @@ static void render_info(void)
 
     int cur_w = str_width_aa_2x(&roboto_title, cur_str);
     int cur_x = 58 - cur_w / 2;
-    if (cur_x < 4) cur_x = 4;
+    if (cur_x < 4)
+        cur_x = 4;
     fb_draw_string_aa_2x(cur_x, 42, &roboto_title, cur_str, leak_val_color(leak_lpm));
 
     /* Average leak */
@@ -1649,7 +1711,8 @@ static void render_info(void)
 
     int avg_w = str_width_aa_2x(&roboto_title, avg_str);
     int avg_x = 182 - avg_w / 2;
-    if (avg_x < 124) avg_x = 124;
+    if (avg_x < 124)
+        avg_x = 124;
     fb_draw_string_aa_2x(avg_x, 42, &roboto_title, avg_str, leak_val_color(avg_lpm));
 
     /* Vertical divider tick between CUR and AVG columns */
@@ -1665,7 +1728,8 @@ static void render_info(void)
     const char *rt_hdr = "Session runtime";
     int rt_hdr_w = str_width_aa(&roboto_body, rt_hdr);
     int rt_hdr_x = (LCD_H_RES - rt_hdr_w) / 2;
-    if (rt_hdr_x < 4) rt_hdr_x = 4;
+    if (rt_hdr_x < 4)
+        rt_hdr_x = 4;
     fb_draw_string_aa(rt_hdr_x, mid_y + 10, &roboto_body, rt_hdr, hdr_col);
 
     /* Calculate elapsed time from TherapyStart (monotonic) */
@@ -1676,7 +1740,8 @@ static void render_info(void)
 #else
         int64_t elapsed_us = esp_timer_get_time() - start_us;
 #endif
-        if (elapsed_us < 0) elapsed_us = 0;
+        if (elapsed_us < 0)
+            elapsed_us = 0;
         int64_t elapsed_sec = elapsed_us / 1000000;
         hours = (int)(elapsed_sec / 3600);
         mins = (int)((elapsed_sec % 3600) / 60);
@@ -1687,9 +1752,9 @@ static void render_info(void)
 
     int rt_w = str_width_aa_2x(&roboto_title, rt_str);
     int rt_x = (LCD_H_RES - rt_w) / 2;
-    if (rt_x < 4) rt_x = 4;
-    fb_draw_string_aa_2x(rt_x, mid_y + 42, &roboto_title, rt_str,
-                         rgb565(200, 210, 225));
+    if (rt_x < 4)
+        rt_x = 4;
+    fb_draw_string_aa_2x(rt_x, mid_y + 42, &roboto_title, rt_str, rgb565(200, 210, 225));
 
     lcd_flush();
 }
@@ -1721,7 +1786,8 @@ static void fb_draw_ble_indicator(int x, int y)
     for (int r = 0; r < 15; r++) {
         uint16_t row = bitmap[r];
         int py = y + r;
-        if (py < 0 || py >= LCD_V_RES) continue;
+        if (py < 0 || py >= LCD_V_RES)
+            continue;
         for (int c = 0; c < 9; c++) {
             if (row & (1 << (8 - c))) {
                 int px = x + c;
@@ -1744,19 +1810,19 @@ static void fb_draw_battery_indicator(int x, int y, int percent, bool charging)
     /* Text color based on charge level */
     uint16_t text_col;
     if (percent < 0) {
-        text_col = rgb565(160, 180, 205);   /* calibrating / unknown */
+        text_col = rgb565(160, 180, 205); /* calibrating / unknown */
     } else if (percent <= 15) {
-        text_col = rgb565(255, 60, 60);      /* red */
+        text_col = rgb565(255, 60, 60); /* red */
     } else if (percent <= 30) {
-        text_col = rgb565(255, 180, 0);      /* orange */
+        text_col = rgb565(255, 180, 0); /* orange */
     } else {
-        text_col = rgb565(80, 220, 100);     /* green */
+        text_col = rgb565(80, 220, 100); /* green */
     }
 
     /* Battery outline: 22px wide × 14px tall body + 3×6px terminal nub */
-    fb_fill_rect(x, y, 22, 14, frame_col);             /* outer frame */
+    fb_fill_rect(x, y, 22, 14, frame_col);               /* outer frame */
     fb_fill_rect(x + 1, y + 1, 20, 12, rgb565(0, 0, 0)); /* inner cavity */
-    fb_fill_rect(x + 22, y + 4, 3, 6, frame_col);      /* terminal nub */
+    fb_fill_rect(x + 22, y + 4, 3, 6, frame_col);        /* terminal nub */
 
     /* Charging bolt inside the cavity, or proportional fill if on battery */
     if (charging) {
@@ -1768,7 +1834,7 @@ static void fb_draw_battery_indicator(int x, int y, int percent, bool charging)
         fb_fill_rect(bx + 3, by + 2, 3, 1, bolt_col);
         fb_fill_rect(bx + 2, by + 3, 3, 1, bolt_col);
         fb_fill_rect(bx + 1, by + 4, 4, 1, bolt_col);
-        fb_fill_rect(bx + 0, by + 5, 8, 1, bolt_col);  /* waist bar */
+        fb_fill_rect(bx + 0, by + 5, 8, 1, bolt_col); /* waist bar */
         fb_fill_rect(bx + 3, by + 6, 4, 1, bolt_col);
         fb_fill_rect(bx + 2, by + 7, 4, 1, bolt_col);
         fb_fill_rect(bx + 2, by + 8, 3, 1, bolt_col);
@@ -1776,8 +1842,10 @@ static void fb_draw_battery_indicator(int x, int y, int percent, bool charging)
         fb_fill_rect(bx + 0, by + 10, 2, 1, bolt_col);
     } else if (percent > 0) {
         int fill_w = (percent * 20 + 50) / 100;
-        if (fill_w < 1) fill_w = 1;
-        if (fill_w > 20) fill_w = 20;
+        if (fill_w < 1)
+            fill_w = 1;
+        if (fill_w > 20)
+            fill_w = 20;
         fb_fill_rect(x + 1, y + 1, fill_w, 12, text_col);
     }
 
@@ -1795,7 +1863,8 @@ static void fb_draw_battery_indicator(int x, int y, int percent, bool charging)
  * draws without holding it. RSSI is read live each refresh. */
 static void render_status(void)
 {
-    if (!s_panel || !s_fb) return;
+    if (!s_panel || !s_fb)
+        return;
 
     char title[STATUS_TITLE_LEN];
     char lines[MAX_STATUS_LINES][STATUS_LINE_LEN];
@@ -1827,7 +1896,7 @@ static void render_status(void)
 #else
     time_t now = time(NULL);
 #endif
-    if (now > 1700000000) {  /* only show if NTP-synced (after ~Nov 2023) */
+    if (now > 1700000000) { /* only show if NTP-synced (after ~Nov 2023) */
         struct tm tm_info;
 #if CONFIG_SOMNOTRACE_QEMU_DISPLAY_154
         gmtime_r(&now, &tm_info);
@@ -1855,7 +1924,8 @@ static void render_status(void)
     if (title[0]) {
         int w = str_width_aa(&roboto_title, title);
         int x = (LCD_H_RES - w) / 2;
-        if (x < 4) x = 4;
+        if (x < 4)
+            x = 4;
         fb_draw_string_aa(x, y, &roboto_title, title, title_col);
         y += 40;
     } else {
@@ -1863,12 +1933,15 @@ static void render_status(void)
     }
 
     int line_h = roboto_body.height + 6;
-    if (line_h < 18) line_h = 18;
+    if (line_h < 18)
+        line_h = 18;
     for (int i = 0; i < nlines; i++) {
-        if (!lines[i][0]) continue;
+        if (!lines[i][0])
+            continue;
         int w = str_width_aa(&roboto_body, lines[i]);
         int x = (LCD_H_RES - w) / 2;
-        if (x < 4) x = 4;
+        if (x < 4)
+            x = 4;
         fb_draw_string_aa(x, y, &roboto_body, lines[i], text_col);
         y += line_h;
     }
@@ -1878,7 +1951,7 @@ static void render_status(void)
      * the status lines above happen to say. */
     if (notice[0]) {
         const uint16_t notice_col = rgb565(255, 190, 30);
-        const uint16_t notice_bg  = rgb565(46, 34, 0);
+        const uint16_t notice_bg = rgb565(46, 34, 0);
 
         int band_h = roboto_body.height + 10;
         int band_y = LCD_V_RES - band_h;
@@ -1898,7 +1971,8 @@ static void render_status(void)
 
         int tw = str_width_aa(&roboto_body, notice);
         int tx = tri_x + 16 + ((LCD_H_RES - tri_x - 16) - tw) / 2;
-        if (tx < tri_x + 16) tx = tri_x + 16;
+        if (tx < tri_x + 16)
+            tx = tri_x + 16;
         fb_draw_string_aa(tx, band_y + 5, &roboto_body, notice, notice_col);
     }
 
@@ -1907,7 +1981,8 @@ static void render_status(void)
 
 void bsp_display_set_notice(const char *text)
 {
-    if (!s_state_mutex) return;
+    if (!s_state_mutex)
+        return;
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
     if (text && text[0]) {
         strncpy(s_notice, text, STATUS_LINE_LEN - 1);
@@ -1917,7 +1992,8 @@ void bsp_display_set_notice(const char *text)
     }
     s_status_dirty = true;
     xSemaphoreGive(s_state_mutex);
-    if (s_display_task) xTaskNotifyGive(s_display_task);
+    if (s_display_task)
+        xTaskNotifyGive(s_display_task);
 }
 
 /* The single owner of the framebuffer and LCD panel. Renders the current
@@ -1984,8 +2060,7 @@ static void display_task(void *arg)
         if (mode == DISP_MODE_GRAPH) {
             /* Instantaneous zero-lag redraw on fresh packet data, mode change,
              * or every second for status/keepalive. */
-            if (notified || mode_changed || dirty ||
-                (now - last_render) >= pdMS_TO_TICKS(1000)) {
+            if (notified || mode_changed || dirty || (now - last_render) >= pdMS_TO_TICKS(1000)) {
                 render_graph();
                 last_render = now;
                 s_last_render_us = esp_timer_get_time();
@@ -1993,15 +2068,13 @@ static void display_task(void *arg)
         } else if (mode == DISP_MODE_INFO) {
             /* Redraw on new leak data, mode change, or every second for
              * the session runtime clock. */
-            if (notified || mode_changed ||
-                (now - last_render) >= pdMS_TO_TICKS(1000)) {
+            if (notified || mode_changed || (now - last_render) >= pdMS_TO_TICKS(1000)) {
                 render_info();
                 last_render = now;
                 s_last_render_us = esp_timer_get_time();
             }
         } else {
-            if (mode_changed || dirty ||
-                (now - last_render) >= pdMS_TO_TICKS(STATUS_FRAME_MS)) {
+            if (mode_changed || dirty || (now - last_render) >= pdMS_TO_TICKS(STATUS_FRAME_MS)) {
                 render_status();
                 last_render = now;
                 s_last_render_us = esp_timer_get_time();
@@ -2023,13 +2096,16 @@ static void display_task(void *arg)
         static uint32_t rendered_generation;
         xSemaphoreTake(s_state_mutex, portMAX_DELAY);
         bool scene_complete = scene_generation != 0 &&
-            scene_generation == s_qemu_scene_generation && !s_qemu_scene_seeding;
+                              scene_generation == s_qemu_scene_generation && !s_qemu_scene_seeding;
         xSemaphoreGive(s_state_mutex);
         if (scene_complete && rendered_generation != scene_generation) {
-            ESP_LOGI(TAG, "QEMU 1.54 scene ready: %u (%s)",
-                     (unsigned)scene, s_qemu_scene_names[scene]);
-            ESP_LOGI(TAG, "QEMU 1.54 frame ready: scene=%u rotation=%u backlight=%s",
-                     (unsigned)scene, (unsigned)s_rotation, backlight_on ? "on" : "off");
+            ESP_LOGI(
+                TAG, "QEMU 1.54 scene ready: %u (%s)", (unsigned)scene, s_qemu_scene_names[scene]);
+            ESP_LOGI(TAG,
+                     "QEMU 1.54 frame ready: scene=%u rotation=%u backlight=%s",
+                     (unsigned)scene,
+                     (unsigned)s_rotation,
+                     backlight_on ? "on" : "off");
             if (rendered_generation == 0)
                 ESP_LOGI(TAG, "240x240 original-board UI preview ready");
             rendered_generation = scene_generation;
@@ -2042,8 +2118,8 @@ static void display_task(void *arg)
         if (!hwm_logged) {
             hwm_logged = true;
             UBaseType_t hwm = uxTaskGetStackHighWaterMark(NULL);
-            ESP_LOGI(TAG, "display: stack high-water = %u bytes",
-                     (unsigned)(hwm * sizeof(StackType_t)));
+            ESP_LOGI(
+                TAG, "display: stack high-water = %u bytes", (unsigned)(hwm * sizeof(StackType_t)));
         }
     }
 }
@@ -2101,9 +2177,11 @@ void bsp_display_qemu_set_tab(uint8_t tab)
         }
     } else {
         const char *const ready[] = {"AirSense paired", "Waiting for therapy", "Simulated data"};
-        const char *const disconnected[] = {"Wi-Fi disconnected", "AirSense not paired", "Simulated data"};
+        const char *const disconnected[] = {
+            "Wi-Fi disconnected", "AirSense not paired", "Simulated data"};
         bsp_display_show_lines("SomnoTrace", tab == 3 ? disconnected : ready, 3);
-        if (tab == 3) bsp_display_set_notice("Check connection");
+        if (tab == 3)
+            bsp_display_set_notice("Check connection");
     }
 
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
@@ -2112,7 +2190,8 @@ void bsp_display_qemu_set_tab(uint8_t tab)
     s_qemu_scene_seeding = false;
     s_status_dirty = true;
     xSemaphoreGive(s_state_mutex);
-    if (s_display_task) xTaskNotifyGive(s_display_task);
+    if (s_display_task)
+        xTaskNotifyGive(s_display_task);
 #else
     (void)tab;
 #endif
@@ -2135,8 +2214,7 @@ void bsp_display_restart_idle_timeout(void)
      * remains disabled there. Keep the cross-board settings API harmless. */
 }
 
-void bsp_display_push_metrics(float pressure_cmh2o, float respiratory_rate,
-                              float flow_limitation)
+void bsp_display_push_metrics(float pressure_cmh2o, float respiratory_rate, float flow_limitation)
 {
     (void)pressure_cmh2o;
     (void)respiratory_rate;

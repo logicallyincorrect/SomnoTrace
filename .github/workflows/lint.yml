@@ -39,7 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install cppcheck and shellcheck
+      - name: Install linters and formatter
         # Whatever the runner image ships. Pinning an exact apt revision would break the
         # build the day Ubuntu rebuilds the package for unrelated reasons — an outage in
         # exchange for nothing. The versions are RECORDED in scripts/lint-versions.env and
@@ -48,6 +48,10 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -y --no-install-recommends cppcheck shellcheck
+          python3 -m pip install --disable-pip-version-check clang-format==18.1.8
+
+      - name: clang-format — authored C and headers
+        run: scripts/format-authored.sh --check
 
       - name: Report analyser versions against the pins
         run: |

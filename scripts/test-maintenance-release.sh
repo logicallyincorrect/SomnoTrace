@@ -6,7 +6,7 @@ PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 if [[ -z "${IDF_PATH:-}" ]]; then
     exec docker run --rm --entrypoint bash \
         -v "${PROJECT_DIR}:/project:ro" -w /project \
-        "espressif/idf:${IDF_TAG:-v5.5.1}" scripts/test-maintenance-release.sh
+        "espressif/idf:${IDF_TAG:-v5.5.5}" scripts/test-maintenance-release.sh
 fi
 CJSON_DIR="${IDF_PATH}/components/json/cJSON"
 TEST_DIR="$(mktemp -d /tmp/somno-release-test.XXXXXX)"

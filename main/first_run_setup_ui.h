@@ -20,9 +20,9 @@
 extern "C" {
 #endif
 
-#define FIRST_RUN_SETUP_UI_WIFI_RESULT_MAX      6U
-#define FIRST_RUN_SETUP_UI_TIMEZONE_RESULT_MAX  6U
-#define FIRST_RUN_SETUP_UI_AIRSENSE_RESULT_MAX  6U
+#define FIRST_RUN_SETUP_UI_WIFI_RESULT_MAX 6U
+#define FIRST_RUN_SETUP_UI_TIMEZONE_RESULT_MAX 6U
+#define FIRST_RUN_SETUP_UI_AIRSENSE_RESULT_MAX 6U
 
 typedef enum {
     FIRST_RUN_SETUP_UI_WIFI_IDLE = 0,
@@ -116,14 +116,11 @@ typedef struct {
     char card_summary[48];
     char error_message[96];
 
-    first_run_setup_ui_wifi_result_t
-        wifi_results[FIRST_RUN_SETUP_UI_WIFI_RESULT_MAX];
+    first_run_setup_ui_wifi_result_t wifi_results[FIRST_RUN_SETUP_UI_WIFI_RESULT_MAX];
     uint8_t wifi_result_count;
-    first_run_setup_ui_timezone_result_t
-        timezone_results[FIRST_RUN_SETUP_UI_TIMEZONE_RESULT_MAX];
+    first_run_setup_ui_timezone_result_t timezone_results[FIRST_RUN_SETUP_UI_TIMEZONE_RESULT_MAX];
     uint8_t timezone_result_count;
-    first_run_setup_ui_airsense_result_t
-        airsense_results[FIRST_RUN_SETUP_UI_AIRSENSE_RESULT_MAX];
+    first_run_setup_ui_airsense_result_t airsense_results[FIRST_RUN_SETUP_UI_AIRSENSE_RESULT_MAX];
     uint8_t airsense_result_count;
 
     /* Rev B3 extension. These fields are appended so existing snapshot
@@ -161,29 +158,26 @@ typedef struct {
 typedef struct {
     void *context;
     esp_err_t (*wifi_scan)(void *context);
-    esp_err_t (*wifi_connect)(void *context, const char *ssid,
-                              const char *password);
+    esp_err_t (*wifi_connect)(void *context, const char *ssid, const char *password);
     esp_err_t (*timezone_search)(void *context, const char *query);
-    esp_err_t (*timezone_select)(void *context, const char *iana_id,
-                                 const char *posix_tz);
+    esp_err_t (*timezone_select)(void *context, const char *iana_id, const char *posix_tz);
     esp_err_t (*airsense_scan)(void *context);
-    esp_err_t (*airsense_begin_pairing)(void *context,
-                                        const char *device_address);
+    esp_err_t (*airsense_begin_pairing)(void *context, const char *device_address);
     /* String form preserves a valid leading zero in the AirSense passkey. */
-    esp_err_t (*airsense_confirm_code)(void *context,
-                                       const char four_digit_code[5]);
+    esp_err_t (*airsense_confirm_code)(void *context, const char four_digit_code[5]);
     esp_err_t (*card_retry)(void *context);
     esp_err_t (*configure_alerts)(void *context);
     esp_err_t (*configure_uploads)(void *context);
     esp_err_t (*finished)(void *context);
     /* Rev B3 extensions. A NULL static-address callback is expected on
      * firmware without persistent IPv4 support and is rendered unavailable. */
-    esp_err_t (*wifi_set_static_ipv4)(void *context, const char *address,
-                                      const char *gateway, const char *dns);
+    esp_err_t (*wifi_set_static_ipv4)(void *context,
+                                      const char *address,
+                                      const char *gateway,
+                                      const char *dns);
     esp_err_t (*ntp_server_set)(void *context, const char *server);
     esp_err_t (*hostname_set)(void *context, const char *hostname);
-    esp_err_t (*time_advanced_set)(void *context, const char *ntp_server,
-                                   const char *hostname);
+    esp_err_t (*time_advanced_set)(void *context, const char *ntp_server, const char *hostname);
 } first_run_setup_ui_controller_t;
 
 typedef struct {
@@ -197,8 +191,8 @@ typedef struct {
 /* All functions that mutate LVGL must be called from the LVGL task, or while
  * holding the application's LVGL lock. create() is deliberately lazy: until
  * it is called, this module allocates no LVGL objects or snapshot storage. */
-esp_err_t first_run_setup_ui_create(
-    lv_obj_t *parent, const first_run_setup_ui_controller_t *controller);
+esp_err_t first_run_setup_ui_create(lv_obj_t *parent,
+                                    const first_run_setup_ui_controller_t *controller);
 void first_run_setup_ui_destroy(void);
 
 /* show() rebuilds the current step before clearing HIDDEN, guaranteeing the
@@ -208,8 +202,7 @@ esp_err_t first_run_setup_ui_show(void);
 void first_run_setup_ui_hide(void);
 bool first_run_setup_ui_is_visible(void);
 
-esp_err_t first_run_setup_ui_update(
-    const first_run_setup_ui_live_t *snapshot);
+esp_err_t first_run_setup_ui_update(const first_run_setup_ui_live_t *snapshot);
 void first_run_setup_ui_snapshot(first_run_setup_ui_snapshot_t *out);
 lv_obj_t *first_run_setup_ui_root(void);
 

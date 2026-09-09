@@ -25,7 +25,8 @@ void bsp_audio_set_volume(uint8_t percent)
 
 esp_err_t bsp_audio_test_beep(void)
 {
-    ESP_LOGW("bsp_audio_7b", "7B has no onboard SomnoTrace alert speaker (volume=%u)",
+    ESP_LOGW("bsp_audio_7b",
+             "7B has no onboard SomnoTrace alert speaker (volume=%u)",
              (unsigned)s_volume);
     return ESP_ERR_NOT_SUPPORTED;
 }

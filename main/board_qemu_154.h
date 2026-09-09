@@ -15,5 +15,6 @@ esp_err_t board_qemu_154_init(esp_lcd_panel_handle_t *panel);
  * QEMU consumes native little-endian RGB565; conversion and rotation happen
  * here without modifying the renderer's framebuffer or allocating DMA. */
 esp_err_t board_qemu_154_flush(esp_lcd_panel_handle_t panel,
-                             const uint16_t *wire_rgb565, uint16_t rotation,
-                             bool backlight_on);
+                               const uint16_t *wire_rgb565,
+                               uint16_t rotation,
+                               bool backlight_on);

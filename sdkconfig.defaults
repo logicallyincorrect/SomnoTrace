@@ -152,10 +152,8 @@ CONFIG_BT_NIMBLE_GATT_SERVER=y
 
 # WiFi + BLE coexistence
 CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y
-CONFIG_ESP_WIFI_TASK_CORE_ID_0=y
-CONFIG_ESP_WIFI_TASK_CORE_ID=0
-CONFIG_BT_NIMBLE_PINNED_TO_CORE_CHOICE=y
-CONFIG_BT_NIMBLE_PINNED_TO_CORE=1
+CONFIG_ESP_WIFI_TASK_PINNED_TO_CORE_0=y
+CONFIG_BT_NIMBLE_PINNED_TO_CORE_0=y
 # NimBLE msys1 / ACL buffer pool — two connections (AS11 + O2 Ring).
 # Raised from 24 to 32 to provide headroom for concurrent GATT traffic.
 CONFIG_BT_NIMBLE_MSYS_1_BLOCK_COUNT=32
@@ -193,7 +191,6 @@ CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
 # them after the handshake. This reduces per-connection memory footprint
 # and allows two concurrent TLS connections (e.g. SleepHQ upload + OTA).
 CONFIG_MBEDTLS_DYNAMIC_BUFFER=y
-CONFIG_MBEDTLS_DYNAMIC_BUFFER_PEER_CRED=y
 CONFIG_MBEDTLS_DYNAMIC_FREE_CONFIG_DATA=y
 
 # Certificate bundle for HTTPS (SleepHQ upload) — common set only
