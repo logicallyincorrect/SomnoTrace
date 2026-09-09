@@ -34,6 +34,7 @@
 #include <math.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -42,22 +43,22 @@
 
 static const char *TAG = "session_graph";
 
-#define SNT_MAGIC  0x534E5442u
+#define SNT_MAGIC 0x534E5442u
 typedef struct __attribute__((packed)) {
     uint32_t magic;
-    uint8_t  version;
-    uint8_t  tier;
-    uint8_t  n_channels;
-    uint8_t  sample_bytes;
+    uint8_t version;
+    uint8_t tier;
+    uint8_t n_channels;
+    uint8_t sample_bytes;
     uint16_t sample_hz_x10;
     uint16_t reserved;
-    int64_t  start_epoch_ms;
+    int64_t start_epoch_ms;
     uint32_t sample_count;
     uint32_t reserved2;
 } snt_hdr_t;
 
-#define SNT_HDR_SIZE sizeof(snt_hdr_t)   /* 28 bytes (packed) */
-#define GRAPH_MAX_POINTS 50000  /* upper bound for ?points=all */
+#define SNT_HDR_SIZE sizeof(snt_hdr_t) /* 28 bytes (packed) */
+#define GRAPH_MAX_POINTS 50000         /* upper bound for ?points=all */
 
 /* ── Physical-unit scaling factors ────────────────────────────────────
  * Raw .snt files store int16 digital values.  These scale factors convert
@@ -73,13 +74,13 @@ typedef struct __attribute__((packed)) {
 
 /* BRP: Flow.40ms  — phys [-2.0, 3.0] dig [-1000, 1500] → 0.002 L/s per digit
  *      Press.40ms — phys [0.0, 40.0]  dig [0, 2000]     → 0.02 cmH2O per digit */
-#define BRP_FLOW_SCALE   0.002f    /* L/s per digit */
-#define BRP_FLOW_OFFSET  (-2.0f)   /* phys_min */
-#define BRP_FLOW_DIG_MIN (-1000)   /* dig_min */
-#define BRP_PRESS_SCALE  0.02f     /* cmH2O per digit */
+#define BRP_FLOW_SCALE 0.002f    /* L/s per digit */
+#define BRP_FLOW_OFFSET (-2.0f)  /* phys_min */
+#define BRP_FLOW_DIG_MIN (-1000) /* dig_min */
+#define BRP_PRESS_SCALE 0.02f    /* cmH2O per digit */
 
 /* PLD ch3: Leak — phys [0.0, 2.0] dig [0, 100] → 0.02 L/s per digit */
-#define PLD_LEAK_SCALE   0.02f     /* L/s per digit */
+#define PLD_LEAK_SCALE 0.02f /* L/s per digit */
 
 /* URL-decode a query parameter value.  Returns decoded length or -1 on overflow. */
 static int graph_url_decode(char *dst, const char *src, int max_len)
@@ -87,7 +88,7 @@ static int graph_url_decode(char *dst, const char *src, int max_len)
     int i = 0;
     while (*src && i < max_len - 1) {
         if (*src == '%' && isxdigit((unsigned char)src[1]) && isxdigit((unsigned char)src[2])) {
-            char hex[3] = { src[1], src[2], '\0' };
+            char hex[3] = {src[1], src[2], '\0'};
             dst[i++] = (char)strtol(hex, NULL, 16);
             src += 3;
         } else if (*src == '+') {
@@ -97,7 +98,8 @@ static int graph_url_decode(char *dst, const char *src, int max_len)
             dst[i++] = *src++;
         }
     }
-    if (i >= max_len) return -1;
+    if (i >= max_len)
+        return -1;
     dst[i] = '\0';
     return i;
 }
@@ -157,7 +159,8 @@ static bool get_qparam(httpd_req_t *req, const char *key, char *out, int out_len
                         return true;
                     }
                 }
-                if (!next_amp) break;
+                if (!next_amp)
+                    break;
                 p = next_amp + 1;
             }
         }
@@ -177,21 +180,24 @@ static inline int16_t snt_missing_for(uint8_t version)
 
 static inline float brp_flow_phys(int16_t dig, int16_t missing)
 {
-    if (dig == missing) return 0.0f;
+    if (dig == missing)
+        return 0.0f;
     /* raw: 100 * L/s -> L/s is dig/100.0. convert L/s to L/min by * 60.0 -> dig * 0.6f */
     return (float)dig * 0.6f;
 }
 
 static inline float brp_press_phys(int16_t dig, int16_t missing)
 {
-    if (dig == missing) return 0.0f;
+    if (dig == missing)
+        return 0.0f;
     /* raw: 100 * cmH2O -> return dig/100.0f */
     return (float)dig * 0.01f;
 }
 
 static inline float pld_leak_phys(int16_t dig, int16_t missing)
 {
-    if (dig == missing) return 0.0f;
+    if (dig == missing)
+        return 0.0f;
     /* raw: 100 * L/s -> return L/min by * 60.0 -> dig * 0.6f */
     return (float)dig * 0.6f;
 }
@@ -201,8 +207,8 @@ static inline float pld_leak_phys(int16_t dig, int16_t missing)
  * sorted by start_epoch_ms, with metadata including clock drift and file sizes. */
 typedef struct {
     char id[32];
-    char state[16];             /* manifest state, reported as-is            */
-    bool partial;               /* ended abnormally: data is real but short  */
+    char state[16]; /* manifest state, reported as-is            */
+    bool partial;   /* ended abnormally: data is real but short  */
     int64_t start_epoch_ms;
     int64_t end_epoch_ms;
     int64_t clock_drift_ms;
@@ -212,29 +218,86 @@ typedef struct {
     uint32_t pld_samples;
     long brp_bytes;
     long brp_mm_bytes;
-    int fmt;                    /* session format: 2=flow/press split, 1=legacy brp */
-    uint32_t stream_notifications;  /* BLE notifications received */
-    uint32_t gap_events;            /* gap detections (compensated) */
-    uint32_t gap_missing;           /* total missing notifications compensated */
+    int fmt;                       /* session format: 2=flow/press split, 1=legacy brp */
+    uint32_t stream_notifications; /* BLE notifications received */
+    uint32_t gap_events;           /* gap detections (compensated) */
+    uint32_t gap_missing;          /* total missing notifications compensated */
 } session_manifest_t;
 
 static int compare_session_start(const void *a, const void *b)
 {
     const session_manifest_t *sa = (const session_manifest_t *)a;
     const session_manifest_t *sb = (const session_manifest_t *)b;
-    if (sa->start_epoch_ms < sb->start_epoch_ms) return -1;
-    if (sa->start_epoch_ms > sb->start_epoch_ms) return 1;
+    if (sa->start_epoch_ms < sb->start_epoch_ms)
+        return -1;
+    if (sa->start_epoch_ms > sb->start_epoch_ms)
+        return 1;
     return 0;
 }
 
 static long file_size_stat(const char *path)
 {
     struct stat st;
-    if (stat(path, &st) == 0) return st.st_size;
+    if (stat(path, &st) == 0)
+        return st.st_size;
     return 0;
 }
 
-esp_err_t sessions_list_handler(httpd_req_t *req)
+typedef esp_err_t (*session_graph_read_handler_t)(httpd_req_t *req);
+static portMUX_TYPE s_graph_state_lock = portMUX_INITIALIZER_UNLOCKED;
+static bool s_graph_closing = true;
+static uint32_t s_sync_inflight;
+
+static esp_err_t session_graph_send_storage_busy(httpd_req_t *req)
+{
+    httpd_resp_set_status(req, "503 Service Unavailable");
+    httpd_resp_set_hdr(req, "Retry-After", "1");
+    return httpd_resp_sendstr(req, "card busy; retry later");
+}
+
+static bool session_graph_storage_cancelled(void)
+{
+    return sd_storage_recording_pending() || sd_storage_recording_active();
+}
+
+static bool session_graph_request_begin(void)
+{
+    bool admitted;
+    portENTER_CRITICAL(&s_graph_state_lock);
+    admitted = !__atomic_load_n(&s_graph_closing, __ATOMIC_RELAXED);
+    if (admitted)
+        __atomic_add_fetch(&s_sync_inflight, 1, __ATOMIC_RELAXED);
+    portEXIT_CRITICAL(&s_graph_state_lock);
+    return admitted;
+}
+
+static void session_graph_request_end(void)
+{
+    __atomic_sub_fetch(&s_sync_inflight, 1, __ATOMIC_RELEASE);
+}
+
+static esp_err_t session_graph_with_storage(httpd_req_t *req, session_graph_read_handler_t handler)
+{
+    if (!session_graph_request_begin()) {
+        return session_graph_send_storage_busy(req);
+    }
+    if (!sd_storage_lease_acquire(SD_LEASE_UPLOAD, 0)) {
+        session_graph_request_end();
+        return session_graph_send_storage_busy(req);
+    }
+    if (session_graph_storage_cancelled()) {
+        sd_storage_lease_release_unchanged(SD_LEASE_UPLOAD);
+        session_graph_request_end();
+        return session_graph_send_storage_busy(req);
+    }
+
+    esp_err_t result = handler(req);
+    sd_storage_lease_release_unchanged(SD_LEASE_UPLOAD);
+    session_graph_request_end();
+    return result;
+}
+
+static esp_err_t sessions_list_handler_impl(httpd_req_t *req)
 {
     char date[16];
     if (!get_qparam(req, "date", date, sizeof(date))) {
@@ -260,12 +323,20 @@ esp_err_t sessions_list_handler(httpd_req_t *req)
 
     /* Collect completed sessions into an array for sorting */
     int cap = 8, count = 0;
-    session_manifest_t *sessions = heap_caps_calloc(cap, sizeof(session_manifest_t), MALLOC_CAP_SPIRAM);
-    if (!sessions) sessions = calloc(cap, sizeof(session_manifest_t));
-    if (!sessions) { closedir(dd); httpd_resp_send_500(req); return ESP_FAIL; }
+    session_manifest_t *sessions =
+        heap_caps_calloc(cap, sizeof(session_manifest_t), MALLOC_CAP_SPIRAM);
+    if (!sessions)
+        sessions = calloc(cap, sizeof(session_manifest_t));
+    if (!sessions) {
+        closedir(dd);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
 
     struct dirent *fent;
     while ((fent = readdir(dd)) != NULL) {
+        if (session_graph_storage_cancelled())
+            break;
         const char *suffix = "_session.json";
         int slen = strlen(suffix);
         int flen = strlen(fent->d_name);
@@ -274,28 +345,38 @@ esp_err_t sessions_list_handler(httpd_req_t *req)
 
         char session_id[32];
         int plen = flen - slen;
-        if (plen <= 0 || plen >= (int)sizeof(session_id)) continue;
+        if (plen <= 0 || plen >= (int)sizeof(session_id))
+            continue;
         memcpy(session_id, fent->d_name, plen);
         session_id[plen] = '\0';
 
         char jpath[600];
         snprintf(jpath, sizeof(jpath), "%s/%s", day_dir, fent->d_name);
         FILE *f = fopen(jpath, "r");
-        if (!f) continue;
+        if (!f)
+            continue;
         fseek(f, 0, SEEK_END);
         long fsz = ftell(f);
         fseek(f, 0, SEEK_SET);
-        if (fsz <= 0 || fsz > 4096) { fclose(f); continue; }
+        if (fsz <= 0 || fsz > 4096) {
+            fclose(f);
+            continue;
+        }
         char *buf = heap_caps_malloc((size_t)fsz + 1, MALLOC_CAP_SPIRAM);
-        if (!buf) buf = malloc((size_t)fsz + 1);
-        if (!buf) { fclose(f); continue; }
+        if (!buf)
+            buf = malloc((size_t)fsz + 1);
+        if (!buf) {
+            fclose(f);
+            continue;
+        }
         fread(buf, 1, fsz, f);
         buf[fsz] = '\0';
         fclose(f);
 
         cJSON *j = cJSON_Parse(buf);
         free(buf);
-        if (!j) continue;
+        if (!j)
+            continue;
 
         cJSON *j_st = cJSON_GetObjectItem(j, "start_epoch_ms");
         cJSON *j_en = cJSON_GetObjectItem(j, "end_epoch_ms");
@@ -310,8 +391,14 @@ esp_err_t sessions_list_handler(httpd_req_t *req)
         cJSON *j_gaps = cJSON_GetObjectItem(j, "gap_events");
         cJSON *j_missing = cJSON_GetObjectItem(j, "gap_missing");
 
-        if (!j_st || !cJSON_IsNumber(j_st)) { cJSON_Delete(j); continue; }
-        if ((int64_t)j_st->valuedouble < 946684800000LL) { cJSON_Delete(j); continue; }
+        if (!j_st || !cJSON_IsNumber(j_st)) {
+            cJSON_Delete(j);
+            continue;
+        }
+        if ((int64_t)j_st->valuedouble < 946684800000LL) {
+            cJSON_Delete(j);
+            continue;
+        }
 
         /* Which sessions the Web UI may show.
          *
@@ -330,19 +417,22 @@ esp_err_t sessions_list_handler(httpd_req_t *req)
          * is not final, and its .snt files are being appended to while the
          * graph would be reading them), and "storage_failed", where the raw
          * data itself is not trustworthy. */
-        const char *state = (j_state && cJSON_IsString(j_state))
-                          ? j_state->valuestring : "unknown";
-        bool completed   = (strcmp(state, "completed") == 0);
-        bool partial     = (strcmp(state, "interrupted") == 0 ||
-                            strcmp(state, "timed_out") == 0 ||
-                            strcmp(state, "rotated") == 0 ||
-                            strcmp(state, "split") == 0);
-        if (!completed && !partial) { cJSON_Delete(j); continue; }
+        const char *state = (j_state && cJSON_IsString(j_state)) ? j_state->valuestring : "unknown";
+        bool completed = (strcmp(state, "completed") == 0);
+        bool partial = (strcmp(state, "interrupted") == 0 || strcmp(state, "timed_out") == 0 ||
+                        strcmp(state, "rotated") == 0 || strcmp(state, "split") == 0);
+        if (!completed && !partial) {
+            cJSON_Delete(j);
+            continue;
+        }
 
         if (count >= cap) {
             cap *= 2;
             session_manifest_t *tmp = realloc(sessions, cap * sizeof(session_manifest_t));
-            if (!tmp) { cJSON_Delete(j); break; }
+            if (!tmp) {
+                cJSON_Delete(j);
+                break;
+            }
             sessions = tmp;
         }
 
@@ -358,7 +448,7 @@ esp_err_t sessions_list_handler(httpd_req_t *req)
         s->pld_samples = j_pld ? (uint32_t)j_pld->valuedouble : 0;
         s->clock_drift_ms = j_drift ? (int64_t)j_drift->valuedouble : 0;
         s->clock_drift_valid = j_drift_valid ? cJSON_IsTrue(j_drift_valid) : (j_drift != NULL);
-        s->fmt = j_fmt ? (int)j_fmt->valuedouble : 1;  /* default v1 if absent */
+        s->fmt = j_fmt ? (int)j_fmt->valuedouble : 1; /* default v1 if absent */
         s->stream_notifications = j_notif ? (uint32_t)j_notif->valuedouble : 0;
         s->gap_events = j_gaps ? (uint32_t)j_gaps->valuedouble : 0;
         s->gap_missing = j_missing ? (uint32_t)j_missing->valuedouble : 0;
@@ -383,6 +473,10 @@ esp_err_t sessions_list_handler(httpd_req_t *req)
         count++;
     }
     closedir(dd);
+    if (session_graph_storage_cancelled()) {
+        free(sessions);
+        return session_graph_send_storage_busy(req);
+    }
 
     /* Sort by start_epoch_ms */
     if (count > 1)
@@ -391,32 +485,59 @@ esp_err_t sessions_list_handler(httpd_req_t *req)
     /* Build JSON response with dynamic buffer */
     int json_cap = count * 400 + 64;
     char *json = heap_caps_malloc(json_cap, MALLOC_CAP_SPIRAM);
-    if (!json) { free(sessions); httpd_resp_send_500(req); return ESP_FAIL; }
+    if (!json) {
+        free(sessions);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
     int pos = 0;
     pos += snprintf(json + pos, json_cap - pos, "[");
 
     for (int i = 0; i < count; i++) {
+        if (session_graph_storage_cancelled()) {
+            free(json);
+            free(sessions);
+            return session_graph_send_storage_busy(req);
+        }
         session_manifest_t *s = &sessions[i];
         if (pos > json_cap - 400) {
             json_cap *= 2;
             char *tmp = heap_caps_realloc(json, json_cap, MALLOC_CAP_SPIRAM);
-            if (!tmp) { free(json); free(sessions); httpd_resp_send_500(req); return ESP_FAIL; }
+            if (!tmp) {
+                free(json);
+                free(sessions);
+                httpd_resp_send_500(req);
+                return ESP_FAIL;
+            }
             json = tmp;
         }
-        if (i > 0) pos += snprintf(json + pos, json_cap - pos, ",");
-        pos += snprintf(json + pos, json_cap - pos,
-            "{\"id\":\"%s\",\"state\":\"%s\",\"partial\":%s,"
-            "\"start_epoch_ms\":%lld,\"end_epoch_ms\":%lld,"
-            "\"clock_drift_ms\":%lld,\"clock_drift_valid\":%s,"
-            "\"brp_samples\":%u,\"brp_mm_samples\":%u,\"pld_samples\":%u,"
-            "\"brp_bytes\":%ld,\"brp_mm_bytes\":%ld,"
-            "\"fmt\":%d,\"stream_notifications\":%u,\"gap_events\":%u,\"gap_missing\":%u}",
-            s->id, s->state, s->partial ? "true" : "false",
-            (long long)s->start_epoch_ms, (long long)s->end_epoch_ms,
-            (long long)s->clock_drift_ms, s->clock_drift_valid ? "true" : "false",
-            (unsigned)s->brp_samples, (unsigned)s->brp_mm_samples, (unsigned)s->pld_samples,
-            s->brp_bytes, s->brp_mm_bytes,
-            s->fmt, (unsigned)s->stream_notifications, (unsigned)s->gap_events, (unsigned)s->gap_missing);
+        if (i > 0)
+            pos += snprintf(json + pos, json_cap - pos, ",");
+        pos +=
+            snprintf(json + pos,
+                     json_cap - pos,
+                     "{\"id\":\"%s\",\"state\":\"%s\",\"partial\":%s,"
+                     "\"start_epoch_ms\":%lld,\"end_epoch_ms\":%lld,"
+                     "\"clock_drift_ms\":%lld,\"clock_drift_valid\":%s,"
+                     "\"brp_samples\":%u,\"brp_mm_samples\":%u,\"pld_samples\":%u,"
+                     "\"brp_bytes\":%ld,\"brp_mm_bytes\":%ld,"
+                     "\"fmt\":%d,\"stream_notifications\":%u,\"gap_events\":%u,\"gap_missing\":%u}",
+                     s->id,
+                     s->state,
+                     s->partial ? "true" : "false",
+                     (long long)s->start_epoch_ms,
+                     (long long)s->end_epoch_ms,
+                     (long long)s->clock_drift_ms,
+                     s->clock_drift_valid ? "true" : "false",
+                     (unsigned)s->brp_samples,
+                     (unsigned)s->brp_mm_samples,
+                     (unsigned)s->pld_samples,
+                     s->brp_bytes,
+                     s->brp_mm_bytes,
+                     s->fmt,
+                     (unsigned)s->stream_notifications,
+                     (unsigned)s->gap_events,
+                     (unsigned)s->gap_missing);
     }
 
     pos += snprintf(json + pos, json_cap - pos, "]");
@@ -427,8 +548,10 @@ esp_err_t sessions_list_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-static void resolve_day_dir(httpd_req_t *req, const char *session_id,
-                            char *day_dir, size_t day_dir_len);
+static void resolve_day_dir(httpd_req_t *req,
+                            const char *session_id,
+                            char *day_dir,
+                            size_t day_dir_len);
 
 /* GET /api/days — list noon-days that have session data, with a session count.
  * Cheap: reads the streams/ directory and counts *_session.json per day. */
@@ -437,7 +560,7 @@ static int cmp_str(const void *a, const void *b)
     return strcmp(*(const char *const *)a, *(const char *const *)b);
 }
 
-esp_err_t days_list_handler(httpd_req_t *req)
+static esp_err_t days_list_handler_impl(httpd_req_t *req)
 {
     DIR *dd = opendir(SD_STREAMS_DIR);
     if (!dd) {
@@ -450,30 +573,57 @@ esp_err_t days_list_handler(httpd_req_t *req)
      * re-opening each for counting (keep one dir handle open at a time). */
     int cap = 64, n = 0;
     char **days = heap_caps_calloc(cap, sizeof(char *), MALLOC_CAP_SPIRAM);
-    if (!days) days = calloc(cap, sizeof(char *));
-    if (!days) { closedir(dd); httpd_resp_send_500(req); return ESP_FAIL; }
+    if (!days)
+        days = calloc(cap, sizeof(char *));
+    if (!days) {
+        closedir(dd);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
     struct dirent *ent;
     while ((ent = readdir(dd)) != NULL) {
-        if (strlen(ent->d_name) != 8) continue;
+        if (session_graph_storage_cancelled())
+            break;
+        if (strlen(ent->d_name) != 8)
+            continue;
         bool alldig = true;
-        for (int i = 0; i < 8; i++) if (ent->d_name[i] < '0' || ent->d_name[i] > '9') { alldig = false; break; }
-        if (!alldig) continue;
+        for (int i = 0; i < 8; i++)
+            if (ent->d_name[i] < '0' || ent->d_name[i] > '9') {
+                alldig = false;
+                break;
+            }
+        if (!alldig)
+            continue;
         if (n >= cap) {
             cap *= 2;
             char **tmp = realloc(days, cap * sizeof(char *));
-            if (!tmp) break;
+            if (!tmp)
+                break;
             days = tmp;
         }
         days[n] = strdup(ent->d_name);
-        if (days[n]) n++;
+        if (days[n])
+            n++;
     }
     closedir(dd);
+    if (session_graph_storage_cancelled()) {
+        for (int i = 0; i < n; i++)
+            free(days[i]);
+        free(days);
+        return session_graph_send_storage_busy(req);
+    }
 
     qsort(days, n, sizeof(char *), cmp_str);
 
     int json_cap = n * 48 + 64;
     char *json = heap_caps_malloc(json_cap, MALLOC_CAP_SPIRAM);
-    if (!json) { for (int i = 0; i < n; i++) free(days[i]); free(days); httpd_resp_send_500(req); return ESP_FAIL; }
+    if (!json) {
+        for (int i = 0; i < n; i++)
+            free(days[i]);
+        free(days);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
     int pos = 0;
     pos += snprintf(json + pos, json_cap - pos, "[");
     for (int i = 0; i < n; i++) {
@@ -487,19 +637,35 @@ esp_err_t days_list_handler(httpd_req_t *req)
             const char *suffix = "_session.json";
             int slen = strlen(suffix);
             while ((e2 = readdir(d2)) != NULL) {
+                if (session_graph_storage_cancelled())
+                    break;
                 int fl = strlen(e2->d_name);
-                if (fl > slen && strcmp(e2->d_name + fl - slen, suffix) == 0) sessions++;
+                if (fl > slen && strcmp(e2->d_name + fl - slen, suffix) == 0)
+                    sessions++;
             }
             closedir(d2);
         }
-        if (sessions == 0) continue;   /* skip empty/partial day folders */
-        pos += snprintf(json + pos, json_cap - pos, "%s{\"day\":\"%s\",\"sessions\":%d}",
-                        (pos > 1 ? "," : ""), days[i], sessions);
+        if (session_graph_storage_cancelled()) {
+            free(json);
+            for (int j = 0; j < n; j++)
+                free(days[j]);
+            free(days);
+            return session_graph_send_storage_busy(req);
+        }
+        if (sessions == 0)
+            continue; /* skip empty/partial day folders */
+        pos += snprintf(json + pos,
+                        json_cap - pos,
+                        "%s{\"day\":\"%s\",\"sessions\":%d}",
+                        (pos > 1 ? "," : ""),
+                        days[i],
+                        sessions);
         free(days[i]);
         days[i] = NULL;
     }
     pos += snprintf(json + pos, json_cap - pos, "]");
-    for (int i = 0; i < n; i++) free(days[i]);
+    for (int i = 0; i < n; i++)
+        free(days[i]);
     free(days);
 
     httpd_resp_set_type(req, "application/json");
@@ -509,7 +675,7 @@ esp_err_t days_list_handler(httpd_req_t *req)
 }
 
 /* GET /api/summary?date=YYYYMMDD — per-day summary metrics from the spool. */
-esp_err_t summary_handler(httpd_req_t *req)
+static esp_err_t summary_handler_impl(httpd_req_t *req)
 {
     char date[16];
     if (!get_qparam(req, "date", date, sizeof(date)) || strlen(date) != 8) {
@@ -518,6 +684,10 @@ esp_err_t summary_handler(httpd_req_t *req)
     }
     char *json = NULL;
     esp_err_t e = edf_gen_summary_json(date, &json);
+    if (session_graph_storage_cancelled()) {
+        free(json);
+        return session_graph_send_storage_busy(req);
+    }
     if (e != ESP_OK || !json) {
         httpd_resp_set_type(req, "application/json");
         httpd_resp_set_status(req, "404 Not Found");
@@ -533,7 +703,7 @@ esp_err_t summary_handler(httpd_req_t *req)
 /* GET /api/session/settings?session=ID&date=YYYYMMDD — therapy mode + pressure
  * settings for the pressure panel (CPAP flat lines). Parses the session's
  * settings.json (SettingProfiles). */
-esp_err_t session_settings_handler(httpd_req_t *req)
+static esp_err_t session_settings_handler_impl(httpd_req_t *req)
 {
     char session_id[32];
     if (!get_qparam(req, "session", session_id, sizeof(session_id))) {
@@ -555,16 +725,31 @@ esp_err_t session_settings_handler(httpd_req_t *req)
     fseek(f, 0, SEEK_END);
     long fsz = ftell(f);
     fseek(f, 0, SEEK_SET);
-    if (fsz <= 0 || fsz > 32 * 1024) { fclose(f); httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "bad settings"); return ESP_FAIL; }
+    if (fsz <= 0 || fsz > 32 * 1024) {
+        fclose(f);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "bad settings");
+        return ESP_FAIL;
+    }
     char *buf = heap_caps_malloc(fsz + 1, MALLOC_CAP_SPIRAM);
-    if (!buf) { fclose(f); httpd_resp_send_500(req); return ESP_FAIL; }
+    if (!buf) {
+        fclose(f);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
     size_t rd = fread(buf, 1, fsz, f);
     fclose(f);
     buf[rd] = '\0';
+    if (session_graph_storage_cancelled()) {
+        free(buf);
+        return session_graph_send_storage_busy(req);
+    }
 
     cJSON *root = cJSON_Parse(buf);
     free(buf);
-    if (!root) { httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "parse error"); return ESP_FAIL; }
+    if (!root) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "parse error");
+        return ESP_FAIL;
+    }
 
     cJSON *sp = cJSON_GetObjectItem(root, "SettingProfiles");
     cJSON *ap = sp ? cJSON_GetObjectItem(sp, "ActiveProfiles") : NULL;
@@ -574,8 +759,10 @@ esp_err_t session_settings_handler(httpd_req_t *req)
     cJSON *out = cJSON_CreateObject();
 
     cJSON *tpn = ap ? cJSON_GetObjectItem(ap, "TherapyProfile") : NULL;
-    if (tpn && cJSON_IsString(tpn)) cJSON_AddStringToObject(out, "mode", tpn->valuestring);
-    else cJSON_AddNullToObject(out, "mode");
+    if (tpn && cJSON_IsString(tpn))
+        cJSON_AddStringToObject(out, "mode", tpn->valuestring);
+    else
+        cJSON_AddNullToObject(out, "mode");
 
     cJSON *v;
     if (tp) {
@@ -607,7 +794,10 @@ esp_err_t session_settings_handler(httpd_req_t *req)
 
     char *js = cJSON_PrintUnformatted(out);
     cJSON_Delete(out);
-    if (!js) { httpd_resp_send_500(req); return ESP_FAIL; }
+    if (!js) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, js, strlen(js));
     free(js);
@@ -626,8 +816,10 @@ esp_err_t session_settings_handler(httpd_req_t *req)
  * authoritative folder name.  If 'date' is missing (e.g. direct API call),
  * we fall back to deriving the folder from the session ID prefix — which
  * is wrong for pre-noon sessions, but is the best we can do. */
-static void resolve_day_dir(httpd_req_t *req, const char *session_id,
-                            char *day_dir, size_t day_dir_len)
+static void resolve_day_dir(httpd_req_t *req,
+                            const char *session_id,
+                            char *day_dir,
+                            size_t day_dir_len)
 {
     char date[16];
     if (get_qparam(req, "date", date, sizeof(date)) && strlen(date) == 8) {
@@ -656,7 +848,7 @@ static void resolve_day_dir(httpd_req_t *req, const char *session_id,
  *   → {"t":[...],"leak":[...]}
  * Flow zoom: brp.snt (L0, 25Hz, 2×int16/record)
  *   → {"t":[...],"flow":[...],"press":[...]}  */
-esp_err_t session_graph_handler(httpd_req_t *req)
+static esp_err_t session_graph_handler_impl(httpd_req_t *req)
 {
     char session_id[32], channel[16], points_str[16];
     char start_ms_str[32], end_ms_str[32];
@@ -681,8 +873,10 @@ esp_err_t session_graph_handler(httpd_req_t *req)
             target_points = GRAPH_MAX_POINTS;
         } else {
             target_points = atoi(points_str);
-            if (target_points < 10) target_points = 10;
-            if (target_points > GRAPH_MAX_POINTS) target_points = GRAPH_MAX_POINTS;
+            if (target_points < 10)
+                target_points = 10;
+            if (target_points > GRAPH_MAX_POINTS)
+                target_points = GRAPH_MAX_POINTS;
         }
     }
 
@@ -712,13 +906,15 @@ esp_err_t session_graph_handler(httpd_req_t *req)
     if (!f && have_alt) {
         ESP_LOGI(TAG, "graph: falling back to L0 raw: %s", alt_path);
         f = fopen(alt_path, "rb");
-        if (f) strlcpy(file_path, alt_path, sizeof(file_path));
+        if (f)
+            strlcpy(file_path, alt_path, sizeof(file_path));
     }
     if (!f) {
         ESP_LOGW(TAG, "graph: file not found: %s", file_path);
         httpd_resp_set_type(req, "application/json");
         if (strcmp(channel, "flow") == 0) {
-            httpd_resp_sendstr(req, "{\"t\":[],\"flow\":[],\"press\":[],\"error\":\"data file not found\"}");
+            httpd_resp_sendstr(
+                req, "{\"t\":[],\"flow\":[],\"press\":[],\"error\":\"data file not found\"}");
         } else {
             httpd_resp_sendstr(req, "{\"t\":[],\"leak\":[],\"error\":\"data file not found\"}");
         }
@@ -730,6 +926,10 @@ esp_err_t session_graph_handler(httpd_req_t *req)
         fclose(f);
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "invalid SNT header");
         return ESP_FAIL;
+    }
+    if (session_graph_storage_cancelled()) {
+        fclose(f);
+        return session_graph_send_storage_busy(req);
     }
 
     int64_t start_ms = hdr.start_epoch_ms;
@@ -743,7 +943,8 @@ esp_err_t session_graph_handler(httpd_req_t *req)
      * but cap it so we do not try to build a multi-megabyte JSON buffer. */
     if (full_points) {
         target_points = (sample_count > 0 && sample_count < (uint32_t)GRAPH_MAX_POINTS)
-                        ? (int)sample_count : GRAPH_MAX_POINTS;
+                            ? (int)sample_count
+                            : GRAPH_MAX_POINTS;
     }
 
     /* Compute target window: full session or zoomed range */
@@ -753,10 +954,12 @@ esp_err_t session_graph_handler(httpd_req_t *req)
         int64_t zoom_start = strtoll(start_ms_str, NULL, 10);
         int64_t zoom_end = strtoll(end_ms_str, NULL, 10);
         int64_t offset_ms = zoom_start - start_ms;
-        if (offset_ms < 0) offset_ms = 0;
+        if (offset_ms < 0)
+            offset_ms = 0;
         start_sample = (uint32_t)(offset_ms / ms_per_rec);
         int64_t dur_ms = zoom_end - zoom_start;
-        if (dur_ms <= 0) dur_ms = ms_per_rec;
+        if (dur_ms <= 0)
+            dur_ms = ms_per_rec;
         n_samples = (uint32_t)(dur_ms / ms_per_rec);
         if (start_sample >= sample_count) {
             n_samples = 0;
@@ -770,85 +973,178 @@ esp_err_t session_graph_handler(httpd_req_t *req)
     int max_pts = emit_raw ? (n_samples + 64) : (target_points * 2 + 64);
     int json_cap = max_pts * 48 + 256;
     char *json = heap_caps_malloc(json_cap, MALLOC_CAP_SPIRAM);
-    if (!json) { fclose(f); httpd_resp_send_500(req); return ESP_FAIL; }
+    if (!json) {
+        fclose(f);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
     int pos = 0;
 
     if (strcmp(channel, "flow") == 0) {
         if (emit_raw && n_samples > 0) {
             /* ── Flow raw window: emit un-decimated L0 samples ── */
             int16_t *buf = heap_caps_malloc(n_samples * 2 * sizeof(int16_t), MALLOC_CAP_SPIRAM);
-            if (!buf) { fclose(f); free(json); httpd_resp_send_500(req); return ESP_FAIL; }
+            if (!buf) {
+                fclose(f);
+                free(json);
+                httpd_resp_send_500(req);
+                return ESP_FAIL;
+            }
 
             long file_offset = SNT_HDR_SIZE + (long)start_sample * rec_bytes;
             fseek(f, file_offset, SEEK_SET);
             size_t got = fread(buf, 2 * sizeof(int16_t), n_samples, f);
             n_samples = (uint32_t)got;
+            if (session_graph_storage_cancelled()) {
+                free(buf);
+                fclose(f);
+                free(json);
+                return session_graph_send_storage_busy(req);
+            }
 
             pos += snprintf(json + pos, json_cap - pos, "{\"t\":[");
             for (uint32_t i = 0; i < n_samples; i++) {
+                if ((i & 255U) == 0 && session_graph_storage_cancelled()) {
+                    free(buf);
+                    fclose(f);
+                    free(json);
+                    return session_graph_send_storage_busy(req);
+                }
                 int64_t t = start_ms + (int64_t)(start_sample + i) * ms_per_rec;
-                if (i > 0) pos += snprintf(json + pos, json_cap - pos, ",");
+                if (i > 0)
+                    pos += snprintf(json + pos, json_cap - pos, ",");
                 pos += snprintf(json + pos, json_cap - pos, "%lld", (long long)t);
             }
             pos += snprintf(json + pos, json_cap - pos, "],\"flow\":[");
             for (uint32_t i = 0; i < n_samples; i++) {
-                if (i > 0) pos += snprintf(json + pos, json_cap - pos, ",");
-                pos += snprintf(json + pos, json_cap - pos, "%.2f", brp_flow_phys(buf[i * 2], missing));
+                if ((i & 255U) == 0 && session_graph_storage_cancelled()) {
+                    free(buf);
+                    fclose(f);
+                    free(json);
+                    return session_graph_send_storage_busy(req);
+                }
+                if (i > 0)
+                    pos += snprintf(json + pos, json_cap - pos, ",");
+                pos += snprintf(
+                    json + pos, json_cap - pos, "%.2f", brp_flow_phys(buf[i * 2], missing));
             }
             pos += snprintf(json + pos, json_cap - pos, "],\"press\":[");
             for (uint32_t i = 0; i < n_samples; i++) {
-                if (i > 0) pos += snprintf(json + pos, json_cap - pos, ",");
-                pos += snprintf(json + pos, json_cap - pos, "%.2f", brp_press_phys(buf[i * 2 + 1], missing));
+                if ((i & 255U) == 0 && session_graph_storage_cancelled()) {
+                    free(buf);
+                    fclose(f);
+                    free(json);
+                    return session_graph_send_storage_busy(req);
+                }
+                if (i > 0)
+                    pos += snprintf(json + pos, json_cap - pos, ",");
+                pos += snprintf(
+                    json + pos, json_cap - pos, "%.2f", brp_press_phys(buf[i * 2 + 1], missing));
             }
             pos += snprintf(json + pos, json_cap - pos, "]}");
             free(buf);
         } else {
             /* ── Flow decimated: L1 or L0 MinMax envelope over requested window ── */
             int group = n_samples / target_points;
-            if (group < 1) group = 1;
+            if (group < 1)
+                group = 1;
             int n_out = n_samples / group;
-            if (n_out > target_points) n_out = target_points;
+            if (n_out > target_points)
+                n_out = target_points;
 
             float *flow = heap_caps_malloc(n_out * sizeof(float) * 2, MALLOC_CAP_SPIRAM);
-        if (!flow) flow = malloc(n_out * sizeof(float) * 2);
-            if (!flow) { fclose(f); free(json); httpd_resp_send_500(req); return ESP_FAIL; }
+            if (!flow)
+                flow = malloc(n_out * sizeof(float) * 2);
+            if (!flow) {
+                fclose(f);
+                free(json);
+                httpd_resp_send_500(req);
+                return ESP_FAIL;
+            }
             float *press = flow + n_out;
 
             bool is_l1 = (hdr.tier == 1 && n_ch == 4);
             fseek(f, SNT_HDR_SIZE + (long)start_sample * rec_bytes, SEEK_SET);
 
-            int out = 0; uint32_t ri = 0;
+            int out = 0;
+            uint32_t ri = 0;
             while (ri < n_samples && out < n_out) {
+                if (session_graph_storage_cancelled()) {
+                    free(flow);
+                    fclose(f);
+                    free(json);
+                    return session_graph_send_storage_busy(req);
+                }
                 float g_fmn = 1e9f, g_fmx = -1e9f;
                 float g_pmn = 1e9f, g_pmx = -1e9f;
                 for (int g = 0; g < group && ri < n_samples; g++) {
+                    if ((g & 255) == 0 && session_graph_storage_cancelled()) {
+                        free(flow);
+                        fclose(f);
+                        free(json);
+                        return session_graph_send_storage_busy(req);
+                    }
                     if (is_l1) {
                         int16_t rec[4];
-                        if (fread(rec, sizeof(int16_t), 4, f) != 4) { ri = n_samples; break; }
-                        if (rec[0] != missing) { float v = brp_flow_phys(rec[0], missing); if (v < g_fmn) g_fmn = v; }
-                        if (rec[1] != missing) { float v = brp_flow_phys(rec[1], missing); if (v > g_fmx) g_fmx = v; }
-                        if (rec[2] != missing) { float v = brp_press_phys(rec[2], missing); if (v < g_pmn) g_pmn = v; }
-                        if (rec[3] != missing) { float v = brp_press_phys(rec[3], missing); if (v > g_pmx) g_pmx = v; }
-                    } else {
-                        int16_t rec[2];
-                        if (fread(rec, sizeof(int16_t), 2, f) != 2) { ri = n_samples; break; }
+                        if (fread(rec, sizeof(int16_t), 4, f) != 4) {
+                            ri = n_samples;
+                            break;
+                        }
                         if (rec[0] != missing) {
                             float v = brp_flow_phys(rec[0], missing);
-                            if (v < g_fmn) g_fmn = v;
-                            if (v > g_fmx) g_fmx = v;
+                            if (v < g_fmn)
+                                g_fmn = v;
+                        }
+                        if (rec[1] != missing) {
+                            float v = brp_flow_phys(rec[1], missing);
+                            if (v > g_fmx)
+                                g_fmx = v;
+                        }
+                        if (rec[2] != missing) {
+                            float v = brp_press_phys(rec[2], missing);
+                            if (v < g_pmn)
+                                g_pmn = v;
+                        }
+                        if (rec[3] != missing) {
+                            float v = brp_press_phys(rec[3], missing);
+                            if (v > g_pmx)
+                                g_pmx = v;
+                        }
+                    } else {
+                        int16_t rec[2];
+                        if (fread(rec, sizeof(int16_t), 2, f) != 2) {
+                            ri = n_samples;
+                            break;
+                        }
+                        if (rec[0] != missing) {
+                            float v = brp_flow_phys(rec[0], missing);
+                            if (v < g_fmn)
+                                g_fmn = v;
+                            if (v > g_fmx)
+                                g_fmx = v;
                         }
                         if (rec[1] != missing) {
                             float v = brp_press_phys(rec[1], missing);
-                            if (v < g_pmn) g_pmn = v;
-                            if (v > g_pmx) g_pmx = v;
+                            if (v < g_pmn)
+                                g_pmn = v;
+                            if (v > g_pmx)
+                                g_pmx = v;
                         }
                     }
                     ri++;
                 }
-                if (g_fmn > 1e8f) { g_fmn = 0.0f; }
-                if (g_fmx < -1e8f) { g_fmx = 0.0f; }
-                if (g_pmn > 1e8f) { g_pmn = 0.0f; }
-                if (g_pmx < -1e8f) { g_pmx = 0.0f; }
+                if (g_fmn > 1e8f) {
+                    g_fmn = 0.0f;
+                }
+                if (g_fmx < -1e8f) {
+                    g_fmx = 0.0f;
+                }
+                if (g_pmn > 1e8f) {
+                    g_pmn = 0.0f;
+                }
+                if (g_pmx < -1e8f) {
+                    g_pmx = 0.0f;
+                }
                 /* Preserve direction by choosing the signed extreme with the
                  * largest magnitude.  Pressure is shown as the mid-point. */
                 flow[out] = (fabsf(g_fmx) >= fabsf(g_fmn)) ? g_fmx : g_fmn;
@@ -859,17 +1155,20 @@ esp_err_t session_graph_handler(httpd_req_t *req)
             pos += snprintf(json + pos, json_cap - pos, "{\"t\":[");
             for (int i = 0; i < out; i++) {
                 int64_t t = start_ms + (int64_t)(start_sample + i * group) * ms_per_rec;
-                if (i > 0) pos += snprintf(json + pos, json_cap - pos, ",");
+                if (i > 0)
+                    pos += snprintf(json + pos, json_cap - pos, ",");
                 pos += snprintf(json + pos, json_cap - pos, "%lld", (long long)t);
             }
             pos += snprintf(json + pos, json_cap - pos, "],\"flow\":[");
             for (int i = 0; i < out; i++) {
-                if (i > 0) pos += snprintf(json + pos, json_cap - pos, ",");
+                if (i > 0)
+                    pos += snprintf(json + pos, json_cap - pos, ",");
                 pos += snprintf(json + pos, json_cap - pos, "%.2f", flow[i]);
             }
             pos += snprintf(json + pos, json_cap - pos, "],\"press\":[");
             for (int i = 0; i < out; i++) {
-                if (i > 0) pos += snprintf(json + pos, json_cap - pos, ",");
+                if (i > 0)
+                    pos += snprintf(json + pos, json_cap - pos, ",");
                 pos += snprintf(json + pos, json_cap - pos, "%.2f", press[i]);
             }
             pos += snprintf(json + pos, json_cap - pos, "]}");
@@ -879,46 +1178,97 @@ esp_err_t session_graph_handler(httpd_req_t *req)
         if (emit_raw && n_samples > 0) {
             /* ── Leak raw window: emit un-decimated samples from _pld.snt ── */
             int16_t *buf = heap_caps_malloc(n_samples * 12 * sizeof(int16_t), MALLOC_CAP_SPIRAM);
-            if (!buf) { fclose(f); free(json); httpd_resp_send_500(req); return ESP_FAIL; }
+            if (!buf) {
+                fclose(f);
+                free(json);
+                httpd_resp_send_500(req);
+                return ESP_FAIL;
+            }
 
             long file_offset = SNT_HDR_SIZE + (long)start_sample * rec_bytes;
             fseek(f, file_offset, SEEK_SET);
             size_t got = fread(buf, 12 * sizeof(int16_t), n_samples, f);
             n_samples = (uint32_t)got;
+            if (session_graph_storage_cancelled()) {
+                free(buf);
+                fclose(f);
+                free(json);
+                return session_graph_send_storage_busy(req);
+            }
 
             pos += snprintf(json + pos, json_cap - pos, "{\"t\":[");
             for (uint32_t i = 0; i < n_samples; i++) {
+                if ((i & 255U) == 0 && session_graph_storage_cancelled()) {
+                    free(buf);
+                    fclose(f);
+                    free(json);
+                    return session_graph_send_storage_busy(req);
+                }
                 int64_t t = start_ms + (int64_t)(start_sample + i) * ms_per_rec;
-                if (i > 0) pos += snprintf(json + pos, json_cap - pos, ",");
+                if (i > 0)
+                    pos += snprintf(json + pos, json_cap - pos, ",");
                 pos += snprintf(json + pos, json_cap - pos, "%lld", (long long)t);
             }
             pos += snprintf(json + pos, json_cap - pos, "],\"leak\":[");
             for (uint32_t i = 0; i < n_samples; i++) {
-                if (i > 0) pos += snprintf(json + pos, json_cap - pos, ",");
-                pos += snprintf(json + pos, json_cap - pos, "%.2f", pld_leak_phys(buf[i * 12 + 3], missing));
+                if ((i & 255U) == 0 && session_graph_storage_cancelled()) {
+                    free(buf);
+                    fclose(f);
+                    free(json);
+                    return session_graph_send_storage_busy(req);
+                }
+                if (i > 0)
+                    pos += snprintf(json + pos, json_cap - pos, ",");
+                pos += snprintf(
+                    json + pos, json_cap - pos, "%.2f", pld_leak_phys(buf[i * 12 + 3], missing));
             }
             pos += snprintf(json + pos, json_cap - pos, "]}");
             free(buf);
         } else {
             /* ── Leak decimated: PLD channel 3 envelope over requested window ── */
             int group = n_samples / target_points;
-            if (group < 1) group = 1;
+            if (group < 1)
+                group = 1;
             int n_out = n_samples / group;
-            if (n_out > target_points) n_out = target_points;
+            if (n_out > target_points)
+                n_out = target_points;
 
             float *dec = heap_caps_malloc(n_out * sizeof(float), MALLOC_CAP_SPIRAM);
-        if (!dec) dec = malloc(n_out * sizeof(float));
-            if (!dec) { fclose(f); free(json); httpd_resp_send_500(req); return ESP_FAIL; }
+            if (!dec)
+                dec = malloc(n_out * sizeof(float));
+            if (!dec) {
+                fclose(f);
+                free(json);
+                httpd_resp_send_500(req);
+                return ESP_FAIL;
+            }
 
             fseek(f, SNT_HDR_SIZE + (long)start_sample * rec_bytes, SEEK_SET);
 
             int16_t rec12[12];
-            int out = 0; uint32_t ri = 0;
+            int out = 0;
+            uint32_t ri = 0;
             while (ri < n_samples && out < n_out) {
+                if (session_graph_storage_cancelled()) {
+                    free(dec);
+                    fclose(f);
+                    free(json);
+                    return session_graph_send_storage_busy(req);
+                }
                 float last_val = 0.0f;
                 for (int g = 0; g < group && ri < n_samples; g++) {
-                    if (fread(rec12, sizeof(int16_t), 12, f) != 12) { ri = n_samples; break; }
-                    if (rec12[3] != missing) last_val = pld_leak_phys(rec12[3], missing);
+                    if ((g & 255) == 0 && session_graph_storage_cancelled()) {
+                        free(dec);
+                        fclose(f);
+                        free(json);
+                        return session_graph_send_storage_busy(req);
+                    }
+                    if (fread(rec12, sizeof(int16_t), 12, f) != 12) {
+                        ri = n_samples;
+                        break;
+                    }
+                    if (rec12[3] != missing)
+                        last_val = pld_leak_phys(rec12[3], missing);
                     ri++;
                 }
                 dec[out] = last_val;
@@ -928,12 +1278,14 @@ esp_err_t session_graph_handler(httpd_req_t *req)
             pos += snprintf(json + pos, json_cap - pos, "{\"t\":[");
             for (int i = 0; i < out; i++) {
                 int64_t t = start_ms + (int64_t)(start_sample + i * group) * ms_per_rec;
-                if (i > 0) pos += snprintf(json + pos, json_cap - pos, ",");
+                if (i > 0)
+                    pos += snprintf(json + pos, json_cap - pos, ",");
                 pos += snprintf(json + pos, json_cap - pos, "%lld", (long long)t);
             }
             pos += snprintf(json + pos, json_cap - pos, "],\"leak\":[");
             for (int i = 0; i < out; i++) {
-                if (i > 0) pos += snprintf(json + pos, json_cap - pos, ",");
+                if (i > 0)
+                    pos += snprintf(json + pos, json_cap - pos, ",");
                 pos += snprintf(json + pos, json_cap - pos, "%.2f", dec[i]);
             }
             pos += snprintf(json + pos, json_cap - pos, "]}");
@@ -951,6 +1303,31 @@ esp_err_t session_graph_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+esp_err_t sessions_list_handler(httpd_req_t *req)
+{
+    return session_graph_with_storage(req, sessions_list_handler_impl);
+}
+
+esp_err_t days_list_handler(httpd_req_t *req)
+{
+    return session_graph_with_storage(req, days_list_handler_impl);
+}
+
+esp_err_t summary_handler(httpd_req_t *req)
+{
+    return session_graph_with_storage(req, summary_handler_impl);
+}
+
+esp_err_t session_settings_handler(httpd_req_t *req)
+{
+    return session_graph_with_storage(req, session_settings_handler_impl);
+}
+
+esp_err_t session_graph_handler(httpd_req_t *req)
+{
+    return session_graph_with_storage(req, session_graph_handler_impl);
+}
+
 typedef struct {
     httpd_req_t *req;
     char file_path[400];
@@ -965,19 +1342,58 @@ typedef struct {
  * RAM per request. The httpd worker enqueues a request and returns
  * immediately; ownership of each `session_file_async_t*` passes to the worker,
  * which frees it and completes the async handler. */
-#define SNT_CHUNK_SIZE   8192    /* 8 KB chunks — smaller than the 32 KB TCP
-                                  * send buffer so lwIP can fit several
-                                  * in-flight segments between BLE coex slots */
-#define SNT_QUEUE_DEPTH  6       /* pending requests before we reject with 503 */
+/* 8 KB is smaller than the 32 KB TCP send buffer, allowing multiple
+ * in-flight segments between BLE coexistence slots. */
+#define SNT_CHUNK_SIZE 8192
+#define SNT_QUEUE_DEPTH 1 /* one pending request behind the active one */
+#define SNT_MAX_INFLIGHT 2
 #define SNT_WORKER_STACK 8192
 static QueueHandle_t s_download_queue = NULL;
+static TaskHandle_t s_download_worker_task = NULL;
+static uint32_t s_download_inflight;
+
+static bool snt_download_cancelled(void)
+{
+    return __atomic_load_n(&s_graph_closing, __ATOMIC_ACQUIRE) || session_graph_storage_cancelled();
+}
+
+static bool snt_download_admit(void)
+{
+    bool admitted;
+    portENTER_CRITICAL(&s_graph_state_lock);
+    admitted = !__atomic_load_n(&s_graph_closing, __ATOMIC_RELAXED) &&
+               __atomic_load_n(&s_download_inflight, __ATOMIC_RELAXED) < SNT_MAX_INFLIGHT;
+    if (admitted) {
+        __atomic_add_fetch(&s_download_inflight, 1, __ATOMIC_RELAXED);
+    }
+    portEXIT_CRITICAL(&s_graph_state_lock);
+    return admitted;
+}
+
+static void snt_download_release(void)
+{
+    __atomic_sub_fetch(&s_download_inflight, 1, __ATOMIC_RELEASE);
+}
 
 /* Stream one file to its (async) request using the caller-provided chunk
  * buffer. Does not free/complete the transfer — the worker owns that. */
 static void snt_send_file(session_file_async_t *transfer, char *buf)
 {
+    if (snt_download_cancelled())
+        return;
+    if (!sd_storage_lease_acquire(SD_LEASE_UPLOAD, 0)) {
+        httpd_resp_set_status(transfer->req, "503 Service Unavailable");
+        httpd_resp_set_hdr(transfer->req, "Retry-After", "1");
+        httpd_resp_sendstr(transfer->req, "card busy; retry later");
+        return;
+    }
+
     FILE *f = fopen(transfer->file_path, "rb");
-    if (!f) { httpd_resp_send_500(transfer->req); return; }
+    if (!f) {
+        httpd_resp_send_err(transfer->req, HTTPD_404_NOT_FOUND, "file no longer available");
+        sd_storage_lease_release_unchanged(SD_LEASE_UPLOAD);
+        return;
+    }
 
     fseek(f, transfer->range_start, SEEK_SET);
     long remaining = transfer->send_size;
@@ -990,28 +1406,41 @@ static void snt_send_file(session_file_async_t *transfer, char *buf)
     uint32_t n_chunks = 0;
     int64_t t_start = esp_timer_get_time();
     while (remaining > 0) {
+        if (snt_download_cancelled())
+            break;
         int64_t r0 = esp_timer_get_time();
-        n = fread(buf, 1, (size_t)remaining < SNT_CHUNK_SIZE ? (size_t)remaining : SNT_CHUNK_SIZE, f);
+        n = fread(
+            buf, 1, (size_t)remaining < SNT_CHUNK_SIZE ? (size_t)remaining : SNT_CHUNK_SIZE, f);
         int64_t r1 = esp_timer_get_time();
-        if (n == 0) break;
+        if (n == 0)
+            break;
+        if (snt_download_cancelled())
+            break;
         int64_t read_us = r1 - r0;
         t_read_us += read_us;
-        if (read_us > worst_read_us) worst_read_us = read_us;
+        if (read_us > worst_read_us)
+            worst_read_us = read_us;
         if (read_us > 150000) {
-            ESP_LOGW(TAG, "snt_download: slow READ %lld ms (chunk %u)",
-                     (long long)(read_us / 1000), (unsigned)n_chunks);
+            ESP_LOGW(TAG,
+                     "snt_download: slow READ %lld ms (chunk %u)",
+                     (long long)(read_us / 1000),
+                     (unsigned)n_chunks);
         }
 
         int64_t s0 = esp_timer_get_time();
         esp_err_t serr = httpd_resp_send_chunk(transfer->req, buf, (ssize_t)n);
         int64_t s1 = esp_timer_get_time();
-        if (serr != ESP_OK) { fclose(f); return; }
+        if (serr != ESP_OK)
+            break;
         int64_t send_us = s1 - s0;
         t_send_us += send_us;
-        if (send_us > worst_send_us) worst_send_us = send_us;
+        if (send_us > worst_send_us)
+            worst_send_us = send_us;
         if (send_us > 150000) {
-            ESP_LOGW(TAG, "snt_download: slow SEND %lld ms (chunk %u)",
-                     (long long)(send_us / 1000), (unsigned)n_chunks);
+            ESP_LOGW(TAG,
+                     "snt_download: slow SEND %lld ms (chunk %u)",
+                     (long long)(send_us / 1000),
+                     (unsigned)n_chunks);
         }
 
         remaining -= n;
@@ -1019,15 +1448,22 @@ static void snt_send_file(session_file_async_t *transfer, char *buf)
     }
     int64_t total_ms = (esp_timer_get_time() - t_start) / 1000;
     long sent = transfer->send_size - remaining;
-    ESP_LOGI(TAG, "snt_download: %ld bytes in %lld ms (%ld KB/s) | read=%lld ms (worst %lld) "
-                  "send=%lld ms (worst %lld) chunks=%u",
-             sent, (long long)total_ms,
+    ESP_LOGI(TAG,
+             "snt_download: %ld bytes in %lld ms (%ld KB/s) | read=%lld ms (worst %lld) "
+             "send=%lld ms (worst %lld) chunks=%u",
+             sent,
+             (long long)total_ms,
              total_ms > 0 ? (long)(sent / total_ms) : 0,
-             (long long)(t_read_us / 1000), (long long)(worst_read_us / 1000),
-             (long long)(t_send_us / 1000), (long long)(worst_send_us / 1000),
+             (long long)(t_read_us / 1000),
+             (long long)(worst_read_us / 1000),
+             (long long)(t_send_us / 1000),
+             (long long)(worst_send_us / 1000),
              (unsigned)n_chunks);
-    httpd_resp_send_chunk(transfer->req, NULL, 0);
+    if (remaining == 0 && !snt_download_cancelled()) {
+        httpd_resp_send_chunk(transfer->req, NULL, 0);
+    }
     fclose(f);
+    sd_storage_lease_release_unchanged(SD_LEASE_UPLOAD);
 }
 
 static void snt_download_worker(void *arg)
@@ -1040,21 +1476,27 @@ static void snt_download_worker(void *arg)
         session_file_async_t *transfer = NULL;
         if (xQueueReceive(s_download_queue, &transfer, portMAX_DELAY) != pdTRUE || !transfer)
             continue;
-        if (!buf) buf = heap_caps_malloc(SNT_CHUNK_SIZE, MALLOC_CAP_SPIRAM);
+        if (!buf)
+            buf = heap_caps_malloc(SNT_CHUNK_SIZE, MALLOC_CAP_SPIRAM);
         if (!buf) {
             httpd_resp_send_500(transfer->req);
         } else {
             snt_send_file(transfer, buf);
         }
+        /* Every transfer advertises Connection: close. Retire the socket while
+         * the async request still owns it, including cancellation/error paths. */
+        shutdown(httpd_req_to_sockfd(transfer->req), SHUT_RDWR);
         httpd_req_async_handler_complete(transfer->req);
         free(transfer);
+        snt_download_release();
 
         /* One-shot high-water mark after the first download to verify the
          * 8 KB PSRAM stack is sufficient for the FATFS read + lwIP send path. */
         if (!hwm_logged) {
             hwm_logged = true;
             UBaseType_t hwm = uxTaskGetStackHighWaterMark(NULL);
-            ESP_LOGI(TAG, "snt_download: stack high-water = %u bytes",
+            ESP_LOGI(TAG,
+                     "snt_download: stack high-water = %u bytes",
                      (unsigned)(hwm * sizeof(StackType_t)));
         }
     }
@@ -1064,37 +1506,88 @@ static void snt_download_worker(void *arg)
  * persistent worker task on a PSRAM stack (the worker only reads SD and writes
  * to sockets — no flash writes — so an external-memory stack is safe under
  * CONFIG_SPI_FLASH_AUTO_SUSPEND). Falls back to an internal stack. */
-void session_graph_init(void)
+esp_err_t session_graph_init(void)
 {
-    if (s_download_queue) return;
+    if (s_download_queue && s_download_worker_task) {
+        portENTER_CRITICAL(&s_graph_state_lock);
+        __atomic_store_n(&s_graph_closing, false, __ATOMIC_RELEASE);
+        portEXIT_CRITICAL(&s_graph_state_lock);
+        return ESP_OK;
+    }
     s_download_queue = xQueueCreate(SNT_QUEUE_DEPTH, sizeof(session_file_async_t *));
     if (!s_download_queue) {
         ESP_LOGE(TAG, "failed to create download queue");
-        return;
+        return ESP_ERR_NO_MEM;
     }
     static StackType_t *stack = NULL;
     static StaticTask_t *tcb = NULL;
     stack = heap_caps_malloc(SNT_WORKER_STACK, MALLOC_CAP_SPIRAM);
-    tcb   = heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL);
+    tcb = heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL);
     TaskHandle_t h = NULL;
     if (stack && tcb) {
-        h = xTaskCreateStaticPinnedToCore(snt_download_worker, "snt_download",
-                                          SNT_WORKER_STACK, NULL, 4, stack, tcb,
+        h = xTaskCreateStaticPinnedToCore(snt_download_worker,
+                                          "snt_download",
+                                          SNT_WORKER_STACK,
+                                          NULL,
+                                          4,
+                                          stack,
+                                          tcb,
                                           tskNO_AFFINITY);
     } else {
         ESP_LOGW(TAG, "snt worker PSRAM stack alloc failed, using internal stack");
-        free(stack); free(tcb); stack = NULL; tcb = NULL;
-        h = psram_task_create(snt_download_worker, "snt_download", SNT_WORKER_STACK, NULL, 4, tskNO_AFFINITY, NULL, NULL);
+        free(stack);
+        free(tcb);
+        stack = NULL;
+        tcb = NULL;
+        h = psram_task_create(snt_download_worker,
+                              "snt_download",
+                              SNT_WORKER_STACK,
+                              NULL,
+                              4,
+                              tskNO_AFFINITY,
+                              NULL,
+                              NULL);
     }
-    if (!h) ESP_LOGE(TAG, "failed to create snt_download worker");
-    else ESP_LOGI(TAG, "snt_download worker started (PSRAM stack=%s)", stack ? "yes" : "no");
+    if (!h) {
+        ESP_LOGE(TAG, "failed to create snt_download worker");
+        free(stack);
+        free(tcb);
+        stack = NULL;
+        tcb = NULL;
+        vQueueDelete(s_download_queue);
+        s_download_queue = NULL;
+        return ESP_ERR_NO_MEM;
+    }
+    s_download_worker_task = h;
+    portENTER_CRITICAL(&s_graph_state_lock);
+    __atomic_store_n(&s_graph_closing, false, __ATOMIC_RELEASE);
+    portEXIT_CRITICAL(&s_graph_state_lock);
+    ESP_LOGI(TAG, "snt_download worker started (PSRAM stack=%s)", stack ? "yes" : "no");
+    return ESP_OK;
+}
+
+bool session_graph_cancel_and_wait(void)
+{
+    portENTER_CRITICAL(&s_graph_state_lock);
+    __atomic_store_n(&s_graph_closing, true, __ATOMIC_RELEASE);
+    portEXIT_CRITICAL(&s_graph_state_lock);
+    int64_t deadline = esp_timer_get_time() + 6000000;
+    while (__atomic_load_n(&s_download_inflight, __ATOMIC_ACQUIRE) != 0 ||
+           __atomic_load_n(&s_sync_inflight, __ATOMIC_ACQUIRE) != 0) {
+        if (esp_timer_get_time() >= deadline) {
+            ESP_LOGE(TAG, "timed out draining session graph requests");
+            return false;
+        }
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+    return true;
 }
 
 /* GET /api/session/file?session=ID&date=YYYYMMDD&type=brp|brp_mm|pld|sa2|events
  * Streams the raw .snt file as application/octet-stream so the dashboard
  * can pull the whole file once and cache/decimate it in the browser.
  * Supports HTTP Range requests for parallel chunked downloads. */
-esp_err_t session_file_handler(httpd_req_t *req)
+static esp_err_t session_file_handler_impl(httpd_req_t *req)
 {
     char session_id[32], type[16] = "brp";
     if (!get_qparam(req, "session", session_id, sizeof(session_id))) {
@@ -1111,9 +1604,8 @@ esp_err_t session_file_handler(httpd_req_t *req)
      * start/stop), fetched by the dashboard for the event overlay.
      * v2 format: "flow" and "flow_mm" replace "brp" and "brp_mm".
      * v1 types are kept for backwards compatibility with old sessions. */
-    if (strcmp(type, "brp") != 0 && strcmp(type, "brp_mm") != 0 &&
-        strcmp(type, "flow") != 0 && strcmp(type, "flow_mm") != 0 &&
-        strcmp(type, "pld") != 0 && strcmp(type, "sa2") != 0 &&
+    if (strcmp(type, "brp") != 0 && strcmp(type, "brp_mm") != 0 && strcmp(type, "flow") != 0 &&
+        strcmp(type, "flow_mm") != 0 && strcmp(type, "pld") != 0 && strcmp(type, "sa2") != 0 &&
         strcmp(type, "events") != 0 && strcmp(type, "press") != 0) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "invalid type");
         return ESP_FAIL;
@@ -1122,10 +1614,18 @@ esp_err_t session_file_handler(httpd_req_t *req)
     char file_path[400];
     snprintf(file_path, sizeof(file_path), "%s/%s_%s.snt", day_dir, session_id, type);
 
+    if (!sd_storage_lease_acquire(SD_LEASE_UPLOAD, 0)) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        httpd_resp_set_hdr(req, "Retry-After", "1");
+        httpd_resp_sendstr(req, "card busy; retry later");
+        return ESP_FAIL;
+    }
+
     FILE *f = fopen(file_path, "rb");
     if (!f) {
         ESP_LOGW(TAG, "session_file: file not found: %s", file_path);
         httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "file not found");
+        sd_storage_lease_release_unchanged(SD_LEASE_UPLOAD);
         return ESP_FAIL;
     }
 
@@ -1154,14 +1654,16 @@ esp_err_t session_file_handler(httpd_req_t *req)
                 if (*(dash + 1) != '\0') {
                     range_end = atol(dash + 1);
                 }
-                if (range_start < 0) range_start = 0;
-                if (range_end >= file_size) range_end = file_size - 1;
+                if (range_start < 0)
+                    range_start = 0;
+                if (range_end >= file_size)
+                    range_end = file_size - 1;
                 if (range_start <= range_end) {
                     has_range = true;
                     /* Set Content-Range header */
                     char cr[80];
-                    snprintf(cr, sizeof(cr), "bytes %ld-%ld/%ld",
-                             range_start, range_end, file_size);
+                    snprintf(
+                        cr, sizeof(cr), "bytes %ld-%ld/%ld", range_start, range_end, file_size);
                     httpd_resp_set_hdr(req, "Content-Range", cr);
                     httpd_resp_set_status(req, "206 Partial Content");
                 }
@@ -1178,6 +1680,7 @@ esp_err_t session_file_handler(httpd_req_t *req)
         httpd_resp_set_hdr(req, "Content-Length", cl);
         httpd_resp_send_chunk(req, NULL, 0);
         fclose(f);
+        sd_storage_lease_release_unchanged(SD_LEASE_UPLOAD);
         return ESP_OK;
     }
 
@@ -1190,6 +1693,7 @@ esp_err_t session_file_handler(httpd_req_t *req)
         fseek(f, has_range ? range_start : 0, SEEK_SET);
         size_t got = fread(sbuf, 1, send_size, f);
         fclose(f);
+        sd_storage_lease_release_unchanged(SD_LEASE_UPLOAD);
         char cl[24];
         snprintf(cl, sizeof(cl), "%ld", (long)got);
         httpd_resp_set_hdr(req, "Content-Length", cl);
@@ -1204,11 +1708,23 @@ esp_err_t session_file_handler(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Connection", "close");
 
     session_file_async_t *transfer = heap_caps_calloc(1, sizeof(*transfer), MALLOC_CAP_SPIRAM);
-    if (!transfer) transfer = calloc(1, sizeof(*transfer));
-    httpd_req_t *async_req = NULL;
-    if (!transfer || httpd_req_async_handler_begin(req, &async_req) != ESP_OK) {
+    if (!transfer)
+        transfer = calloc(1, sizeof(*transfer));
+    if (!transfer || !snt_download_admit()) {
         free(transfer);
         fclose(f);
+        sd_storage_lease_release_unchanged(SD_LEASE_UPLOAD);
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        httpd_resp_set_hdr(req, "Retry-After", "1");
+        httpd_resp_sendstr(req, "session download busy; retry later");
+        return ESP_FAIL;
+    }
+    httpd_req_t *async_req = NULL;
+    if (httpd_req_async_handler_begin(req, &async_req) != ESP_OK) {
+        snt_download_release();
+        free(transfer);
+        fclose(f);
+        sd_storage_lease_release_unchanged(SD_LEASE_UPLOAD);
         httpd_resp_send_500(req);
         return ESP_FAIL;
     }
@@ -1218,16 +1734,27 @@ esp_err_t session_file_handler(httpd_req_t *req)
     transfer->range_start = range_start;
     transfer->send_size = send_size;
     fclose(f);
+    sd_storage_lease_release_unchanged(SD_LEASE_UPLOAD);
 
     /* Hand off to the persistent download worker. Ownership of `transfer` and
      * completion of the async handler pass to the worker. If the queue is full
      * (too many pending downloads), reject and clean up here. */
-    if (!s_download_queue ||
-        xQueueSend(s_download_queue, &transfer, 0) != pdTRUE) {
+    if (!s_download_queue || xQueueSend(s_download_queue, &transfer, 0) != pdTRUE) {
         ESP_LOGW(TAG, "snt_download: queue unavailable/full, rejecting request");
         httpd_req_async_handler_complete(async_req);
         free(transfer);
+        snt_download_release();
         return ESP_FAIL;
     }
     return ESP_OK;
+}
+
+esp_err_t session_file_handler(httpd_req_t *req)
+{
+    if (!session_graph_request_begin()) {
+        return session_graph_send_storage_busy(req);
+    }
+    esp_err_t result = session_file_handler_impl(req);
+    session_graph_request_end();
+    return result;
 }

@@ -138,7 +138,10 @@ for body in (
 history_collect_days = function_body(HISTORY, "history_collect_days_leased")
 assert "opendir(SD_STREAMS_DIR)" in history_collect_days
 assert "errno != ENOENT && errno != ENOTDIR" in history_collect_days
-assert "if (errno != 0) result = ESP_FAIL" in history_collect_days
+assert re.search(
+    r"if\s*\(\s*errno\s*!=\s*0\s*\)\s*result\s*=\s*ESP_FAIL",
+    history_collect_days,
+)
 assert "closedir(dir) != 0" in history_collect_days
 assert re.search(r"result\s*=\s*ESP_FAIL", history_collect_days)
 assert "history_storage_lifecycle_contract_test.py" in HOST_TEST

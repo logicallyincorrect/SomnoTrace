@@ -22,7 +22,6 @@
  * (https://github.com/ilyakruchinin)." See the NOTICE file for details.
  */
 
-
 #pragma once
 
 #include <stdbool.h>
@@ -30,11 +29,11 @@
 #include <stdint.h>
 #include "esp_err.h"
 
-#define NETPROV_SSID_MAXLEN     32
-#define NETPROV_PASS_MAXLEN     64
+#define NETPROV_SSID_MAXLEN 32
+#define NETPROV_PASS_MAXLEN 64
 #define NETPROV_HOSTNAME_MAXLEN 32
-#define NETPROV_MAX_SSID_SLOTS  4
-#define NETPROV_SCAN_MAX_APS     20
+#define NETPROV_MAX_SSID_SLOTS 4
+#define NETPROV_SCAN_MAX_APS 20
 
 /* IPv4 policy travels with its saved network, never with a display draft. */
 struct netprov_ipv4 {
@@ -68,11 +67,11 @@ cJSON *netprov_build_status_json(void);
  * This is observed state, not a boot-time assumption: `up` goes false the
  * moment the AP disappears, so callers must never cache "connected". */
 typedef struct {
-    bool up;                              /* associated AND holding an IP */
-    char ssid[NETPROV_SSID_MAXLEN + 1];   /* AP actually in use ("" if down) */
-    char ip[16];                          /* current IP ("0.0.0.0" if down) */
-    int  rssi;                            /* dBm; only valid if rssi_valid */
-    bool rssi_valid;                      /* false when down or query failed */
+    bool up;                            /* associated AND holding an IP */
+    char ssid[NETPROV_SSID_MAXLEN + 1]; /* AP actually in use ("" if down) */
+    char ip[16];                        /* current IP ("0.0.0.0" if down) */
+    int rssi;                           /* dBm; only valid if rssi_valid */
+    bool rssi_valid;                    /* false when down or query failed */
 } netprov_link_t;
 
 /* Snapshot the current station link state. Non-blocking, safe from any task. */
@@ -143,8 +142,7 @@ esp_err_t netprov_save_config(const struct netprov_config *cfg);
  * Scans, picks matching SSIDs in saved slot order, tries up to 3 attempts
  * with 5 s spacing per candidate. On success writes IP into ip_out
  * (>= 16 bytes) and returns ESP_OK. */
-esp_err_t netprov_try_connect(const struct netprov_config *cfg,
-                              char *ip_out, int timeout_ms);
+esp_err_t netprov_try_connect(const struct netprov_config *cfg, char *ip_out, int timeout_ms);
 
 /* Start the SoftAP provisioning portal and captive DNS/HTTP server.
  * SSID is "${hostname}-setup". ap_ip_out (>= 16 bytes) receives the AP IP.
@@ -162,7 +160,7 @@ void netprov_start_link_supervisor(void);
 /* Ask the link supervisor to attempt a full scan-and-connect cycle now. */
 void netprov_request_rescan(void);
 
-/* Task entry for the captive DNS server (wildcard hijack). 
+/* Task entry for the captive DNS server (wildcard hijack).
  * arg is ignored; starts automatically inside netprov_start_portal. */
 void netprov_dns_task(void *arg);
 

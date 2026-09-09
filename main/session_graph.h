@@ -22,11 +22,15 @@
  */
 
 #pragma once
+#include <stdbool.h>
 #include "esp_http_server.h"
 
-/* Must be called once at startup (before registering HTTP handlers) to
- * initialise the binary semaphore that serialises large-file transfers. */
-void session_graph_init(void);
+/* Must succeed before the HTTP server registers these handlers. */
+esp_err_t session_graph_init(void);
+
+/* Refuse new file transfers, cancel active/queued work, and wait until no
+ * async request still references the HTTP server. */
+bool session_graph_cancel_and_wait(void);
 
 /* GET /api/sessions?date=YYYYMMDD
  * Returns JSON array of sessions for the given noon-day folder. */

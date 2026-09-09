@@ -22,7 +22,6 @@
  * (https://github.com/ilyakruchinin)." See the NOTICE file for details.
  */
 
-
 #include "net_provision.h"
 #include "as11_ble.h"
 #include "oximeter.h"
@@ -40,7 +39,8 @@
 #include "session_graph.h"
 #include "oximetry_http.h"
 #if CONFIG_SOMNOTRACE_BOARD_WAVESHARE_7B
-#include "board_waveshare_7b.h"
+#include "display_transport_rgb.h"
+#include "touch_input.h"
 #endif
 
 #include <inttypes.h>
@@ -90,22 +90,22 @@ static const char *TAG = "netprov";
  * in net_provision.h.  The response helper is defined with the OTA handlers. */
 static esp_err_t ota_send_busy(httpd_req_t *req);
 
-#define NVS_NAMESPACE       "cfg"
-#define NVS_KEY_HOSTNAME    "hostname"
-#define NVS_KEY_SSID_FMT    "ssid%d"
-#define NVS_KEY_PASS_FMT    "pass%d"
-#define NVS_KEY_MDNS_NAME   "mdns_name"
-#define MDNS_NAME_MAX       11   /* 10 chars + NUL */
+#define NVS_NAMESPACE "cfg"
+#define NVS_KEY_HOSTNAME "hostname"
+#define NVS_KEY_SSID_FMT "ssid%d"
+#define NVS_KEY_PASS_FMT "pass%d"
+#define NVS_KEY_MDNS_NAME "mdns_name"
+#define MDNS_NAME_MAX 11 /* 10 chars + NUL */
 
-#define WIFI_CONNECTED_BIT  BIT0
-#define WIFI_FAIL_BIT       BIT1
-#define MAX_STA_RETRY       3
+#define WIFI_CONNECTED_BIT BIT0
+#define WIFI_FAIL_BIT BIT1
+#define MAX_STA_RETRY 3
 #define NETPROV_SCAN_MAX_RAW_APS 64
 
 /* Failed reconnects to the current SSID before falling back to a full
  * scan across every configured network.  Without this the driver retries
  * one dead SSID forever and never fails over. */
-#define RECONNECT_TRIES_BEFORE_RESCAN  5
+#define RECONNECT_TRIES_BEFORE_RESCAN 5
 
 static EventGroupHandle_t s_wifi_events;
 static int s_retry_num = 0;
@@ -121,7 +121,7 @@ static uint32_t s_ap_ip = 0;
 /* Link state published to the LCD and /api/status. */
 static char s_link_ssid[NETPROV_SSID_MAXLEN + 1] = "";
 static SemaphoreHandle_t s_link_mutex = NULL;
-static volatile int  s_reconnect_tries = 0;
+static volatile int s_reconnect_tries = 0;
 static volatile bool s_rescan_requested = false;
 static volatile bool s_reselect_on_disconnect;
 static bool s_manual_reconnect; /* radio gate owner only */
@@ -146,11 +146,13 @@ static netprov_scan_snapshot_t s_scan_snapshot = {
 
 static bool user_scan_running(void)
 {
-    if (!s_scan_mutex) return false;
+    if (!s_scan_mutex)
+        return false;
     /* Event-loop callbacks must not wait behind UI/HTTP work.  If the state
      * is being changed right now, conservatively defer reconnect to the link
      * supervisor rather than collide with a just-reserved scan. */
-    if (xSemaphoreTake(s_scan_mutex, 0) != pdTRUE) return true;
+    if (xSemaphoreTake(s_scan_mutex, 0) != pdTRUE)
+        return true;
     bool running = s_scan_snapshot.state == NETPROV_SCAN_RUNNING;
     xSemaphoreGive(s_scan_mutex);
     return running;
@@ -165,7 +167,8 @@ static esp_err_t do_netprov_load(void *arg)
     struct netprov_config local = {0};
     strlcpy(local.hostname, "SomnoTrace", sizeof(local.hostname));
     nvs_handle_t h;
-    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &h) != ESP_OK) return ESP_ERR_NVS_NOT_FOUND;
+    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &h) != ESP_OK)
+        return ESP_ERR_NVS_NOT_FOUND;
 
     size_t len = sizeof(local.hostname);
     nvs_get_str(h, NVS_KEY_HOSTNAME, local.hostname, &len);
@@ -194,7 +197,8 @@ static esp_err_t do_netprov_load(void *arg)
 
 bool netprov_load_config(struct netprov_config *cfg)
 {
-    if (!cfg) return false;
+    if (!cfg)
+        return false;
     memset(cfg, 0, sizeof(*cfg));
     strlcpy(cfg->hostname, "SomnoTrace", sizeof(cfg->hostname));
     return nvs_writer_run(do_netprov_load, cfg) == ESP_OK;
@@ -207,19 +211,24 @@ static esp_err_t do_netprov_save(void *arg)
     struct netprov_config local = *cfg;
     nvs_handle_t h;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
-    if (err != ESP_OK) return err;
+    if (err != ESP_OK)
+        return err;
 
     err = nvs_set_str(h, NVS_KEY_HOSTNAME, local.hostname);
     for (int i = 0; i < NETPROV_MAX_SSID_SLOTS; i++) {
         char key[16];
         snprintf(key, sizeof(key), NVS_KEY_SSID_FMT, i + 1);
-        if (err == ESP_OK) err = nvs_set_str(h, key, local.wifi[i].ssid);
+        if (err == ESP_OK)
+            err = nvs_set_str(h, key, local.wifi[i].ssid);
         snprintf(key, sizeof(key), NVS_KEY_PASS_FMT, i + 1);
-        if (err == ESP_OK) err = nvs_set_str(h, key, local.wifi[i].pass);
+        if (err == ESP_OK)
+            err = nvs_set_str(h, key, local.wifi[i].pass);
         snprintf(key, sizeof(key), "ipv4_%d", i + 1);
-        if (err == ESP_OK) err = nvs_set_blob(h, key, &local.wifi[i].ipv4, sizeof(local.wifi[i].ipv4));
+        if (err == ESP_OK)
+            err = nvs_set_blob(h, key, &local.wifi[i].ipv4, sizeof(local.wifi[i].ipv4));
     }
-    if (err == ESP_OK) err = nvs_commit(h);
+    if (err == ESP_OK)
+        err = nvs_commit(h);
     nvs_close(h);
     return err;
 }
@@ -227,7 +236,8 @@ static esp_err_t do_netprov_save(void *arg)
 esp_err_t netprov_save_config(const struct netprov_config *cfg)
 {
     esp_err_t valid = netprov_validate_config(cfg);
-    if (valid != ESP_OK) return valid;
+    if (valid != ESP_OK)
+        return valid;
     return nvs_writer_run(do_netprov_save, (void *)cfg);
 }
 
@@ -239,9 +249,11 @@ static esp_err_t do_save_mdns_name(void *arg)
     const char *name = (const char *)arg;
     nvs_handle_t h;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
-    if (err != ESP_OK) return err;
+    if (err != ESP_OK)
+        return err;
     err = nvs_set_str(h, NVS_KEY_MDNS_NAME, name);
-    if (err == ESP_OK) err = nvs_commit(h);
+    if (err == ESP_OK)
+        err = nvs_commit(h);
     nvs_close(h);
     return err;
 }
@@ -260,35 +272,46 @@ static esp_err_t do_load_mdns_name(void *arg)
     char value[MDNS_NAME_MAX] = {0};
     nvs_handle_t h;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &h);
-    if (err != ESP_OK) { a->ok = false; return err; }
+    if (err != ESP_OK) {
+        a->ok = false;
+        return err;
+    }
     size_t value_len = sizeof(value);
     err = nvs_get_str(h, NVS_KEY_MDNS_NAME, value, &value_len);
     nvs_close(h);
     a->ok = err == ESP_OK && value[0] != '\0';
-    if (a->ok && out && out_len) strlcpy(out, value, out_len);
+    if (a->ok && out && out_len)
+        strlcpy(out, value, out_len);
     return err;
 }
 
 void netprov_get_mdns_name(char *out, size_t out_len)
 {
-    if (!out || out_len == 0) return;
+    if (!out || out_len == 0)
+        return;
     out[0] = '\0';
-    mdns_read_args_t args = { .out = out, .out_len = out_len, .ok = false };
+    mdns_read_args_t args = {.out = out, .out_len = out_len, .ok = false};
     nvs_writer_run(do_load_mdns_name, &args);
-    if (!args.ok || out[0] == '\0') strlcpy(out, "somnotrace", out_len);
+    if (!args.ok || out[0] == '\0')
+        strlcpy(out, "somnotrace", out_len);
     strlcpy(s_mdns_name, out, sizeof(s_mdns_name));
 }
 
 esp_err_t netprov_set_mdns_name(const char *name)
 {
-    if (!name || !name[0] || strlen(name) > NETPROV_HOSTNAME_MAXLEN || name[0] == '-' || name[strlen(name)-1] == '-') return ESP_ERR_INVALID_ARG;
+    if (!name || !name[0] || strlen(name) > NETPROV_HOSTNAME_MAXLEN || name[0] == '-' ||
+        name[strlen(name) - 1] == '-')
+        return ESP_ERR_INVALID_ARG;
     for (const char *p = name; *p; ++p)
-        if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '-')) return ESP_ERR_INVALID_ARG;
+        if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') ||
+              *p == '-'))
+            return ESP_ERR_INVALID_ARG;
     esp_err_t err = nvs_writer_run(do_save_mdns_name, (void *)name);
     if (err == ESP_OK) {
         strlcpy(s_mdns_name, name, sizeof(s_mdns_name));
         mdns_hostname_set(name); /* returns invalid-state before mDNS starts */
-        if (s_netif_sta) esp_netif_set_hostname(s_netif_sta, name);
+        if (s_netif_sta)
+            esp_netif_set_hostname(s_netif_sta, name);
     }
     return err;
 }
@@ -305,11 +328,13 @@ const char *netprov_mdns_name_cached(void)
  * were handed is no longer ours, so it must not be reported any more. */
 static void link_mark_down(void)
 {
-    if (s_link_mutex) xSemaphoreTake(s_link_mutex, portMAX_DELAY);
+    if (s_link_mutex)
+        xSemaphoreTake(s_link_mutex, portMAX_DELAY);
     s_connected = false;
     s_link_ssid[0] = '\0';
     strlcpy(s_connected_ip, "0.0.0.0", sizeof(s_connected_ip));
-    if (s_link_mutex) xSemaphoreGive(s_link_mutex);
+    if (s_link_mutex)
+        xSemaphoreGive(s_link_mutex);
 }
 
 /* Publish the "link is up" state, recording which AP we actually landed on
@@ -319,20 +344,23 @@ static void link_mark_up(const char *ip)
     wifi_ap_record_t *ap = malloc(sizeof(wifi_ap_record_t));
     bool have_ap = ap && (esp_wifi_sta_get_ap_info(ap) == ESP_OK);
 
-    if (s_link_mutex) xSemaphoreTake(s_link_mutex, portMAX_DELAY);
+    if (s_link_mutex)
+        xSemaphoreTake(s_link_mutex, portMAX_DELAY);
     s_connected = true;
     strlcpy(s_connected_ip, ip, sizeof(s_connected_ip));
     if (have_ap && ap) {
         strlcpy(s_link_ssid, (const char *)ap->ssid, sizeof(s_link_ssid));
     }
-    if (s_link_mutex) xSemaphoreGive(s_link_mutex);
-    if (ap) free(ap);
+    if (s_link_mutex)
+        xSemaphoreGive(s_link_mutex);
+    if (ap)
+        free(ap);
 }
 
-static void wifi_event_handler(void *arg, esp_event_base_t base,
-                               int32_t id, void *data)
+static void wifi_event_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
-    (void)arg; (void)data;
+    (void)arg;
+    (void)data;
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
         if (s_connecting) {
             esp_wifi_connect();
@@ -369,12 +397,15 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
                 ESP_LOGI(TAG, "deferring reconnect until user scan completes");
                 s_rescan_requested = true;
             } else if (++s_reconnect_tries < RECONNECT_TRIES_BEFORE_RESCAN) {
-                ESP_LOGI(TAG, "reconnect failed (%d/%d), retrying same SSID",
-                         s_reconnect_tries, RECONNECT_TRIES_BEFORE_RESCAN);
+                ESP_LOGI(TAG,
+                         "reconnect failed (%d/%d), retrying same SSID",
+                         s_reconnect_tries,
+                         RECONNECT_TRIES_BEFORE_RESCAN);
                 esp_wifi_connect();
             } else {
-                ESP_LOGW(TAG, "reconnect to '%s' failed %d times, "
-                              "rescanning all configured networks",
+                ESP_LOGW(TAG,
+                         "reconnect to '%s' failed %d times, "
+                         "rescanning all configured networks",
                          s_link_ssid[0] ? s_link_ssid : "(unknown)",
                          s_reconnect_tries);
                 s_rescan_requested = true;
@@ -391,25 +422,30 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
             /* Reconnect succeeded outside the boot-time connect path. */
             link_mark_up(s_got_ip);
             bsp_display_set_wifi_connected(true);
-            ESP_LOGI(TAG, "Wi-Fi reconnected to '%s', ip=%s",
-                     s_link_ssid[0] ? s_link_ssid : "?", s_got_ip);
+            ESP_LOGI(TAG,
+                     "Wi-Fi reconnected to '%s', ip=%s",
+                     s_link_ssid[0] ? s_link_ssid : "?",
+                     s_got_ip);
         }
     }
 }
 
 void netprov_get_link(netprov_link_t *out)
 {
-    if (!out) return;
+    if (!out)
+        return;
     memset(out, 0, sizeof(*out));
     strlcpy(out->ip, "0.0.0.0", sizeof(out->ip));
 
-    if (s_link_mutex) xSemaphoreTake(s_link_mutex, portMAX_DELAY);
+    if (s_link_mutex)
+        xSemaphoreTake(s_link_mutex, portMAX_DELAY);
     out->up = s_connected;
     if (s_connected) {
         strlcpy(out->ssid, s_link_ssid, sizeof(out->ssid));
         strlcpy(out->ip, s_connected_ip, sizeof(out->ip));
     }
-    if (s_link_mutex) xSemaphoreGive(s_link_mutex);
+    if (s_link_mutex)
+        xSemaphoreGive(s_link_mutex);
 
     /* RSSI is only meaningful while associated, and the query can still
      * fail — report validity rather than a misleading default. */
@@ -424,7 +460,8 @@ void netprov_get_link(netprov_link_t *out)
 
 bool netprov_is_link_up(void)
 {
-    if (!s_link_mutex) return false;
+    if (!s_link_mutex)
+        return false;
     xSemaphoreTake(s_link_mutex, portMAX_DELAY);
     bool connected = s_connected;
     xSemaphoreGive(s_link_mutex);
@@ -445,7 +482,8 @@ static void link_supervisor_task(void *arg)
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(1000));
 
-        if (!s_rescan_requested || s_portal_mode || s_connected) continue;
+        if (!s_rescan_requested || s_portal_mode || s_connected)
+            continue;
         s_rescan_requested = false;
 
         if (!s_link_cfg_valid) {
@@ -459,8 +497,10 @@ static void link_supervisor_task(void *arg)
             link_mark_up(ip);
             bsp_display_set_wifi_connected(true);
             strlcpy(s_connected_ip, ip, sizeof(s_connected_ip));
-            ESP_LOGI(TAG, "failover: reconnected to '%s', ip=%s",
-                     s_link_ssid[0] ? s_link_ssid : "?", ip);
+            ESP_LOGI(TAG,
+                     "failover: reconnected to '%s', ip=%s",
+                     s_link_ssid[0] ? s_link_ssid : "?",
+                     ip);
         } else if (s_portal_mode) {
             /* Portal mode was activated while we were trying to connect.
              * Don't schedule another rescan — the AP is now up. */
@@ -468,8 +508,9 @@ static void link_supervisor_task(void *arg)
         } else {
             /* Nothing reachable right now.  Back off and let the next
              * disconnect cycle raise another rescan. */
-            ESP_LOGW(TAG, "failover: no configured network reachable, "
-                          "retrying in 30s");
+            ESP_LOGW(TAG,
+                     "failover: no configured network reachable, "
+                     "retrying in 30s");
             vTaskDelay(pdMS_TO_TICKS(30000));
             s_rescan_requested = true;
         }
@@ -479,12 +520,15 @@ static void link_supervisor_task(void *arg)
 esp_err_t netprov_init(void)
 {
     s_link_mutex = xSemaphoreCreateMutex();
-    if (!s_link_mutex) return ESP_ERR_NO_MEM;
+    if (!s_link_mutex)
+        return ESP_ERR_NO_MEM;
     s_scan_mutex = xSemaphoreCreateMutex();
     s_radio_gate = xSemaphoreCreateBinary();
     if (!s_scan_mutex || !s_radio_gate) {
-        if (s_scan_mutex) vSemaphoreDelete(s_scan_mutex);
-        if (s_radio_gate) vSemaphoreDelete(s_radio_gate);
+        if (s_scan_mutex)
+            vSemaphoreDelete(s_scan_mutex);
+        if (s_radio_gate)
+            vSemaphoreDelete(s_radio_gate);
         vSemaphoreDelete(s_link_mutex);
         s_scan_mutex = NULL;
         s_radio_gate = NULL;
@@ -534,42 +578,46 @@ esp_err_t netprov_init(void)
 /* ------------------------------------------------------------------ */
 /*  STA connect with scan + candidate selection                       */
 /* ------------------------------------------------------------------ */
-static esp_err_t try_single_ssid(const char *ssid, const char *pass,
-                                 const wifi_ap_record_t *rec,
-                                 char *ip_out, int timeout_ms)
+static esp_err_t try_single_ssid(
+    const char *ssid, const char *pass, const wifi_ap_record_t *rec, char *ip_out, int timeout_ms)
 {
-    if (s_portal_mode) return ESP_FAIL;
+    if (s_portal_mode)
+        return ESP_FAIL;
     s_wifi_events = xEventGroupCreate();
     s_retry_num = 0;
     s_connecting = true;
 
-    wifi_config_t wc = { 0 };
+    wifi_config_t wc = {0};
     strlcpy((char *)wc.sta.ssid, ssid, sizeof(wc.sta.ssid));
     strlcpy((char *)wc.sta.password, pass, sizeof(wc.sta.password));
     wc.sta.threshold.authmode = WIFI_AUTH_OPEN;
     if (rec) {
         memcpy(wc.sta.bssid, rec->bssid, sizeof(wc.sta.bssid));
         wc.sta.bssid_set = true;
-        wc.sta.channel   = rec->primary;
+        wc.sta.channel = rec->primary;
     }
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wc));
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    EventBits_t bits = xEventGroupWaitBits(
-        s_wifi_events, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-        pdFALSE, pdFALSE, pdMS_TO_TICKS(timeout_ms));
+    EventBits_t bits = xEventGroupWaitBits(s_wifi_events,
+                                           WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+                                           pdFALSE,
+                                           pdFALSE,
+                                           pdMS_TO_TICKS(timeout_ms));
 
     esp_err_t result;
     if (bits & WIFI_CONNECTED_BIT) {
         strlcpy(ip_out, s_got_ip, 16);
         /* Publish the link state, including which SSID we actually landed on. */
-        if (s_link_mutex) xSemaphoreTake(s_link_mutex, portMAX_DELAY);
+        if (s_link_mutex)
+            xSemaphoreTake(s_link_mutex, portMAX_DELAY);
         strlcpy(s_connected_ip, s_got_ip, sizeof(s_connected_ip));
         strlcpy(s_link_ssid, ssid, sizeof(s_link_ssid));
         s_connected = true;
-        if (s_link_mutex) xSemaphoreGive(s_link_mutex);
+        if (s_link_mutex)
+            xSemaphoreGive(s_link_mutex);
         s_reconnect_tries = 0;
         ESP_LOGI(TAG, "connected to '%s', ip=%s", ssid, ip_out);
         result = ESP_OK;
@@ -588,7 +636,8 @@ static esp_err_t try_single_ssid(const char *ssid, const char *pass,
 
 static esp_err_t apply_ipv4(const struct netprov_ipv4 *cfg)
 {
-    if (!s_netif_sta) return ESP_ERR_INVALID_STATE;
+    if (!s_netif_sta)
+        return ESP_ERR_INVALID_STATE;
     esp_netif_dhcpc_stop(s_netif_sta);
     esp_netif_ip_info_t ip = {0};
     if (cfg->manual) {
@@ -597,8 +646,10 @@ static esp_err_t apply_ipv4(const struct netprov_ipv4 *cfg)
         ip.gw.addr = inet_addr(cfg->gateway);
     }
     esp_err_t err = esp_netif_set_ip_info(s_netif_sta, &ip);
-    if (err != ESP_OK) return err;
-    if (!cfg->manual) return esp_netif_dhcpc_start(s_netif_sta);
+    if (err != ESP_OK)
+        return err;
+    if (!cfg->manual)
+        return esp_netif_dhcpc_start(s_netif_sta);
     esp_netif_dns_info_t dns = {0};
     dns.ip.type = ESP_IPADDR_TYPE_V4;
     dns.ip.u_addr.ip4.addr = inet_addr(cfg->dns);
@@ -606,9 +657,11 @@ static esp_err_t apply_ipv4(const struct netprov_ipv4 *cfg)
 }
 
 static esp_err_t try_connect_radio_locked(const struct netprov_config *cfg,
-                                          char *ip_out, int timeout_ms)
+                                          char *ip_out,
+                                          int timeout_ms)
 {
-    if (s_portal_mode) return ESP_FAIL;
+    if (s_portal_mode)
+        return ESP_FAIL;
     s_reselect_on_disconnect = false;
     link_mark_down();
 
@@ -631,25 +684,36 @@ static esp_err_t try_connect_radio_locked(const struct netprov_config *cfg,
     int scan_retries = 3;
     int n_cands = 0;
 
-    typedef struct { int slot; int rssi; wifi_ap_record_t rec; } cand_t;
+    typedef struct {
+        int slot;
+        int rssi;
+        wifi_ap_record_t rec;
+    } cand_t;
     cand_t cands[NETPROV_MAX_SSID_SLOTS];
 
     for (int attempt = 1; attempt <= scan_retries; attempt++) {
-        if (s_manual_reconnect && bsp_display_therapy_safe_maintenance_should_abort()) return ESP_ERR_INVALID_STATE;
-        wifi_scan_config_t scan_cfg = { .show_hidden = false };
+        if (s_manual_reconnect && bsp_display_therapy_safe_maintenance_should_abort())
+            return ESP_ERR_INVALID_STATE;
+        wifi_scan_config_t scan_cfg = {.show_hidden = false};
         esp_err_t scan_err = esp_wifi_scan_start(&scan_cfg, true);
         if (scan_err != ESP_OK) {
-            ESP_LOGW(TAG, "Wi-Fi scan failed (err=0x%x), retrying scan (%d/%d)", scan_err, attempt, scan_retries);
+            ESP_LOGW(TAG,
+                     "Wi-Fi scan failed (err=0x%x), retrying scan (%d/%d)",
+                     scan_err,
+                     attempt,
+                     scan_retries);
             vTaskDelay(pdMS_TO_TICKS(1000));
             continue;
         }
 
         ap_count = 0;
         esp_wifi_scan_get_ap_num(&ap_count);
-        if (ap_count > 32) ap_count = 32;
+        if (ap_count > 32)
+            ap_count = 32;
 
         records = heap_caps_calloc(ap_count, sizeof(wifi_ap_record_t), MALLOC_CAP_SPIRAM);
-        if (!records) records = calloc(ap_count, sizeof(wifi_ap_record_t));
+        if (!records)
+            records = calloc(ap_count, sizeof(wifi_ap_record_t));
         if (records && ap_count) {
             esp_wifi_scan_get_ap_records(&ap_count, records);
         }
@@ -657,12 +721,13 @@ static esp_err_t try_connect_radio_locked(const struct netprov_config *cfg,
         /* Build candidates: strongest matching SSID first */
         n_cands = 0;
         for (int i = 0; i < NETPROV_MAX_SSID_SLOTS; i++) {
-            if (cfg->wifi[i].ssid[0] == '\0') continue;
+            if (cfg->wifi[i].ssid[0] == '\0')
+                continue;
             int best_rssi = -128;
             wifi_ap_record_t best_rec = {0};
             for (int j = 0; j < ap_count; j++) {
-                if (records && strcmp((char *)records[j].ssid, cfg->wifi[i].ssid) == 0
-                    && records[j].rssi > best_rssi) {
+                if (records && strcmp((char *)records[j].ssid, cfg->wifi[i].ssid) == 0 &&
+                    records[j].rssi > best_rssi) {
                     best_rssi = records[j].rssi;
                     best_rec = records[j];
                 }
@@ -687,12 +752,16 @@ static esp_err_t try_connect_radio_locked(const struct netprov_config *cfg,
         }
 
         if (attempt < scan_retries) {
-            ESP_LOGI(TAG, "SSID candidates not found in scan, retrying scan in 1s (%d/%d)...", attempt, scan_retries);
+            ESP_LOGI(TAG,
+                     "SSID candidates not found in scan, retrying scan in 1s (%d/%d)...",
+                     attempt,
+                     scan_retries);
             vTaskDelay(pdMS_TO_TICKS(1000));
         }
     }
 
-    if (s_portal_mode) return ESP_FAIL;
+    if (s_portal_mode)
+        return ESP_FAIL;
     esp_wifi_stop();
 
     if (n_cands == 0) {
@@ -703,26 +772,31 @@ static esp_err_t try_connect_radio_locked(const struct netprov_config *cfg,
     /* Candidates were built in saved slot order. RSSI selects only the best
      * BSSID within each SSID; priority is independent of signal strength. */
 
-    if (s_portal_mode) return ESP_FAIL;
+    if (s_portal_mode)
+        return ESP_FAIL;
 
     /* 3. Try each candidate: 3 attempts, 5 s between retries */
     for (int i = 0; i < n_cands; i++) {
-        if (s_portal_mode) return ESP_FAIL;
+        if (s_portal_mode)
+            return ESP_FAIL;
         int slot = cands[i].slot;
-        ESP_LOGI(TAG, "trying candidate %d: '%s' (%d dBm)",
-                 i + 1, cfg->wifi[slot].ssid, cands[i].rssi);
+        ESP_LOGI(
+            TAG, "trying candidate %d: '%s' (%d dBm)", i + 1, cfg->wifi[slot].ssid, cands[i].rssi);
 
-        if (apply_ipv4(&cfg->wifi[slot].ipv4) != ESP_OK) continue;
+        if (apply_ipv4(&cfg->wifi[slot].ipv4) != ESP_OK)
+            continue;
         for (int attempt = 1; attempt <= MAX_STA_RETRY; attempt++) {
-            if (s_manual_reconnect && bsp_display_therapy_safe_maintenance_should_abort()) return ESP_ERR_INVALID_STATE;
+            if (s_manual_reconnect && bsp_display_therapy_safe_maintenance_should_abort())
+                return ESP_ERR_INVALID_STATE;
             esp_err_t err = try_single_ssid(cfg->wifi[slot].ssid,
                                             cfg->wifi[slot].pass,
                                             cands[i].rssi > -128 ? &cands[i].rec : NULL,
-                                            ip_out, timeout_ms);
-            if (err == ESP_OK) return ESP_OK;
+                                            ip_out,
+                                            timeout_ms);
+            if (err == ESP_OK)
+                return ESP_OK;
             if (attempt < MAX_STA_RETRY) {
-                ESP_LOGI(TAG, "waiting 5 s before retry %d/%d",
-                         attempt + 1, MAX_STA_RETRY);
+                ESP_LOGI(TAG, "waiting 5 s before retry %d/%d", attempt + 1, MAX_STA_RETRY);
                 vTaskDelay(pdMS_TO_TICKS(5000));
             }
         }
@@ -732,10 +806,10 @@ static esp_err_t try_connect_radio_locked(const struct netprov_config *cfg,
     return ESP_FAIL;
 }
 
-esp_err_t netprov_try_connect(const struct netprov_config *cfg,
-                              char *ip_out, int timeout_ms)
+esp_err_t netprov_try_connect(const struct netprov_config *cfg, char *ip_out, int timeout_ms)
 {
-    if (!s_radio_gate) return ESP_ERR_INVALID_STATE;
+    if (!s_radio_gate)
+        return ESP_ERR_INVALID_STATE;
     xSemaphoreTake(s_radio_gate, portMAX_DELAY);
     esp_err_t result = try_connect_radio_locked(cfg, ip_out, timeout_ms);
     xSemaphoreGive(s_radio_gate);
@@ -750,7 +824,7 @@ static int url_decode(const char *src, char *dst, size_t dst_size)
     size_t di = 0;
     for (size_t si = 0; src[si] && di + 1 < dst_size; si++) {
         if (src[si] == '%' && src[si + 1] && src[si + 2]) {
-            char hex[3] = { src[si + 1], src[si + 2], 0 };
+            char hex[3] = {src[si + 1], src[si + 2], 0};
             dst[di++] = (char)strtol(hex, NULL, 16);
             si += 2;
         } else if (src[si] == '+') {
@@ -768,13 +842,15 @@ static bool form_get(const char *body, const char *key, char *out, size_t out_si
     char needle[40];
     snprintf(needle, sizeof(needle), "%s=", key);
     const char *p = strstr(body, needle);
-    if (!p) return false;
+    if (!p)
+        return false;
     p += strlen(needle);
     const char *end = strchr(p, '&');
     size_t len = end ? (size_t)(end - p) : strlen(p);
 
     char raw[160];
-    if (len >= sizeof(raw)) len = sizeof(raw) - 1;
+    if (len >= sizeof(raw))
+        len = sizeof(raw) - 1;
     memcpy(raw, p, len);
     raw[len] = '\0';
     url_decode(raw, out, out_size);
@@ -787,22 +863,22 @@ static bool form_get(const char *body, const char *key, char *out, size_t out_si
 extern const char _binary_portal_html_start[];
 extern const char _binary_portal_html_end[];
 #define PORTAL_HTML_START _binary_portal_html_start
-#define PORTAL_HTML_LEN   ((size_t)(_binary_portal_html_end - _binary_portal_html_start))
+#define PORTAL_HTML_LEN ((size_t)(_binary_portal_html_end - _binary_portal_html_start))
 
 extern const char _binary_zones_json_start[];
 extern const char _binary_zones_json_end[];
 #define ZONES_JSON_START _binary_zones_json_start
-#define ZONES_JSON_LEN   ((size_t)(_binary_zones_json_end - _binary_zones_json_start))
+#define ZONES_JSON_LEN ((size_t)(_binary_zones_json_end - _binary_zones_json_start))
 
 extern const char _binary_uPlot_iife_min_js_start[];
 extern const char _binary_uPlot_iife_min_js_end[];
 #define UPLOT_JS_START _binary_uPlot_iife_min_js_start
-#define UPLOT_JS_LEN   ((size_t)(_binary_uPlot_iife_min_js_end - _binary_uPlot_iife_min_js_start))
+#define UPLOT_JS_LEN ((size_t)(_binary_uPlot_iife_min_js_end - _binary_uPlot_iife_min_js_start))
 
 extern const char _binary_uPlot_min_css_start[];
 extern const char _binary_uPlot_min_css_end[];
 #define UPLOT_CSS_START _binary_uPlot_min_css_start
-#define UPLOT_CSS_LEN   ((size_t)(_binary_uPlot_min_css_end - _binary_uPlot_min_css_start))
+#define UPLOT_CSS_LEN ((size_t)(_binary_uPlot_min_css_end - _binary_uPlot_min_css_start))
 
 extern const char _binary_logo_full_svg_start[];
 extern const char _binary_logo_full_svg_end[];
@@ -813,7 +889,6 @@ extern const char _binary_logo_small_svg_end[];
 #define LOGO_SMALL_SVG_START _binary_logo_small_svg_start
 
 /* portal.html and uPlot assets are embedded via CMakeLists.txt target_add_binary_data */
-
 
 static esp_err_t redirect_to_portal(httpd_req_t *req)
 {
@@ -869,23 +944,22 @@ static esp_err_t tz_get_handler(httpd_req_t *req)
 static esp_err_t manifest_get_handler(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "application/json");
-    const char manifest[] =
-        "{\n"
-        "  \"short_name\": \"SomnoTrace\",\n"
-        "  \"name\": \"SomnoTrace Web Portal\",\n"
-        "  \"start_url\": \"/\",\n"
-        "  \"background_color\": \"#0f172a\",\n"
-        "  \"theme_color\": \"#0f172a\",\n"
-        "  \"display\": \"standalone\",\n"
-        "  \"orientation\": \"any\",\n"
-        "  \"icons\": [\n"
-        "    {\n"
-        "      \"src\": \"/favicon.svg\",\n"
-        "      \"sizes\": \"512x512\",\n"
-        "      \"type\": \"image/svg+xml\"\n"
-        "    }\n"
-        "  ]\n"
-        "}";
+    const char manifest[] = "{\n"
+                            "  \"short_name\": \"SomnoTrace\",\n"
+                            "  \"name\": \"SomnoTrace Web Portal\",\n"
+                            "  \"start_url\": \"/\",\n"
+                            "  \"background_color\": \"#0f172a\",\n"
+                            "  \"theme_color\": \"#0f172a\",\n"
+                            "  \"display\": \"standalone\",\n"
+                            "  \"orientation\": \"any\",\n"
+                            "  \"icons\": [\n"
+                            "    {\n"
+                            "      \"src\": \"/favicon.svg\",\n"
+                            "      \"sizes\": \"512x512\",\n"
+                            "      \"type\": \"image/svg+xml\"\n"
+                            "    }\n"
+                            "  ]\n"
+                            "}";
     httpd_resp_send(req, manifest, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
@@ -898,7 +972,8 @@ static esp_err_t sw_get_handler(httpd_req_t *req)
         "const CACHE_NAME = 'somnotrace-v3';\n"
         "self.addEventListener('install', e => {\n"
         "  self.skipWaiting();\n"
-        "  e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['/', '/manifest.json', '/uplot.js', '/uplot.css', '/logo.svg', '/favicon.svg'])));\n"
+        "  e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['/', '/manifest.json', "
+        "'/uplot.js', '/uplot.css', '/logo.svg', '/favicon.svg'])));\n"
         "});\n"
         "self.addEventListener('activate', e => {\n"
         "  e.waitUntil(caches.keys().then(keys => Promise.all(\n"
@@ -906,7 +981,8 @@ static esp_err_t sw_get_handler(httpd_req_t *req)
         "  )).then(() => self.clients.claim()));\n"
         "});\n"
         "self.addEventListener('fetch', e => {\n"
-        "  if (e.request.url.includes('/api/') || e.request.url.includes('/scan') || e.request.url.includes('/save')) {\n"
+        "  if (e.request.url.includes('/api/') || e.request.url.includes('/scan') || "
+        "e.request.url.includes('/save')) {\n"
         "    e.respondWith(fetch(e.request));\n"
         "  } else {\n"
         "    /* Network-first: always fetch fresh when the device is reachable,\n"
@@ -967,16 +1043,16 @@ static esp_err_t favicon_get_handler(httpd_req_t *req)
  * producer-maintained cache in sd_storage; this frequently-polled endpoint
  * must never turn a missing/stale sample into synchronous card I/O. */
 
-#define STATUS_CACHE_NVS_MS   120000  /* refresh NVS-backed settings every 2 min */
+#define STATUS_CACHE_NVS_MS 120000 /* refresh NVS-backed settings every 2 min */
 
 static struct {
     /* NVS config */
     struct netprov_config cfg;
-    bool     cfg_valid;
+    bool cfg_valid;
     TickType_t cfg_tick;
     /* Timezone / NTP */
-    char     tz_name[40];
-    char     ntp_srv[64];
+    char tz_name[40];
+    char ntp_srv[64];
     TickType_t tz_tick;
 } s_status_cache;
 
@@ -1000,7 +1076,8 @@ cJSON *netprov_build_status_json(void)
     }
 
     cJSON *resp = cJSON_CreateObject();
-    if (!resp) return NULL;
+    if (!resp)
+        return NULL;
 
     cJSON_AddStringToObject(resp, "mode", s_portal_mode ? "setup" : "connected");
 
@@ -1044,8 +1121,10 @@ cJSON *netprov_build_status_json(void)
         cJSON *has_pass_arr = cJSON_AddArrayToObject(resp, "has_pass");
         for (int i = 0; i < NETPROV_MAX_SSID_SLOTS; i++) {
             if (s_status_cache.cfg.wifi[i].ssid[0] != '\0') {
-                cJSON_AddItemToArray(ssids_arr, cJSON_CreateString(s_status_cache.cfg.wifi[i].ssid));
-                cJSON_AddItemToArray(has_pass_arr, cJSON_CreateBool(s_status_cache.cfg.wifi[i].pass[0] != '\0'));
+                cJSON_AddItemToArray(ssids_arr,
+                                     cJSON_CreateString(s_status_cache.cfg.wifi[i].ssid));
+                cJSON_AddItemToArray(has_pass_arr,
+                                     cJSON_CreateBool(s_status_cache.cfg.wifi[i].pass[0] != '\0'));
             }
         }
     }
@@ -1063,9 +1142,15 @@ cJSON *netprov_build_status_json(void)
     cJSON_AddBoolToObject(resp, "ntp_synced", time_sync_is_synced());
     const char *src_str = "none";
     switch (time_source_get()) {
-        case TIME_SRC_NTP:        src_str = "ntp"; break;
-        case TIME_SRC_AS11_DRIFT: src_str = "as11_drift"; break;
-        default:                  src_str = "none"; break;
+    case TIME_SRC_NTP:
+        src_str = "ntp";
+        break;
+    case TIME_SRC_AS11_DRIFT:
+        src_str = "as11_drift";
+        break;
+    default:
+        src_str = "none";
+        break;
     }
     cJSON_AddStringToObject(resp, "time_source", src_str);
     time_t now_t = time(NULL);
@@ -1102,21 +1187,20 @@ cJSON *netprov_build_status_json(void)
 #if CONFIG_SOMNOTRACE_BOARD_WAVESHARE_7B
     /* Timestamped controller observations; these do not measure emitted light. */
     touch_observation_t touch;
-    waveshare_7b_touch_snapshot(&touch);
+    touch_input_snapshot(&touch);
     cJSON *input = cJSON_AddObjectToObject(resp, "touch");
     if (input) {
         int64_t now_us = esp_timer_get_time();
         cJSON_AddBoolToObject(input, "healthy", touch_observation_healthy(&touch, now_us));
         cJSON_AddBoolToObject(input, "recovering", touch.recovering);
-        cJSON_AddBoolToObject(input, "preventive_recovery",
-                              touch.preventive_recovery);
+        cJSON_AddBoolToObject(input, "preventive_recovery", touch.preventive_recovery);
         cJSON_AddNumberToObject(input, "read_errors", touch.errors);
         cJSON_AddNumberToObject(input, "consecutive_errors", touch.consecutive_errors);
         cJSON_AddNumberToObject(input, "recovery_attempts", touch.recovery_attempts);
-        cJSON_AddNumberToObject(input, "preventive_recovery_requests",
-                                touch.preventive_recovery_requests);
-        cJSON_AddNumberToObject(input, "preventive_recovery_attempts",
-                                touch.preventive_recovery_attempts);
+        cJSON_AddNumberToObject(
+            input, "preventive_recovery_requests", touch.preventive_recovery_requests);
+        cJSON_AddNumberToObject(
+            input, "preventive_recovery_attempts", touch.preventive_recovery_attempts);
         cJSON_AddNumberToObject(input, "visibility_requests", touch.visibility_requests);
         cJSON_AddBoolToObject(input, "frame_valid", touch.valid);
         cJSON_AddBoolToObject(input, "pressed", touch_observation_pressed(&touch, now_us));
@@ -1124,10 +1208,13 @@ cJSON *netprov_build_status_json(void)
         cJSON_AddNumberToObject(input, "last_error", touch.last_error);
         if (touch.frame_us > 0 && now_us >= touch.frame_us)
             cJSON_AddNumberToObject(input, "frame_age_ms", (now_us - touch.frame_us) / 1000);
-        else cJSON_AddNullToObject(input, "frame_age_ms");
+        else
+            cJSON_AddNullToObject(input, "frame_age_ms");
         if (touch.observed && now_us >= touch.observed_us)
-            cJSON_AddNumberToObject(input, "observation_age_ms", (now_us - touch.observed_us) / 1000);
-        else cJSON_AddNullToObject(input, "observation_age_ms");
+            cJSON_AddNumberToObject(
+                input, "observation_age_ms", (now_us - touch.observed_us) / 1000);
+        else
+            cJSON_AddNullToObject(input, "observation_age_ms");
     }
     bsp_display_wake_snapshot_t wake;
     cJSON *display = cJSON_AddObjectToObject(resp, "display");
@@ -1142,9 +1229,10 @@ cJSON *netprov_build_status_json(void)
             cJSON_AddBoolToObject(display, "gesture_blocked", wake.gesture_blocked);
             cJSON_AddNumberToObject(display, "write_errors", wake.write_errors);
             if (now_us >= wake.last_service_us)
-                cJSON_AddNumberToObject(display, "service_age_ms",
-                                       (now_us - wake.last_service_us) / 1000);
-            else cJSON_AddNullToObject(display, "service_age_ms");
+                cJSON_AddNumberToObject(
+                    display, "service_age_ms", (now_us - wake.last_service_us) / 1000);
+            else
+                cJSON_AddNullToObject(display, "service_age_ms");
         }
     }
 #endif
@@ -1169,9 +1257,10 @@ cJSON *netprov_build_status_json(void)
         cJSON_AddStringToObject(ox, "state", oximeter_get_status());
         cJSON_AddStringToObject(ox, "error", oximeter_get_error());
         cJSON_AddBoolToObject(ox, "paired", oximeter_is_paired());
-        cJSON_AddStringToObject(ox, "probe_mode",
-                oximeter_get_probe_mode() == OX_PROBE_PERSISTENT
-                    ? "persistent" : "legacy");
+        cJSON_AddStringToObject(ox,
+                                "probe_mode",
+                                oximeter_get_probe_mode() == OX_PROBE_PERSISTENT ? "persistent"
+                                                                                 : "legacy");
         if (oximeter_is_paired()) {
             cJSON *oinfo = oximeter_get_paired_info();
             if (oinfo) {
@@ -1197,11 +1286,15 @@ cJSON *netprov_build_status_json(void)
     cJSON *alert = cJSON_AddObjectToObject(resp, "alert");
     cJSON_AddStringToObject(alert, "state", therapy_alert_state_str(therapy_alert_get_state()));
 
-    cJSON_AddNumberToObject(resp, "ih_min", (double)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
-    cJSON_AddNumberToObject(resp, "ih_lfb", (double)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+    cJSON_AddNumberToObject(
+        resp, "ih_min", (double)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
+    cJSON_AddNumberToObject(
+        resp, "ih_lfb", (double)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
     cJSON_AddNumberToObject(resp, "ps_free", (double)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
-    cJSON_AddNumberToObject(resp, "ps_min", (double)heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
-    cJSON_AddNumberToObject(resp, "ps_lfb", (double)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+    cJSON_AddNumberToObject(
+        resp, "ps_min", (double)heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
+    cJSON_AddNumberToObject(
+        resp, "ps_lfb", (double)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
     cJSON_AddNumberToObject(resp, "tasks", (double)uxTaskGetNumberOfTasks());
 
     /* A producer-owned snapshot: this call is bounded RAM access only. */
@@ -1248,11 +1341,15 @@ static int scan_ap_rssi_desc(const void *a, const void *b)
     return (int)right->rssi - (int)left->rssi;
 }
 
-static void scan_publish(uint32_t generation, netprov_scan_state_t state,
-                         netprov_scan_block_t blocked_by, esp_err_t result,
-                         const netprov_scan_ap_t *aps, size_t count)
+static void scan_publish(uint32_t generation,
+                         netprov_scan_state_t state,
+                         netprov_scan_block_t blocked_by,
+                         esp_err_t result,
+                         const netprov_scan_ap_t *aps,
+                         size_t count)
 {
-    if (count > NETPROV_SCAN_MAX_APS) count = NETPROV_SCAN_MAX_APS;
+    if (count > NETPROV_SCAN_MAX_APS)
+        count = NETPROV_SCAN_MAX_APS;
     xSemaphoreTake(s_scan_mutex, portMAX_DELAY);
     memset(&s_scan_snapshot, 0, sizeof(s_scan_snapshot));
     s_scan_snapshot.state = state;
@@ -1267,7 +1364,8 @@ static void scan_publish(uint32_t generation, netprov_scan_state_t state,
 
 void netprov_scan_get_snapshot(netprov_scan_snapshot_t *out)
 {
-    if (!out) return;
+    if (!out)
+        return;
     if (!s_scan_mutex) {
         memset(out, 0, sizeof(*out));
         out->state = NETPROV_SCAN_BLOCKED;
@@ -1291,9 +1389,12 @@ static void wifi_scan_task(void *arg)
     /* The request checked this before reserving the radio, but therapy can
      * start between the touch/HTTP callback and this worker being scheduled. */
     if (bsp_display_is_therapy_active() || sd_storage_recording_active()) {
-        scan_publish(generation, NETPROV_SCAN_BLOCKED,
-                     NETPROV_SCAN_BLOCK_RECORDING, ESP_ERR_INVALID_STATE,
-                     NULL, 0);
+        scan_publish(generation,
+                     NETPROV_SCAN_BLOCKED,
+                     NETPROV_SCAN_BLOCK_RECORDING,
+                     ESP_ERR_INVALID_STATE,
+                     NULL,
+                     0);
         xSemaphoreGive(s_radio_gate);
         psram_task_delete(NULL);
         return;
@@ -1321,8 +1422,7 @@ static void wifi_scan_task(void *arg)
         /* Defensive even when start failed: discard any list retained by a
          * prior interrupted driver scan before releasing radio ownership. */
         esp_wifi_clear_ap_list();
-        scan_publish(generation, NETPROV_SCAN_ERROR, NETPROV_SCAN_BLOCK_NONE,
-                     err, NULL, 0);
+        scan_publish(generation, NETPROV_SCAN_ERROR, NETPROV_SCAN_BLOCK_NONE, err, NULL, 0);
         xSemaphoreGive(s_radio_gate);
         psram_task_delete(NULL);
         return;
@@ -1333,8 +1433,7 @@ static void wifi_scan_task(void *arg)
     err = esp_wifi_scan_get_ap_num(&ap_count);
     if (err != ESP_OK) {
         esp_wifi_clear_ap_list();
-        scan_publish(generation, NETPROV_SCAN_ERROR, NETPROV_SCAN_BLOCK_NONE,
-                     err, NULL, 0);
+        scan_publish(generation, NETPROV_SCAN_ERROR, NETPROV_SCAN_BLOCK_NONE, err, NULL, 0);
         xSemaphoreGive(s_radio_gate);
         psram_task_delete(NULL);
         return;
@@ -1347,11 +1446,12 @@ static void wifi_scan_task(void *arg)
     wifi_ap_record_t *records = NULL;
     if (ap_count) {
         records = heap_caps_calloc(ap_count, sizeof(*records), MALLOC_CAP_SPIRAM);
-        if (!records) records = calloc(ap_count, sizeof(*records));
+        if (!records)
+            records = calloc(ap_count, sizeof(*records));
         if (!records) {
             esp_wifi_clear_ap_list();
-            scan_publish(generation, NETPROV_SCAN_ERROR,
-                         NETPROV_SCAN_BLOCK_NONE, ESP_ERR_NO_MEM, NULL, 0);
+            scan_publish(
+                generation, NETPROV_SCAN_ERROR, NETPROV_SCAN_BLOCK_NONE, ESP_ERR_NO_MEM, NULL, 0);
             xSemaphoreGive(s_radio_gate);
             psram_task_delete(NULL);
             return;
@@ -1360,8 +1460,7 @@ static void wifi_scan_task(void *arg)
         if (err != ESP_OK) {
             free(records);
             esp_wifi_clear_ap_list();
-            scan_publish(generation, NETPROV_SCAN_ERROR,
-                         NETPROV_SCAN_BLOCK_NONE, err, NULL, 0);
+            scan_publish(generation, NETPROV_SCAN_ERROR, NETPROV_SCAN_BLOCK_NONE, err, NULL, 0);
             xSemaphoreGive(s_radio_gate);
             psram_task_delete(NULL);
             return;
@@ -1375,9 +1474,9 @@ static void wifi_scan_task(void *arg)
     netprov_scan_ap_t aps[NETPROV_SCAN_MAX_APS] = {0};
     size_t result_count = 0;
     for (uint16_t i = 0; i < ap_count; ++i) {
-        size_t ssid_len = strnlen((const char *)records[i].ssid,
-                                  NETPROV_SSID_MAXLEN);
-        if (!ssid_len) continue;
+        size_t ssid_len = strnlen((const char *)records[i].ssid, NETPROV_SSID_MAXLEN);
+        if (!ssid_len)
+            continue;
 
         size_t existing = result_count;
         for (size_t j = 0; j < result_count; ++j) {
@@ -1394,7 +1493,8 @@ static void wifi_scan_task(void *arg)
             }
             continue;
         }
-        if (result_count >= NETPROV_SCAN_MAX_APS) continue;
+        if (result_count >= NETPROV_SCAN_MAX_APS)
+            continue;
         memcpy(aps[result_count].ssid, records[i].ssid, ssid_len);
         aps[result_count].ssid[ssid_len] = '\0';
         aps[result_count].rssi = records[i].rssi;
@@ -1404,15 +1504,16 @@ static void wifi_scan_task(void *arg)
     free(records);
     qsort(aps, result_count, sizeof(aps[0]), scan_ap_rssi_desc);
 
-    scan_publish(generation, NETPROV_SCAN_READY, NETPROV_SCAN_BLOCK_NONE,
-                 ESP_OK, aps, result_count);
+    scan_publish(
+        generation, NETPROV_SCAN_READY, NETPROV_SCAN_BLOCK_NONE, ESP_OK, aps, result_count);
     xSemaphoreGive(s_radio_gate);
     psram_task_delete(NULL);
 }
 
 esp_err_t netprov_scan_request(void)
 {
-    if (!s_scan_mutex || !s_radio_gate) return ESP_ERR_INVALID_STATE;
+    if (!s_scan_mutex || !s_radio_gate)
+        return ESP_ERR_INVALID_STATE;
 
     xSemaphoreTake(s_scan_mutex, portMAX_DELAY);
     if (s_scan_snapshot.state == NETPROV_SCAN_RUNNING) {
@@ -1421,7 +1522,8 @@ esp_err_t netprov_scan_request(void)
     }
 
     uint32_t generation = s_scan_snapshot.generation + 1;
-    if (generation == 0) generation = 1;
+    if (generation == 0)
+        generation = 1;
     if (bsp_display_is_therapy_active() || sd_storage_recording_active()) {
         memset(&s_scan_snapshot, 0, sizeof(s_scan_snapshot));
         s_scan_snapshot.state = NETPROV_SCAN_BLOCKED;
@@ -1460,10 +1562,10 @@ esp_err_t netprov_scan_request(void)
     s_scan_snapshot.generation = generation;
     xSemaphoreGive(s_scan_mutex);
 
-    if (!psram_task_create(wifi_scan_task, "wifi_scan", 5120, NULL, 3,
-                           tskNO_AFFINITY, NULL, NULL)) {
-        scan_publish(generation, NETPROV_SCAN_ERROR, NETPROV_SCAN_BLOCK_NONE,
-                     ESP_ERR_NO_MEM, NULL, 0);
+    if (!psram_task_create(
+            wifi_scan_task, "wifi_scan", 5120, NULL, 3, tskNO_AFFINITY, NULL, NULL)) {
+        scan_publish(
+            generation, NETPROV_SCAN_ERROR, NETPROV_SCAN_BLOCK_NONE, ESP_ERR_NO_MEM, NULL, 0);
         xSemaphoreGive(s_radio_gate);
         return ESP_ERR_NO_MEM;
     }
@@ -1495,7 +1597,8 @@ static esp_err_t scan_get_handler(httpd_req_t *req)
         }
         for (size_t i = 0; i < snapshot.count; ++i) {
             cJSON *item = cJSON_CreateObject();
-            if (!item) continue;
+            if (!item)
+                continue;
             cJSON_AddStringToObject(item, "ssid", snapshot.aps[i].ssid);
             cJSON_AddNumberToObject(item, "rssi", snapshot.aps[i].rssi);
             cJSON_AddBoolToObject(item, "lock", snapshot.aps[i].secure);
@@ -1505,12 +1608,12 @@ static esp_err_t scan_get_handler(httpd_req_t *req)
         cJSON_Delete(arr);
         s_browser_delivered_scan_generation = snapshot.generation;
         httpd_resp_send(req, json ? json : "[]", HTTPD_RESP_USE_STRLEN);
-        if (json) cJSON_free(json);
+        if (json)
+            cJSON_free(json);
         return ESP_OK;
     }
 
-    if ((snapshot.state == NETPROV_SCAN_ERROR ||
-         snapshot.state == NETPROV_SCAN_BLOCKED) &&
+    if ((snapshot.state == NETPROV_SCAN_ERROR || snapshot.state == NETPROV_SCAN_BLOCKED) &&
         snapshot.generation == s_browser_wait_scan_generation &&
         snapshot.generation != s_browser_delivered_scan_generation) {
         s_browser_delivered_scan_generation = snapshot.generation;
@@ -1540,7 +1643,8 @@ static esp_err_t recv_body(httpd_req_t *req, char *buf, size_t cap)
     int received = 0;
     while (received < total) {
         int r = httpd_req_recv(req, buf + received, total - received);
-        if (r <= 0) return ESP_FAIL;
+        if (r <= 0)
+            return ESP_FAIL;
         received += r;
     }
     buf[received] = '\0';
@@ -1572,7 +1676,8 @@ static esp_err_t ble_pair_handler(httpd_req_t *req)
     cJSON *j = cJSON_Parse(body);
     cJSON *addr = j ? cJSON_GetObjectItem(j, "addr") : NULL;
     if (!cJSON_IsString(addr)) {
-        if (j) cJSON_Delete(j);
+        if (j)
+            cJSON_Delete(j);
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing addr");
         return ESP_FAIL;
     }
@@ -1597,7 +1702,8 @@ static esp_err_t ble_confirm_handler(httpd_req_t *req)
     cJSON *j = cJSON_Parse(body);
     cJSON *pk = j ? cJSON_GetObjectItem(j, "passkey") : NULL;
     if (!cJSON_IsString(pk)) {
-        if (j) cJSON_Delete(j);
+        if (j)
+            cJSON_Delete(j);
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing passkey");
         return ESP_FAIL;
     }
@@ -1647,7 +1753,8 @@ static esp_err_t ox_pair_handler(httpd_req_t *req)
     cJSON *addr = j ? cJSON_GetObjectItem(j, "addr") : NULL;
     cJSON *type = j ? cJSON_GetObjectItem(j, "type") : NULL;
     if (!cJSON_IsString(addr)) {
-        if (j) cJSON_Delete(j);
+        if (j)
+            cJSON_Delete(j);
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing addr");
         return ESP_FAIL;
     }
@@ -1693,7 +1800,8 @@ static esp_err_t ox_probe_mode_handler(httpd_req_t *req)
     cJSON *j = cJSON_Parse(body);
     cJSON *mode = j ? cJSON_GetObjectItem(j, "mode") : NULL;
     if (!cJSON_IsString(mode)) {
-        if (j) cJSON_Delete(j);
+        if (j)
+            cJSON_Delete(j);
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing 'mode'");
         return ESP_FAIL;
     }
@@ -1727,7 +1835,8 @@ static esp_err_t ble_passthrough_handler(httpd_req_t *req)
     }
 
     char *body = heap_caps_malloc(total + 1, MALLOC_CAP_SPIRAM);
-    if (!body) body = malloc(total + 1);
+    if (!body)
+        body = malloc(total + 1);
     if (!body) {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
         return ESP_FAIL;
@@ -1761,9 +1870,9 @@ static esp_err_t ble_passthrough_handler(httpd_req_t *req)
         /* Scan every direct field so duplicate JSON keys cannot hide a later
          * lifecycle-changing method from the gate. */
         cJSON *field = NULL;
-        cJSON_ArrayForEach(field, request_json) {
-            if (field->string && strcmp(field->string, "method") == 0 &&
-                cJSON_IsString(field) &&
+        cJSON_ArrayForEach(field, request_json)
+        {
+            if (field->string && strcmp(field->string, "method") == 0 && cJSON_IsString(field) &&
                 strcmp(field->valuestring, "EnterTherapy") == 0) {
                 starts_therapy = true;
                 break;
@@ -1771,28 +1880,29 @@ static esp_err_t ble_passthrough_handler(httpd_req_t *req)
         }
     } else if (cJSON_IsArray(request_json)) {
         cJSON *item = NULL;
-        cJSON_ArrayForEach(item, request_json) {
+        cJSON_ArrayForEach(item, request_json)
+        {
             if (cJSON_IsObject(item)) {
                 cJSON *field = NULL;
-                cJSON_ArrayForEach(field, item) {
+                cJSON_ArrayForEach(field, item)
+                {
                     if (field->string && strcmp(field->string, "method") == 0 &&
-                        cJSON_IsString(field) &&
-                        strcmp(field->valuestring, "EnterTherapy") == 0) {
+                        cJSON_IsString(field) && strcmp(field->valuestring, "EnterTherapy") == 0) {
                         starts_therapy = true;
                         batched_therapy_start = true;
                         break;
                     }
                 }
             }
-            if (batched_therapy_start) break;
+            if (batched_therapy_start)
+                break;
         }
     }
     cJSON_Delete(request_json);
 
     if (batched_therapy_start) {
         free(body);
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-                            "batched EnterTherapy is not supported");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "batched EnterTherapy is not supported");
         return ESP_FAIL;
     }
 
@@ -1801,14 +1911,12 @@ static esp_err_t ble_passthrough_handler(httpd_req_t *req)
         httpd_resp_set_status(req, "409 Conflict");
         httpd_resp_set_type(req, "application/json");
         httpd_resp_set_hdr(req, "Connection", "close");
-        return httpd_resp_sendstr(
-            req, "{\"ok\":false,\"error\":\"restart already committed\"}");
+        return httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"restart already committed\"}");
     }
 
     char *out_json = NULL;
     bool may_have_run = false;
-    esp_err_t err = as11_ble_passthrough_rpc_tracked(
-        body, &out_json, 10000, &may_have_run);
+    esp_err_t err = as11_ble_passthrough_rpc_tracked(body, &out_json, 10000, &may_have_run);
     free(body);
 
     if (err != ESP_OK || !out_json) {
@@ -1824,8 +1932,9 @@ static esp_err_t ble_passthrough_handler(httpd_req_t *req)
         httpd_resp_set_status(req, "503 Service Unavailable");
         httpd_resp_set_type(req, "application/json");
         httpd_resp_set_hdr(req, "Connection", "close");
-        const char *errmsg = (err == ESP_ERR_INVALID_STATE) ? "BLE session not active/paired" :
-                             (err == ESP_ERR_TIMEOUT) ? "BLE response timeout" : "BLE RPC failed";
+        const char *errmsg = (err == ESP_ERR_INVALID_STATE) ? "BLE session not active/paired"
+                             : (err == ESP_ERR_TIMEOUT)     ? "BLE response timeout"
+                                                            : "BLE RPC failed";
         char errbuf[128];
         snprintf(errbuf, sizeof(errbuf), "{\"ok\":false,\"error\":\"%s\"}", errmsg);
         httpd_resp_sendstr(req, errbuf);
@@ -1838,8 +1947,7 @@ static esp_err_t ble_passthrough_handler(httpd_req_t *req)
          * rejected; on a local parse-allocation failure, conservatively mark
          * therapy active so a real start can never lose to a restart. */
         cJSON *response_json = cJSON_Parse(out_json);
-        bool accepted = !response_json ||
-                        !cJSON_GetObjectItemCaseSensitive(response_json, "error");
+        bool accepted = !response_json || !cJSON_GetObjectItemCaseSensitive(response_json, "error");
         if (accepted && bsp_display_set_therapy_active(true)) {
             bsp_display_set_therapy_start_time(esp_timer_get_time());
         }
@@ -1900,13 +2008,17 @@ static esp_err_t heap_stats_handler(httpd_req_t *req)
 
     cJSON *internal = cJSON_AddObjectToObject(root, "internal");
     cJSON_AddNumberToObject(internal, "free", (double)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
-    cJSON_AddNumberToObject(internal, "min", (double)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
-    cJSON_AddNumberToObject(internal, "lfb", (double)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+    cJSON_AddNumberToObject(
+        internal, "min", (double)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
+    cJSON_AddNumberToObject(
+        internal, "lfb", (double)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
 
     cJSON *psram = cJSON_AddObjectToObject(root, "psram");
     cJSON_AddNumberToObject(psram, "free", (double)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
-    cJSON_AddNumberToObject(psram, "min", (double)heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
-    cJSON_AddNumberToObject(psram, "lfb", (double)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+    cJSON_AddNumberToObject(
+        psram, "min", (double)heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
+    cJSON_AddNumberToObject(
+        psram, "lfb", (double)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
 
     cJSON *dma = cJSON_AddObjectToObject(root, "dma");
     cJSON_AddNumberToObject(dma, "free", (double)heap_caps_get_free_size(MALLOC_CAP_DMA));
@@ -1915,14 +2027,15 @@ static esp_err_t heap_stats_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "tasks", (double)uxTaskGetNumberOfTasks());
 
     cJSON *tasks = cJSON_AddArrayToObject(root, "task_list");
-    TaskStatus_t *task_stats = heap_caps_malloc(uxTaskGetNumberOfTasks() * sizeof(TaskStatus_t),
-                                                MALLOC_CAP_SPIRAM);
+    TaskStatus_t *task_stats =
+        heap_caps_malloc(uxTaskGetNumberOfTasks() * sizeof(TaskStatus_t), MALLOC_CAP_SPIRAM);
     if (task_stats) {
         UBaseType_t n = uxTaskGetSystemState(task_stats, uxTaskGetNumberOfTasks(), NULL);
         for (UBaseType_t i = 0; i < n; i++) {
             cJSON *t = cJSON_CreateObject();
             cJSON_AddStringToObject(t, "name", task_stats[i].pcTaskName);
-            cJSON_AddNumberToObject(t, "stack_hwm", (double)(task_stats[i].usStackHighWaterMark * sizeof(StackType_t)));
+            cJSON_AddNumberToObject(
+                t, "stack_hwm", (double)(task_stats[i].usStackHighWaterMark * sizeof(StackType_t)));
             cJSON_AddNumberToObject(t, "prio", (double)task_stats[i].uxCurrentPriority);
             cJSON_AddNumberToObject(t, "state", (double)task_stats[i].eCurrentState);
             cJSON_AddItemToArray(tasks, t);
@@ -1946,14 +2059,13 @@ static esp_err_t reboot_post_handler(httpd_req_t *req)
     if (!netprov_lifecycle_try_claim("reboot")) {
         return ota_send_busy(req);
     }
-    TaskHandle_t task = psram_task_create(reboot_task, "reboot", 4096, NULL, 5,
-                                          tskNO_AFFINITY, NULL, NULL);
+    TaskHandle_t task =
+        psram_task_create(reboot_task, "reboot", 4096, NULL, 5, tskNO_AFFINITY, NULL, NULL);
     if (!task) {
         netprov_lifecycle_release();
         httpd_resp_set_status(req, "503 Service Unavailable");
         httpd_resp_set_type(req, "application/json");
-        return httpd_resp_sendstr(
-            req, "{\"ok\":false,\"error\":\"unable to schedule restart\"}");
+        return httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"unable to schedule restart\"}");
     }
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_send(req, "{\"ok\":true}", HTTPD_RESP_USE_STRLEN);
@@ -1975,7 +2087,7 @@ static esp_err_t save_post_handler(httpd_req_t *req)
     body[received] = '\0';
 
     /* Check if this is a timezone-only update */
-    char tz_only[4] = { 0 };
+    char tz_only[4] = {0};
     form_get(body, "tz_only", tz_only, sizeof(tz_only));
     bool is_tz_only = (tz_only[0] == '1');
 
@@ -1996,8 +2108,8 @@ static esp_err_t save_post_handler(httpd_req_t *req)
             snprintf(ssid_key, sizeof(ssid_key), "ssid%d", i + 1);
             snprintf(pass_key, sizeof(pass_key), "pass%d", i + 1);
 
-            char ssid[NETPROV_SSID_MAXLEN + 1] = { 0 };
-            char pass[NETPROV_PASS_MAXLEN + 1] = { 0 };
+            char ssid[NETPROV_SSID_MAXLEN + 1] = {0};
+            char pass[NETPROV_PASS_MAXLEN + 1] = {0};
 
             if (form_get(body, ssid_key, ssid, sizeof(ssid)) && ssid[0] != '\0') {
                 form_get(body, pass_key, pass, sizeof(pass));
@@ -2005,7 +2117,9 @@ static esp_err_t save_post_handler(httpd_req_t *req)
                 if (strcmp(pass, "\xe2\x96\x88UNCHANGED\xe2\x96\x88") == 0) {
                     for (int j = 0; j < NETPROV_MAX_SSID_SLOTS; j++) {
                         if (strcmp(old_cfg.wifi[j].ssid, ssid) == 0) {
-                            strlcpy(cfg.wifi[saved_count].pass, old_cfg.wifi[j].pass, sizeof(cfg.wifi[saved_count].pass));
+                            strlcpy(cfg.wifi[saved_count].pass,
+                                    old_cfg.wifi[j].pass,
+                                    sizeof(cfg.wifi[saved_count].pass));
                             break;
                         }
                     }
@@ -2037,8 +2151,8 @@ static esp_err_t save_post_handler(httpd_req_t *req)
     }
 
     /* Save timezone if present */
-    char tz_str_val[64] = { 0 };
-    char tz_name_val[40] = { 0 };
+    char tz_str_val[64] = {0};
+    char tz_name_val[40] = {0};
     if (form_get(body, "tz_str", tz_str_val, sizeof(tz_str_val)) && tz_str_val[0] != '\0') {
         form_get(body, "tz_name", tz_name_val, sizeof(tz_name_val));
         time_sync_set_timezone(tz_str_val, tz_name_val);
@@ -2046,15 +2160,14 @@ static esp_err_t save_post_handler(httpd_req_t *req)
     }
 
     /* Save custom NTP server if present (empty string = auto mode) */
-    char ntp_srv_val[64] = { 0 };
+    char ntp_srv_val[64] = {0};
     if (form_get(body, "ntp_srv", ntp_srv_val, sizeof(ntp_srv_val))) {
         time_sync_set_ntp_server(ntp_srv_val);
-        ESP_LOGI(TAG, "saved NTP server: %s",
-                 ntp_srv_val[0] ? ntp_srv_val : "(auto)");
+        ESP_LOGI(TAG, "saved NTP server: %s", ntp_srv_val[0] ? ntp_srv_val : "(auto)");
     }
 
     /* Save mDNS name if present (requires reboot to take effect) */
-    char mdns_val[MDNS_NAME_MAX] = { 0 };
+    char mdns_val[MDNS_NAME_MAX] = {0};
     if (form_get(body, "mdns_name", mdns_val, sizeof(mdns_val))) {
         if (mdns_val[0] != '\0') {
             netprov_set_mdns_name(mdns_val);
@@ -2065,23 +2178,23 @@ static esp_err_t save_post_handler(httpd_req_t *req)
     httpd_resp_set_type(req, "text/html");
     if (!netprov_lifecycle_try_claim("reboot")) {
         bsp_display_set_notice("Wi-Fi saved; restart waits for active update");
-        return httpd_resp_sendstr(
-            req,
-            "<html><body style=\"font-family:sans-serif\">Saved. Restart deferred until the active update finishes.</body></html>");
+        return httpd_resp_sendstr(req,
+                                  "<html><body style=\"font-family:sans-serif\">Saved. Restart "
+                                  "deferred until the active update finishes.</body></html>");
     }
-    TaskHandle_t task = psram_task_create(reboot_task, "reboot", 4096, NULL, 5,
-                                          tskNO_AFFINITY, NULL, NULL);
+    TaskHandle_t task =
+        psram_task_create(reboot_task, "reboot", 4096, NULL, 5, tskNO_AFFINITY, NULL, NULL);
     if (!task) {
         netprov_lifecycle_release();
         bsp_display_set_notice("Wi-Fi saved; restart device manually");
         httpd_resp_set_status(req, "503 Service Unavailable");
-        return httpd_resp_sendstr(
-            req,
-            "<html><body style=\"font-family:sans-serif\">Saved. Restart manually to apply changes.</body></html>");
+        return httpd_resp_sendstr(req,
+                                  "<html><body style=\"font-family:sans-serif\">Saved. Restart "
+                                  "manually to apply changes.</body></html>");
     }
-    return httpd_resp_sendstr(
-        req,
-        "<html><body style=\"font-family:sans-serif\">Saved. Rebooting to connect...</body></html>");
+    return httpd_resp_sendstr(req,
+                              "<html><body style=\"font-family:sans-serif\">Saved. Rebooting to "
+                              "connect...</body></html>");
 }
 
 /* ------------------------------------------------------------------ */
@@ -2096,8 +2209,10 @@ static esp_err_t save_post_handler(httpd_req_t *req)
 /* Check if path contains ".." (traversal protection) */
 static bool path_is_safe(const char *path)
 {
-    if (!path) return false;
-    if (strstr(path, "..")) return false;
+    if (!path)
+        return false;
+    if (strstr(path, ".."))
+        return false;
     return true;
 }
 
@@ -2127,21 +2242,25 @@ static bool get_query_param(httpd_req_t *req, const char *key, char *out, int ou
 {
     char buf[512];
     int len = httpd_req_get_url_query_str(req, buf, sizeof(buf));
-    if (len <= 0) return false;
+    if (len <= 0)
+        return false;
 
     char key_eq[32];
     snprintf(key_eq, sizeof(key_eq), "%s=", key);
 
     char *p = strstr(buf, key_eq);
-    if (!p) return false;
+    if (!p)
+        return false;
     p += strlen(key_eq);
 
     char *end = strchr(p, '&');
     int val_len = end ? (int)(end - p) : (int)strlen(p);
-    if (val_len <= 0) return false;
+    if (val_len <= 0)
+        return false;
 
     char raw[256];
-    if (val_len >= (int)sizeof(raw)) val_len = sizeof(raw) - 1;
+    if (val_len >= (int)sizeof(raw))
+        val_len = sizeof(raw) - 1;
     memcpy(raw, p, val_len);
     raw[val_len] = '\0';
 
@@ -2171,7 +2290,8 @@ static esp_err_t dir_get_handler(httpd_req_t *req)
 
     /* Build HTML <pre> listing — heap-allocated to avoid stack overflow */
     char *html = heap_caps_malloc(4096, MALLOC_CAP_SPIRAM);
-    if (!html) html = malloc(4096);
+    if (!html)
+        html = malloc(4096);
     if (!html) {
         closedir(d);
         httpd_resp_send_500(req);
@@ -2182,13 +2302,15 @@ static esp_err_t dir_get_handler(httpd_req_t *req)
 
     struct dirent *ent;
     while ((ent = readdir(d)) != NULL && pos < 4096 - 128) {
-        if (ent->d_name[0] == '.') continue;
+        if (ent->d_name[0] == '.')
+            continue;
 
         char full_path[530];
         snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, ent->d_name);
 
         struct stat st;
-        if (stat(full_path, &st) != 0) continue;
+        if (stat(full_path, &st) != 0)
+            continue;
 
         char timestr[32];
         struct tm tm;
@@ -2196,13 +2318,22 @@ static esp_err_t dir_get_handler(httpd_req_t *req)
         strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", &tm);
 
         if (S_ISDIR(st.st_mode)) {
-            pos += snprintf(html + pos, 4096 - pos,
-                "%s    &lt;DIR&gt;    <a href=\"/dir?dir=%s/%s\">%s</a>\n",
-                timestr, dir_path, ent->d_name, ent->d_name);
+            pos += snprintf(html + pos,
+                            4096 - pos,
+                            "%s    &lt;DIR&gt;    <a href=\"/dir?dir=%s/%s\">%s</a>\n",
+                            timestr,
+                            dir_path,
+                            ent->d_name,
+                            ent->d_name);
         } else {
-            pos += snprintf(html + pos, 4096 - pos,
-                "%s    %8ld    <a href=\"/download?path=%s/%s\">%s</a>\n",
-                timestr, (long)st.st_size, dir_path, ent->d_name, ent->d_name);
+            pos += snprintf(html + pos,
+                            4096 - pos,
+                            "%s    %8ld    <a href=\"/download?path=%s/%s\">%s</a>\n",
+                            timestr,
+                            (long)st.st_size,
+                            dir_path,
+                            ent->d_name,
+                            ent->d_name);
         }
     }
     closedir(d);
@@ -2226,8 +2357,8 @@ static bool download_cancelled(void)
 
 /* HTTP's send-all loop can call us repeatedly after positive partial writes.
  * Check cancellation on every call, with a bounded nonblocking socket wait. */
-static int download_send(httpd_handle_t server, int socket, const char *bytes,
-                          size_t size, int flags)
+static int download_send(
+    httpd_handle_t server, int socket, const char *bytes, size_t size, int flags)
 {
     (void)server;
     int64_t deadline = esp_timer_get_time() + 200000;
@@ -2235,15 +2366,19 @@ static int download_send(httpd_handle_t server, int socket, const char *bytes,
         if (download_cancelled() || esp_timer_get_time() >= deadline)
             return HTTPD_SOCK_ERR_TIMEOUT;
         int sent = send(socket, bytes, size, flags | MSG_DONTWAIT);
-        if (sent >= 0) return sent;
-        if (errno == EINTR) continue;
-        if (errno != EAGAIN && errno != EWOULDBLOCK) return HTTPD_SOCK_ERR_FAIL;
+        if (sent >= 0)
+            return sent;
+        if (errno == EINTR)
+            continue;
+        if (errno != EAGAIN && errno != EWOULDBLOCK)
+            return HTTPD_SOCK_ERR_FAIL;
         fd_set writable;
         FD_ZERO(&writable);
         FD_SET(socket, &writable);
-        struct timeval pause = { .tv_usec = 20000 };
+        struct timeval pause = {.tv_usec = 20000};
         int ready = select(socket + 1, NULL, &writable, NULL, &pause);
-        if (ready < 0 && errno != EINTR) return HTTPD_SOCK_ERR_FAIL;
+        if (ready < 0 && errno != EINTR)
+            return HTTPD_SOCK_ERR_FAIL;
     }
 }
 
@@ -2252,7 +2387,8 @@ static bool download_cancel_and_wait(void)
     __atomic_store_n(&s_download_closing, true, __ATOMIC_RELEASE);
     int64_t deadline = esp_timer_get_time() + 5000000;
     while (__atomic_load_n(&s_download_active, __ATOMIC_ACQUIRE)) {
-        if (esp_timer_get_time() >= deadline) return false;
+        if (esp_timer_get_time() >= deadline)
+            return false;
         vTaskDelay(pdMS_TO_TICKS(20));
     }
     return true;
@@ -2270,7 +2406,8 @@ static void download_finish(httpd_req_t *req)
 static esp_err_t download_file(httpd_req_t *req)
 {
     s_download_deadline_us = esp_timer_get_time() + 300000000LL;
-    if (httpd_sess_set_send_override(req->handle, httpd_req_to_sockfd(req), download_send) != ESP_OK)
+    if (httpd_sess_set_send_override(req->handle, httpd_req_to_sockfd(req), download_send) !=
+        ESP_OK)
         return ESP_FAIL;
     char file_path[256];
     if (!get_query_param(req, "path", file_path, sizeof(file_path)) || !path_is_safe(file_path)) {
@@ -2304,7 +2441,8 @@ static esp_err_t download_file(httpd_req_t *req)
         }
         size_t count = fread(buffer, 1, 2048, file);
         if (!count) {
-            if (ferror(file)) result = ESP_FAIL;
+            if (ferror(file))
+                result = ESP_FAIL;
             break;
         }
         if (httpd_resp_send_chunk(req, buffer, count) != ESP_OK) {
@@ -2312,10 +2450,12 @@ static esp_err_t download_file(httpd_req_t *req)
             break;
         }
     }
-    if (result == ESP_OK) result = httpd_resp_send_chunk(req, NULL, 0);
+    if (result == ESP_OK)
+        result = httpd_resp_send_chunk(req, NULL, 0);
 done:
     free(buffer);
-    if (file && fclose(file) != 0) result = ESP_FAIL;
+    if (file && fclose(file) != 0)
+        result = ESP_FAIL;
     sd_storage_lease_release(SD_LEASE_UPLOAD);
     return result;
 }
@@ -2331,8 +2471,8 @@ static void download_task(void *argument)
 static esp_err_t download_get_handler(httpd_req_t *req)
 {
     bool expected = false;
-    if (!__atomic_compare_exchange_n(&s_download_active, &expected, true, false,
-                                      __ATOMIC_ACQ_REL, __ATOMIC_RELAXED)) {
+    if (!__atomic_compare_exchange_n(
+            &s_download_active, &expected, true, false, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED)) {
         httpd_resp_set_status(req, "503 Service Unavailable");
         httpd_resp_sendstr(req, "download in progress; retry later");
         return ESP_OK;
@@ -2350,8 +2490,8 @@ static esp_err_t download_get_handler(httpd_req_t *req)
         httpd_resp_send_500(req);
         return result;
     }
-    if (!psram_task_create(download_task, "file_download", 8192, async, 3,
-                           tskNO_AFFINITY, NULL, NULL)) {
+    if (!psram_task_create(
+            download_task, "file_download", 8192, async, 3, tskNO_AFFINITY, NULL, NULL)) {
         httpd_resp_send_500(async);
         download_finish(async);
     }
@@ -2382,8 +2522,7 @@ static esp_err_t upload_state_get_handler(httpd_req_t *req)
     char query[64] = {0};
     char day[16] = {0};
     if (httpd_req_get_url_query_str(req, query, sizeof(query)) != ESP_OK ||
-        httpd_query_key_value(query, "day", day, sizeof(day)) != ESP_OK ||
-        strlen(day) != 8) {
+        httpd_query_key_value(query, "day", day, sizeof(day)) != ESP_OK || strlen(day) != 8) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "day=YYYYMMDD required");
         return ESP_FAIL;
     }
@@ -2422,7 +2561,8 @@ static esp_err_t upload_config_post_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
     char *body = heap_caps_malloc((size_t)total + 1, MALLOC_CAP_SPIRAM);
-    if (!body) body = malloc((size_t)total + 1);
+    if (!body)
+        body = malloc((size_t)total + 1);
     if (!body) {
         httpd_resp_send_500(req);
         return ESP_FAIL;
@@ -2466,12 +2606,16 @@ static esp_err_t upload_config_post_handler(httpd_req_t *req)
  * escapes because written as bullets it survives an editor round-trip only until something
  * re-encodes the file -- and a sentinel that silently stops matching is a stored password
  * overwritten with eight literal bullets. */
-#define UPLOAD_TEST_PW_KEEP "\xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2"
+#define UPLOAD_TEST_PW_KEEP                                                                        \
+    "\xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2\xe2\x80" \
+    "\xa2"
 static void cfg_str_from(const cJSON *root, const char *key, char *dst, size_t dst_len)
 {
     const cJSON *v = cJSON_GetObjectItemCaseSensitive(root, key);
-    if (!cJSON_IsString(v) || !v->valuestring) return;             /* absent → stored value stands */
-    if (strcmp(v->valuestring, UPLOAD_TEST_PW_KEEP) == 0) return;  /* masked → stored value stands */
+    if (!cJSON_IsString(v) || !v->valuestring)
+        return; /* absent → stored value stands */
+    if (strcmp(v->valuestring, UPLOAD_TEST_PW_KEEP) == 0)
+        return; /* masked → stored value stands */
     snprintf(dst, dst_len, "%s", v->valuestring);
 }
 
@@ -2484,30 +2628,36 @@ static void cfg_str_from(const cJSON *root, const char *key, char *dst, size_t d
 static bool upload_test_read_overrides(httpd_req_t *req, uploader_config_t *out)
 {
     int len = req->content_len;
-    if (len <= 0) return false;
+    if (len <= 0)
+        return false;
     /* The bound is the CALLER's: over-sized bodies are refused with a 413 there, because
      * returning from here without draining the socket desynchronises a keep-alive
      * connection -- the next request reads the leftover payload as its headers. */
     char *body = malloc((size_t)len + 1);
-    if (!body) return false;
+    if (!body)
+        return false;
     int got = 0;
     while (got < len) {
         int r = httpd_req_recv(req, body + got, (size_t)(len - got));
-        if (r <= 0) { free(body); return false; }
+        if (r <= 0) {
+            free(body);
+            return false;
+        }
         got += r;
     }
     body[got] = '\0';
     cJSON *root = cJSON_Parse(body);
     free(body);
-    if (!root) return false;
+    if (!root)
+        return false;
 
-    uploader_load_config(out);          /* start from what is saved, then overlay */
-    cfg_str_from(root, "smb_host",  out->smb_host,  sizeof(out->smb_host));
+    uploader_load_config(out); /* start from what is saved, then overlay */
+    cfg_str_from(root, "smb_host", out->smb_host, sizeof(out->smb_host));
     cfg_str_from(root, "smb_share", out->smb_share, sizeof(out->smb_share));
-    cfg_str_from(root, "smb_user",  out->smb_user,  sizeof(out->smb_user));
-    cfg_str_from(root, "smb_pass",  out->smb_pass,  sizeof(out->smb_pass));
-    cfg_str_from(root, "smb_path",  out->smb_path,  sizeof(out->smb_path));
-    cfg_str_from(root, "shq_client_id",     out->shq_client_id,     sizeof(out->shq_client_id));
+    cfg_str_from(root, "smb_user", out->smb_user, sizeof(out->smb_user));
+    cfg_str_from(root, "smb_pass", out->smb_pass, sizeof(out->smb_pass));
+    cfg_str_from(root, "smb_path", out->smb_path, sizeof(out->smb_path));
+    cfg_str_from(root, "shq_client_id", out->shq_client_id, sizeof(out->shq_client_id));
     cfg_str_from(root, "shq_client_secret", out->shq_client_secret, sizeof(out->shq_client_secret));
     cJSON_Delete(root);
     return true;
@@ -2543,7 +2693,8 @@ static esp_err_t upload_test_send(httpd_req_t *req, const char *backend_id)
         return ESP_FAIL;
     }
 
-    if (err == ESP_ERR_INVALID_STATE) httpd_resp_set_status(req, "409 Conflict");
+    if (err == ESP_ERR_INVALID_STATE)
+        httpd_resp_set_status(req, "409 Conflict");
     httpd_resp_set_type(req, "application/json");
     httpd_resp_sendstr(req, json);
     cJSON_free(json);
@@ -2563,13 +2714,19 @@ static esp_err_t upload_test_sleephq_handler(httpd_req_t *req)
 static const char *upload_test_state_name(uploader_test_state_t state)
 {
     switch (state) {
-    case UPLOAD_TEST_QUEUED: return "queued";
-    case UPLOAD_TEST_RUNNING: return "running";
-    case UPLOAD_TEST_PASSED: return "passed";
-    case UPLOAD_TEST_FAILED: return "failed";
-    case UPLOAD_TEST_BLOCKED: return "blocked";
+    case UPLOAD_TEST_QUEUED:
+        return "queued";
+    case UPLOAD_TEST_RUNNING:
+        return "running";
+    case UPLOAD_TEST_PASSED:
+        return "passed";
+    case UPLOAD_TEST_FAILED:
+        return "failed";
+    case UPLOAD_TEST_BLOCKED:
+        return "blocked";
     case UPLOAD_TEST_IDLE:
-    default: return "idle";
+    default:
+        return "idle";
     }
 }
 
@@ -2584,8 +2741,7 @@ static esp_err_t upload_test_status_handler(httpd_req_t *req)
     }
     cJSON_AddNumberToObject(root, "generation", snapshot.generation);
     cJSON_AddStringToObject(root, "backend", snapshot.backend);
-    cJSON_AddStringToObject(root, "state",
-                            upload_test_state_name(snapshot.state));
+    cJSON_AddStringToObject(root, "state", upload_test_state_name(snapshot.state));
     cJSON_AddNumberToObject(root, "stage", snapshot.stage);
     cJSON_AddNumberToObject(root, "completed_mask", snapshot.completed_mask);
     cJSON_AddNumberToObject(root, "failed_mask", snapshot.failed_mask);
@@ -2630,7 +2786,8 @@ static esp_err_t alert_config_post_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
     char *body = heap_caps_malloc((size_t)total + 1, MALLOC_CAP_SPIRAM);
-    if (!body) body = malloc((size_t)total + 1);
+    if (!body)
+        body = malloc((size_t)total + 1);
     if (!body) {
         httpd_resp_send_500(req);
         return ESP_FAIL;
@@ -2661,7 +2818,8 @@ static esp_err_t alert_test_push_handler(httpd_req_t *req)
     int total = req->content_len;
     if (total > 0 && total <= 2048) {
         body = heap_caps_malloc((size_t)total + 1, MALLOC_CAP_SPIRAM);
-        if (!body) body = malloc((size_t)total + 1);
+        if (!body)
+            body = malloc((size_t)total + 1);
         if (body) {
             int received = httpd_req_recv(req, body, total);
             if (received < 0) {
@@ -2678,8 +2836,7 @@ static esp_err_t alert_test_push_handler(httpd_req_t *req)
 
     if (err != ESP_OK) {
         httpd_resp_set_type(req, "application/json");
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-                            "{\"ok\":false,\"error\":\"push failed\"}");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "{\"ok\":false,\"error\":\"push failed\"}");
         return ESP_FAIL;
     }
     httpd_resp_set_type(req, "application/json");
@@ -2714,26 +2871,30 @@ static esp_err_t settings_all_get_handler(httpd_req_t *req)
     char *up_json = NULL;
     if (uploader_get_config_json(&up_json) == ESP_OK && up_json) {
         cJSON *parsed = cJSON_Parse(up_json);
-        if (parsed) cJSON_AddItemToObject(root, "uploads", parsed);
+        if (parsed)
+            cJSON_AddItemToObject(root, "uploads", parsed);
         free(up_json);
     }
 
     char *dev_json = NULL;
     if (device_settings_get_json(&dev_json) == ESP_OK && dev_json) {
         cJSON *parsed = cJSON_Parse(dev_json);
-        if (parsed) cJSON_AddItemToObject(root, "device", parsed);
+        if (parsed)
+            cJSON_AddItemToObject(root, "device", parsed);
         free(dev_json);
     }
 
     char *alert_json = NULL;
     if (therapy_alert_get_config_json(&alert_json) == ESP_OK && alert_json) {
         cJSON *parsed = cJSON_Parse(alert_json);
-        if (parsed) cJSON_AddItemToObject(root, "alert", parsed);
+        if (parsed)
+            cJSON_AddItemToObject(root, "alert", parsed);
         free(alert_json);
     }
 
     cJSON *st = netprov_build_status_json();
-    if (st) cJSON_AddItemToObject(root, "status", st);
+    if (st)
+        cJSON_AddItemToObject(root, "status", st);
 
     char *json_str = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
@@ -2756,7 +2917,8 @@ static esp_err_t device_settings_post_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
     char *body = heap_caps_malloc((size_t)total + 1, MALLOC_CAP_SPIRAM);
-    if (!body) body = malloc((size_t)total + 1);
+    if (!body)
+        body = malloc((size_t)total + 1);
     if (!body) {
         httpd_resp_send_500(req);
         return ESP_FAIL;
@@ -2831,7 +2993,10 @@ static bool uploader_recording_requested(void)
 static void rebuild_day_task(void *arg)
 {
     char *day = (char *)arg;
-    if (!day) { psram_task_delete(NULL); return; }
+    if (!day) {
+        psram_task_delete(NULL);
+        return;
+    }
 
     esp_err_t ret = edf_gen_rebuild_day(day);
     if (ret == ESP_OK) {
@@ -2840,8 +3005,10 @@ static void rebuild_day_task(void *arg)
          * before, then re-offer the day. */
         uploader_on_day_invalidated(day);
     } else {
-        ESP_LOGE(TAG, "rebuild_day_task: %s failed: %s — not queueing upload",
-                 day, esp_err_to_name(ret));
+        ESP_LOGE(TAG,
+                 "rebuild_day_task: %s failed: %s — not queueing upload",
+                 day,
+                 esp_err_to_name(ret));
     }
     free(day);
     psram_task_delete(NULL);
@@ -2852,13 +3019,13 @@ static void rebuild_day_task(void *arg)
  * should stay open, so actions_handler returns immediately and the UI polls.
  * actions_handler zeroes this and sets .active before starting the task. */
 typedef struct {
-    volatile bool active;   /* format task is running       */
-    volatile bool done;     /* task finished — check .ok     */
-    volatile bool ok;       /* format succeeded             */
-    char error[64];         /* failure reason when !ok      */
+    volatile bool active; /* format task is running       */
+    volatile bool done;   /* task finished — check .ok     */
+    volatile bool ok;     /* format succeeded             */
+    char error[64];       /* failure reason when !ok      */
 } format_progress_t;
 static format_progress_t s_format_progress;
-static SemaphoreHandle_t s_format_mtx;  /* guards s_format_progress reads/writes across tasks */
+static SemaphoreHandle_t s_format_mtx; /* guards s_format_progress reads/writes across tasks */
 
 /* Background task for the destructive SD format.  PSRAM-backed because the
  * format is slow and must not block the HTTP handler.  The format lease is
@@ -2878,8 +3045,7 @@ static void format_sd_task(void *arg)
                 "SD busy — a recording, export or upload is using the card",
                 sizeof(s_format_progress.error));
         xSemaphoreGive(s_format_mtx);
-    } else if (bsp_display_is_therapy_active() ||
-               sd_storage_recording_active()) {
+    } else if (bsp_display_is_therapy_active() || sd_storage_recording_active()) {
         sd_storage_lease_release(SD_LEASE_DESTRUCTIVE);
         xSemaphoreTake(s_format_mtx, portMAX_DELAY);
         strlcpy(s_format_progress.error,
@@ -2912,12 +3078,10 @@ static void format_sd_task(void *arg)
             vTaskDelay(pdMS_TO_TICKS(2500));
             bool announced_defer = false;
             for (;;) {
-                if (bsp_display_is_therapy_active() ||
-                    sd_storage_recording_active()) {
+                if (bsp_display_is_therapy_active() || sd_storage_recording_active()) {
                     if (!announced_defer) {
                         ESP_LOGW(TAG, "format reboot deferred during therapy");
-                        bsp_display_set_notice(
-                            "Card formatted; restart deferred during therapy");
+                        bsp_display_set_notice("Card formatted; restart deferred during therapy");
                         announced_defer = true;
                     }
                     vTaskDelay(pdMS_TO_TICKS(2000));
@@ -2939,8 +3103,7 @@ static void format_sd_task(void *arg)
                     vTaskDelay(pdMS_TO_TICKS(1000));
                     continue;
                 }
-                if (bsp_display_is_therapy_active() ||
-                    sd_storage_recording_active() ||
+                if (bsp_display_is_therapy_active() || sd_storage_recording_active() ||
                     !bsp_display_try_commit_therapy_safe_restart()) {
                     sd_storage_lease_release(SD_LEASE_DESTRUCTIVE);
                     /* Release storage before waking a therapy-start waiter. */
@@ -2955,8 +3118,7 @@ static void format_sd_task(void *arg)
         }
         ESP_LOGE(TAG, "format_sd_task: failed: %s", esp_err_to_name(ret));
         xSemaphoreTake(s_format_mtx, portMAX_DELAY);
-        strlcpy(s_format_progress.error, esp_err_to_name(ret),
-                sizeof(s_format_progress.error));
+        strlcpy(s_format_progress.error, esp_err_to_name(ret), sizeof(s_format_progress.error));
         xSemaphoreGive(s_format_mtx);
         sd_storage_lease_release(SD_LEASE_DESTRUCTIVE);
     }
@@ -2976,8 +3138,8 @@ static esp_err_t format_progress_handler(httpd_req_t *req)
 
     xSemaphoreTake(s_format_mtx, portMAX_DELAY);
     active = s_format_progress.active;
-    done   = s_format_progress.done;
-    ok     = s_format_progress.ok;
+    done = s_format_progress.done;
+    ok = s_format_progress.ok;
     strlcpy(error, s_format_progress.error, sizeof(error));
     xSemaphoreGive(s_format_mtx);
 
@@ -3005,9 +3167,14 @@ esp_err_t maintenance_format_start(void)
     return ESP_ERR_NOT_SUPPORTED; /* Never format host data in the preview. */
 #endif
     if (bsp_display_is_therapy_active() || sd_storage_recording_active() ||
-        !netprov_lifecycle_try_claim("format")) return ESP_ERR_INVALID_STATE;
-    if (!s_format_mtx) s_format_mtx = xSemaphoreCreateMutex();
-    if (!s_format_mtx) { netprov_lifecycle_release(); return ESP_ERR_NO_MEM; }
+        !netprov_lifecycle_try_claim("format"))
+        return ESP_ERR_INVALID_STATE;
+    if (!s_format_mtx)
+        s_format_mtx = xSemaphoreCreateMutex();
+    if (!s_format_mtx) {
+        netprov_lifecycle_release();
+        return ESP_ERR_NO_MEM;
+    }
     xSemaphoreTake(s_format_mtx, portMAX_DELAY);
     memset(&s_format_progress, 0, sizeof(s_format_progress));
     s_format_progress.active = true;
@@ -3025,19 +3192,23 @@ esp_err_t maintenance_format_start(void)
 void maintenance_format_snapshot(bool *active, bool *done, bool *ok, char *error, size_t cap)
 {
     *active = *done = *ok = false;
-    if (cap) error[0] = 0;
-    if (!s_format_mtx) return;
+    if (cap)
+        error[0] = 0;
+    if (!s_format_mtx)
+        return;
     xSemaphoreTake(s_format_mtx, portMAX_DELAY);
-    *active=s_format_progress.active; *done=s_format_progress.done; *ok=s_format_progress.ok;
-    if (cap) strlcpy(error,s_format_progress.error,cap);
+    *active = s_format_progress.active;
+    *done = s_format_progress.done;
+    *ok = s_format_progress.ok;
+    if (cap)
+        strlcpy(error, s_format_progress.error, cap);
     xSemaphoreGive(s_format_mtx);
 }
 
 static bool factory_reset_cancelled(void *unused)
 {
     (void)unused;
-    return bsp_display_therapy_safe_maintenance_should_abort() ||
-           sd_storage_recording_pending();
+    return bsp_display_therapy_safe_maintenance_should_abort() || sd_storage_recording_pending();
 }
 
 /* Internal stack: final NVS erasure and restart disable the flash cache. The
@@ -3050,31 +3221,42 @@ static void factory_reset_task(void *arg)
     bool leased = false, maintenance = false, reserved = false;
     maintenance_fs_totals_t totals = {0};
     maintenance = bsp_display_try_begin_therapy_safe_maintenance();
-    if (!maintenance) goto out;
+    if (!maintenance)
+        goto out;
     leased = sd_storage_lease_acquire(SD_LEASE_DESTRUCTIVE, 0);
-    if (!leased) goto out;
-    const char *roots[] = { SD_SDCARD_DIR, SD_APP_DIR };
-    for (size_t i=0; i<2; i++) {
-        int error = maintenance_fs_walk(roots[i], MAINT_FS_DELETE_TREE, false,
-                                         &totals, factory_reset_cancelled, NULL);
-        if (error) { result = ESP_FAIL; goto out; }
+    if (!leased)
+        goto out;
+    const char *roots[] = {SD_SDCARD_DIR, SD_APP_DIR};
+    for (size_t i = 0; i < 2; i++) {
+        int error = maintenance_fs_walk(
+            roots[i], MAINT_FS_DELETE_TREE, false, &totals, factory_reset_cancelled, NULL);
+        if (error) {
+            result = ESP_FAIL;
+            goto out;
+        }
     }
-    sd_storage_lease_release(SD_LEASE_DESTRUCTIVE); leased = false;
-    bsp_display_end_therapy_safe_maintenance(); maintenance = false;
+    sd_storage_lease_release(SD_LEASE_DESTRUCTIVE);
+    leased = false;
+    bsp_display_end_therapy_safe_maintenance();
+    maintenance = false;
     /* Yield to any therapy start which arrived during the card wipe. It may
      * leave a partial factory reset, which is reported as such; settings have
      * not yet been erased. No long therapy restart reservation covers I/O. */
     reserved = bsp_display_try_reserve_therapy_safe_restart();
-    if (!reserved) goto out;
+    if (!reserved)
+        goto out;
     leased = sd_storage_lease_acquire(SD_LEASE_DESTRUCTIVE, 0);
     if (!leased || bsp_display_is_therapy_active() || sd_storage_recording_active() ||
-        !bsp_display_try_commit_therapy_safe_restart()) goto out;
+        !bsp_display_try_commit_therapy_safe_restart())
+        goto out;
     nvs_writer_lock();
     result = nvs_flash_deinit();
     if (result == ESP_OK || result == ESP_ERR_NVS_NOT_INITIALIZED)
         result = nvs_flash_erase();
     if (result != ESP_OK) {
-        ESP_LOGE(TAG, "Factory settings erase failed: %s; restarting for recovery", esp_err_to_name(result));
+        ESP_LOGE(TAG,
+                 "Factory settings erase failed: %s; restarting for recovery",
+                 esp_err_to_name(result));
         bsp_display_set_notice("Settings erase failed; restarting for recovery");
     }
     /* Commit is one-way. Even an NVS failure must complete the owned restart,
@@ -3082,16 +3264,21 @@ static void factory_reset_task(void *arg)
     sd_storage_deinit();
     esp_restart();
 out:
-    if (leased) sd_storage_lease_release(SD_LEASE_DESTRUCTIVE);
-    if (maintenance) bsp_display_end_therapy_safe_maintenance();
-    if (reserved) bsp_display_cancel_therapy_safe_restart();
+    if (leased)
+        sd_storage_lease_release(SD_LEASE_DESTRUCTIVE);
+    if (maintenance)
+        bsp_display_end_therapy_safe_maintenance();
+    if (reserved)
+        bsp_display_cancel_therapy_safe_restart();
     xSemaphoreTake(s_format_mtx, portMAX_DELAY);
     s_format_progress.active = false;
     s_format_progress.done = true;
     s_format_progress.ok = false;
-    snprintf(s_format_progress.error, sizeof(s_format_progress.error),
+    snprintf(s_format_progress.error,
+             sizeof(s_format_progress.error),
              "Reset incomplete; %llu files removed (%s)",
-             (unsigned long long)totals.files, esp_err_to_name(result));
+             (unsigned long long)totals.files,
+             esp_err_to_name(result));
     xSemaphoreGive(s_format_mtx);
     netprov_lifecycle_release();
     vTaskDelete(NULL);
@@ -3107,10 +3294,15 @@ esp_err_t maintenance_factory_reset_start(void)
         return ESP_ERR_INVALID_STATE;
     if (heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) < 49152 ||
         heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) < 17408) {
-        netprov_lifecycle_release(); return ESP_ERR_NO_MEM;
+        netprov_lifecycle_release();
+        return ESP_ERR_NO_MEM;
     }
-    if (!s_format_mtx) s_format_mtx = xSemaphoreCreateMutex();
-    if (!s_format_mtx) { netprov_lifecycle_release(); return ESP_ERR_NO_MEM; }
+    if (!s_format_mtx)
+        s_format_mtx = xSemaphoreCreateMutex();
+    if (!s_format_mtx) {
+        netprov_lifecycle_release();
+        return ESP_ERR_NO_MEM;
+    }
     xSemaphoreTake(s_format_mtx, portMAX_DELAY);
     memset(&s_format_progress, 0, sizeof(s_format_progress));
     s_format_progress.active = true;
@@ -3119,16 +3311,17 @@ esp_err_t maintenance_factory_reset_start(void)
         xSemaphoreTake(s_format_mtx, portMAX_DELAY);
         s_format_progress.active = false;
         xSemaphoreGive(s_format_mtx);
-        netprov_lifecycle_release(); return ESP_ERR_NO_MEM;
+        netprov_lifecycle_release();
+        return ESP_ERR_NO_MEM;
     }
     return ESP_OK;
 }
 
 /* ── OTA firmware upload ─────────────────────────────────────────── */
 
-#define OTA_CHUNK_SIZE   4096
-#define OTA_MAX_SIZE     (0x400000)  /* 4 MB — partition size */
-#define OTA_BUF_SIZE     (OTA_CHUNK_SIZE * 2)  /* stream buffer: 8 KB */
+#define OTA_CHUNK_SIZE 4096
+#define OTA_MAX_SIZE (0x400000)                 /* 4 MB — partition size */
+#define OTA_BUF_SIZE (OTA_CHUNK_SIZE * 2)       /* stream buffer: 8 KB */
 #define OTA_BUF_STORAGE_SIZE (OTA_BUF_SIZE + 1) /* static streams reserve one byte */
 
 /* Flash/NVS code must run from an internal-RAM task stack.  Keep a measured
@@ -3136,18 +3329,18 @@ esp_err_t maintenance_factory_reset_start(void)
  * the Wi-Fi DMA path which is still serving the request.  The largest-block
  * guard catches fragmentation that a total-free check alone cannot see. */
 #define OTA_UPLOAD_TASK_STACK_BYTES 8192U
-#define OTA_URL_TASK_STACK_BYTES    12288U
+#define OTA_URL_TASK_STACK_BYTES 12288U
 #define OTA_INTERNAL_RUNTIME_RESERVE_BYTES (16U * 1024U)
 #define OTA_INTERNAL_CONTROL_HEADROOM_BYTES 1024U
-#define OTA_UPLOAD_MIN_INTERNAL_FREE \
-    (OTA_UPLOAD_TASK_STACK_BYTES + OTA_INTERNAL_RUNTIME_RESERVE_BYTES + \
+#define OTA_UPLOAD_MIN_INTERNAL_FREE                                                               \
+    (OTA_UPLOAD_TASK_STACK_BYTES + OTA_INTERNAL_RUNTIME_RESERVE_BYTES +                            \
      OTA_INTERNAL_CONTROL_HEADROOM_BYTES)
-#define OTA_URL_MIN_INTERNAL_FREE \
-    (OTA_URL_TASK_STACK_BYTES + OTA_INTERNAL_RUNTIME_RESERVE_BYTES + \
+#define OTA_URL_MIN_INTERNAL_FREE                                                                  \
+    (OTA_URL_TASK_STACK_BYTES + OTA_INTERNAL_RUNTIME_RESERVE_BYTES +                               \
      OTA_INTERNAL_CONTROL_HEADROOM_BYTES)
-#define OTA_UPLOAD_MIN_INTERNAL_LARGEST \
+#define OTA_UPLOAD_MIN_INTERNAL_LARGEST                                                            \
     (OTA_UPLOAD_TASK_STACK_BYTES + OTA_INTERNAL_CONTROL_HEADROOM_BYTES)
-#define OTA_URL_MIN_INTERNAL_LARGEST \
+#define OTA_URL_MIN_INTERNAL_LARGEST                                                               \
     (OTA_URL_TASK_STACK_BYTES + OTA_INTERNAL_CONTROL_HEADROOM_BYTES)
 #define OTA_INTERNAL_CAPS (MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)
 #define OTA_REBOOT_FALLBACK_TIMEOUT_MS 5000U
@@ -3224,14 +3417,14 @@ static bool ota_heap_admit(const char *mode,
     if (out) {
         *out = snapshot;
     }
-    return snapshot.free_bytes >= required_free &&
-           snapshot.largest_block_bytes >= required_largest;
+    return snapshot.free_bytes >= required_free && snapshot.largest_block_bytes >= required_largest;
 }
 
 static esp_err_t ota_send_busy(httpd_req_t *req)
 {
     char body[112];
-    snprintf(body, sizeof(body),
+    snprintf(body,
+             sizeof(body),
              "{\"ok\":false,\"error\":\"update or restart already active\",\"mode\":\"%s\"}",
              lifecycle_claim_owner());
     httpd_resp_set_status(req, "409 Conflict");
@@ -3248,7 +3441,8 @@ static esp_err_t ota_send_resource_error(httpd_req_t *req,
 {
     char body[256];
     ota_heap_snapshot_t current = snapshot ? *snapshot : ota_heap_snapshot();
-    snprintf(body, sizeof(body),
+    snprintf(body,
+             sizeof(body),
              "{\"ok\":false,\"error\":\"%s\","
              "\"internal_free\":%u,\"internal_largest\":%u,"
              "\"required_free\":%u,\"required_largest\":%u}",
@@ -3270,9 +3464,8 @@ static esp_err_t ota_send_storage_busy(httpd_req_t *req)
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Retry-After", "5");
     httpd_resp_set_hdr(req, "Connection", "close");
-    return httpd_resp_sendstr(
-        req,
-        "{\"ok\":false,\"error\":\"therapy or storage operation active\"}");
+    return httpd_resp_sendstr(req,
+                              "{\"ok\":false,\"error\":\"therapy or storage operation active\"}");
 }
 
 /* Verify that OTA starts only from an idle therapy/storage boundary.  The
@@ -3292,8 +3485,7 @@ static bool ota_storage_preflight(void)
         bsp_display_cancel_therapy_safe_restart();
         return false;
     }
-    bool idle = !bsp_display_is_therapy_active() &&
-                !sd_storage_recording_active();
+    bool idle = !bsp_display_is_therapy_active() && !sd_storage_recording_active();
     sd_storage_lease_release(SD_LEASE_DESTRUCTIVE);
     /* Release the storage lease before waking any therapy-start waiter. */
     bsp_display_cancel_therapy_safe_restart();
@@ -3308,13 +3500,10 @@ static bool ota_wait_for_safe_reboot(uint32_t timeout_ms)
     bool announced_defer = false;
     bool wait_forever = timeout_ms == UINT32_MAX;
     TickType_t started = xTaskGetTickCount();
-    TickType_t timeout_ticks = wait_forever
-                                   ? portMAX_DELAY
-                                   : pdMS_TO_TICKS(timeout_ms);
+    TickType_t timeout_ticks = wait_forever ? portMAX_DELAY : pdMS_TO_TICKS(timeout_ms);
     vTaskDelay(pdMS_TO_TICKS(1500));
     for (;;) {
-        if (!wait_forever &&
-            (TickType_t)(xTaskGetTickCount() - started) >= timeout_ticks) {
+        if (!wait_forever && (TickType_t)(xTaskGetTickCount() - started) >= timeout_ticks) {
             return false;
         }
         if (bsp_display_is_therapy_active() || sd_storage_recording_active()) {
@@ -3388,8 +3577,8 @@ static void ota_reboot_task(void *arg)
 
 static bool ota_schedule_reboot(void)
 {
-    TaskHandle_t task = psram_task_create(ota_reboot_task, "ota_reboot", 4096,
-                                          NULL, 5, tskNO_AFFINITY, NULL, NULL);
+    TaskHandle_t task =
+        psram_task_create(ota_reboot_task, "ota_reboot", 4096, NULL, 5, tskNO_AFFINITY, NULL, NULL);
     if (!task) {
         ESP_LOGE(TAG, "OTA reboot task allocation failed; using caller fallback");
         return false;
@@ -3426,10 +3615,8 @@ static ota_ctx_t *ota_upload_context_create(int total_size)
     }
     ctx->total_size = total_size;
     ctx->result = ESP_FAIL;
-    ctx->sbuf_storage = heap_caps_malloc(OTA_BUF_STORAGE_SIZE,
-                                         MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    ctx->flash_buf = heap_caps_malloc(OTA_CHUNK_SIZE,
-                                      MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    ctx->sbuf_storage = heap_caps_malloc(OTA_BUF_STORAGE_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    ctx->flash_buf = heap_caps_malloc(OTA_CHUNK_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!ctx->sbuf_storage || !ctx->flash_buf) {
         free(ctx->flash_buf);
         free(ctx->sbuf_storage);
@@ -3437,9 +3624,8 @@ static ota_ctx_t *ota_upload_context_create(int total_size)
         return NULL;
     }
     ctx->events = xEventGroupCreateStatic(&ctx->event_control);
-    ctx->sbuf = xStreamBufferCreateStatic(OTA_BUF_STORAGE_SIZE, 1,
-                                           ctx->sbuf_storage,
-                                           &ctx->sbuf_control);
+    ctx->sbuf =
+        xStreamBufferCreateStatic(OTA_BUF_STORAGE_SIZE, 1, ctx->sbuf_storage, &ctx->sbuf_control);
     if (!ctx->events || !ctx->sbuf) {
         if (ctx->events) {
             vEventGroupDelete(ctx->events);
@@ -3514,8 +3700,7 @@ static void ota_flash_task(void *arg)
                 break;
             }
             if ((bits & OTA_INPUT_DONE_BIT) && available == 0) {
-                ESP_LOGE(TAG, "OTA: short upload at %d/%d bytes",
-                         written, ctx->total_size);
+                ESP_LOGE(TAG, "OTA: short upload at %d/%d bytes", written, ctx->total_size);
                 result = ESP_ERR_INVALID_SIZE;
                 goto finished;
             }
@@ -3529,11 +3714,11 @@ static void ota_flash_task(void *arg)
         } else {
             want = OTA_CHUNK_SIZE;
         }
-        if (want > OTA_CHUNK_SIZE) want = OTA_CHUNK_SIZE;
+        if (want > OTA_CHUNK_SIZE)
+            want = OTA_CHUNK_SIZE;
         /* A short wait lets producer completion/abort become visible without
          * ever destroying a stream under this task. */
-        size_t got = xStreamBufferReceive(ctx->sbuf, ctx->flash_buf, want,
-                                          pdMS_TO_TICKS(250));
+        size_t got = xStreamBufferReceive(ctx->sbuf, ctx->flash_buf, want, pdMS_TO_TICKS(250));
         if (got == 0) {
             continue;
         }
@@ -3569,7 +3754,8 @@ finished:
         esp_ota_abort(ota_hdl);
     }
     ota_heap_snapshot_t heap = ota_heap_snapshot();
-    ESP_LOGI(TAG, "OTA upload finish: result=%s internal8 free=%u largest=%u",
+    ESP_LOGI(TAG,
+             "OTA upload finish: result=%s internal8 free=%u largest=%u",
              esp_err_to_name(result),
              (unsigned)heap.free_bytes,
              (unsigned)heap.largest_block_bytes);
@@ -3605,10 +3791,8 @@ static esp_err_t ota_upload_handler(httpd_req_t *req)
     }
 
     ota_heap_snapshot_t admission;
-    if (!ota_heap_admit("upload",
-                        OTA_UPLOAD_MIN_INTERNAL_FREE,
-                        OTA_UPLOAD_MIN_INTERNAL_LARGEST,
-                        &admission)) {
+    if (!ota_heap_admit(
+            "upload", OTA_UPLOAD_MIN_INTERNAL_FREE, OTA_UPLOAD_MIN_INTERNAL_LARGEST, &admission)) {
         netprov_lifecycle_release();
         return ota_send_resource_error(req,
                                        "insufficient internal RAM for OTA upload",
@@ -3627,8 +3811,7 @@ static esp_err_t ota_upload_handler(httpd_req_t *req)
      * failure can therefore only signal the task; it never tears resources
      * out from underneath it. */
     ota_ctx_t *ctx = ota_upload_context_create(total);
-    uint8_t *recv_buf = heap_caps_malloc(OTA_CHUNK_SIZE,
-                                         MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    uint8_t *recv_buf = heap_caps_malloc(OTA_CHUNK_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!ctx || !recv_buf) {
         free(recv_buf);
         ota_upload_context_destroy(ctx);
@@ -3654,8 +3837,8 @@ static esp_err_t ota_upload_handler(httpd_req_t *req)
     /* Launch flash task on an INTERNAL RAM stack (not PSRAM) — required for
      * cache-freeze safety during esp_ota_write. */
     TaskHandle_t flash_task = NULL;
-    BaseType_t tr = xTaskCreate(ota_flash_task, "ota_flash",
-                                OTA_UPLOAD_TASK_STACK_BYTES, ctx, 5, &flash_task);
+    BaseType_t tr =
+        xTaskCreate(ota_flash_task, "ota_flash", OTA_UPLOAD_TASK_STACK_BYTES, ctx, 5, &flash_task);
     if (tr != pdPASS) {
         bsp_display_end_therapy_safe_maintenance();
         free(recv_buf);
@@ -3678,7 +3861,8 @@ static esp_err_t ota_upload_handler(httpd_req_t *req)
             break;
         }
         int want = chunked ? OTA_CHUNK_SIZE : (total - received);
-        if (want > OTA_CHUNK_SIZE) want = OTA_CHUNK_SIZE;
+        if (want > OTA_CHUNK_SIZE)
+            want = OTA_CHUNK_SIZE;
         int r = httpd_req_recv(req, (char *)recv_buf, want);
         if (r < 0) {
             ESP_LOGE(TAG, "OTA: recv error at %d bytes", received);
@@ -3702,12 +3886,10 @@ static esp_err_t ota_upload_handler(httpd_req_t *req)
          * instead of filling the stream and masquerading as producer stall. */
         size_t sent = 0;
         TickType_t send_started = xTaskGetTickCount();
-        while (sent < (size_t)r &&
-               !(xEventGroupGetBits(ctx->events) & OTA_FLASH_DONE_BIT)) {
-            sent += xStreamBufferSend(ctx->sbuf, recv_buf + sent,
-                                      (size_t)r - sent, pdMS_TO_TICKS(250));
-            if ((TickType_t)(xTaskGetTickCount() - send_started) >=
-                pdMS_TO_TICKS(10000)) {
+        while (sent < (size_t)r && !(xEventGroupGetBits(ctx->events) & OTA_FLASH_DONE_BIT)) {
+            sent +=
+                xStreamBufferSend(ctx->sbuf, recv_buf + sent, (size_t)r - sent, pdMS_TO_TICKS(250));
+            if ((TickType_t)(xTaskGetTickCount() - send_started) >= pdMS_TO_TICKS(10000)) {
                 break;
             }
         }
@@ -3724,13 +3906,11 @@ static esp_err_t ota_upload_handler(httpd_req_t *req)
     }
     free(recv_buf);
 
-    xEventGroupSetBits(ctx->events,
-                       input_error ? OTA_INPUT_ABORT_BIT : OTA_INPUT_DONE_BIT);
+    xEventGroupSetBits(ctx->events, input_error ? OTA_INPUT_ABORT_BIT : OTA_INPUT_DONE_BIT);
     /* Never free ctx or its stream on a timeout while ota_flash_task can still
      * use them.  All task-side waits are bounded and producer completion is
      * explicit, so this wait has a guaranteed software termination path. */
-    xEventGroupWaitBits(ctx->events, OTA_FLASH_DONE_BIT,
-                        pdFALSE, pdTRUE, portMAX_DELAY);
+    xEventGroupWaitBits(ctx->events, OTA_FLASH_DONE_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
     /* xEventGroupSetBits() may still be unwinding on the other core after the
      * wait returns, and SMP vTaskDelete() only requests a remote-core yield.
      * Observing eSuspended proves the worker has returned from the event-group
@@ -3750,15 +3930,14 @@ static esp_err_t ota_upload_handler(httpd_req_t *req)
         httpd_resp_set_status(req, "409 Conflict");
         httpd_resp_set_type(req, "application/json");
         httpd_resp_set_hdr(req, "Retry-After", "5");
-        return httpd_resp_sendstr(
-            req, "{\"ok\":false,\"error\":\"therapy started; update cancelled\"}");
+        return httpd_resp_sendstr(req,
+                                  "{\"ok\":false,\"error\":\"therapy started; update cancelled\"}");
     }
 
     if (flash_result != ESP_OK && !aborted_by_input) {
         bsp_display_end_therapy_safe_maintenance();
         netprov_lifecycle_release();
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
-                            esp_err_to_name(flash_result));
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, esp_err_to_name(flash_result));
         return ESP_FAIL;
     }
 
@@ -3768,16 +3947,14 @@ static esp_err_t ota_upload_handler(httpd_req_t *req)
         httpd_resp_set_status(req, input_status);
         httpd_resp_set_type(req, "application/json");
         char error_body[112];
-        snprintf(error_body, sizeof(error_body),
-                 "{\"ok\":false,\"error\":\"%s\"}", input_error);
+        snprintf(error_body, sizeof(error_body), "{\"ok\":false,\"error\":\"%s\"}", input_error);
         return httpd_resp_send(req, error_body, HTTPD_RESP_USE_STRLEN);
     }
 
     if (flash_result != ESP_OK) {
         bsp_display_end_therapy_safe_maintenance();
         netprov_lifecycle_release();
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
-                            esp_err_to_name(flash_result));
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, esp_err_to_name(flash_result));
         return ESP_FAIL;
     }
 
@@ -3796,8 +3973,7 @@ static esp_err_t ota_upload_handler(httpd_req_t *req)
             httpd_resp_set_status(req, "503 Service Unavailable");
             httpd_resp_set_type(req, "application/json");
             return httpd_resp_sendstr(
-                req,
-                "{\"ok\":false,\"error\":\"firmware installed; restart manually\"}");
+                req, "{\"ok\":false,\"error\":\"firmware installed; restart manually\"}");
         }
     }
     httpd_resp_set_type(req, "application/json");
@@ -3806,17 +3982,17 @@ static esp_err_t ota_upload_handler(httpd_req_t *req)
 
 /* ── OTA firmware download from URL ─────────────────────────────────── */
 
-#define OTA_URL_MAX_LEN  512
+#define OTA_URL_MAX_LEN 512
 
 /* Progress tracking for URL-based OTA (polled by browser via /api/ota-progress). */
 typedef struct {
-    int total;       /* total bytes to download (0 = unknown) */
-    int downloaded;  /* bytes downloaded so far */
-    int flashed;     /* bytes flashed so far */
-    bool active;     /* download in progress */
-    bool done;       /* finished (check result) */
-    bool ok;         /* true if flash succeeded */
-    char error[96];           /* error message if failed */
+    int total;      /* total bytes to download (0 = unknown) */
+    int downloaded; /* bytes downloaded so far */
+    int flashed;    /* bytes flashed so far */
+    bool active;    /* download in progress */
+    bool done;      /* finished (check result) */
+    bool ok;        /* true if flash succeeded */
+    char error[96]; /* error message if failed */
     bool cancel_requested, cancellable, boot_selected;
     maintenance_ota_stage_t stage, failed_stage;
     int64_t started_us;
@@ -3838,8 +4014,7 @@ static void ota_progress_start(void)
 static void ota_progress_set_error(const char *error)
 {
     portENTER_CRITICAL(&s_ota_progress_lock);
-    strlcpy(s_ota_progress.error, error ? error : "",
-            sizeof(s_ota_progress.error));
+    strlcpy(s_ota_progress.error, error ? error : "", sizeof(s_ota_progress.error));
     portEXIT_CRITICAL(&s_ota_progress_lock);
 }
 
@@ -3874,7 +4049,8 @@ static void ota_progress_finish(bool ok, const char *error)
     s_ota_progress.cancellable = false;
     if (!ok) {
         s_ota_progress.failed_stage = s_ota_progress.stage;
-        s_ota_progress.stage = s_ota_progress.cancel_requested ? MAINT_OTA_CANCELLED : MAINT_OTA_FAILED;
+        s_ota_progress.stage =
+            s_ota_progress.cancel_requested ? MAINT_OTA_CANCELLED : MAINT_OTA_FAILED;
     }
     if (error) {
         strlcpy(s_ota_progress.error, error, sizeof(s_ota_progress.error));
@@ -3897,7 +4073,8 @@ bool maintenance_ota_cancel(void)
 {
     portENTER_CRITICAL(&s_ota_progress_lock);
     bool accepted = s_ota_progress.active && s_ota_progress.cancellable;
-    if (accepted) s_ota_progress.cancel_requested = true;
+    if (accepted)
+        s_ota_progress.cancel_requested = true;
     portEXIT_CRITICAL(&s_ota_progress_lock);
     return accepted;
 }
@@ -3917,7 +4094,8 @@ static void ota_native_stage(maintenance_ota_stage_t stage)
 
 static bool ota_native_commit_begin(void)
 {
-    if (!bsp_display_try_reserve_maintenance_commit()) return false;
+    if (!bsp_display_try_reserve_maintenance_commit())
+        return false;
     portENTER_CRITICAL(&s_ota_progress_lock);
     bool allowed = !s_ota_progress.cancel_requested;
     if (allowed) {
@@ -3925,7 +4103,8 @@ static bool ota_native_commit_begin(void)
         s_ota_progress.stage = MAINT_OTA_COMMIT;
     }
     portEXIT_CRITICAL(&s_ota_progress_lock);
-    if (!allowed) bsp_display_cancel_therapy_safe_restart();
+    if (!allowed)
+        bsp_display_cancel_therapy_safe_restart();
     return allowed;
 }
 
@@ -3939,7 +4118,8 @@ static void ota_native_boot_selected(void)
 
 void maintenance_ota_snapshot(maintenance_ota_snapshot_t *out)
 {
-    if (!out) return;
+    if (!out)
+        return;
 #if CONFIG_SOMNOTRACE_BOARD_QEMU
     /* Explicit deterministic service simulation. No network, flash or reboot. */
     portENTER_CRITICAL(&s_ota_progress_lock);
@@ -3951,20 +4131,29 @@ void maintenance_ota_snapshot(maintenance_ota_snapshot_t *out)
             s_ota_progress.active = false;
             s_ota_progress.done = true;
             s_ota_progress.cancellable = false;
-            s_ota_progress.failed_stage = s_ota_progress.cancel_requested
-                ? s_ota_progress.stage : MAINT_OTA_VERIFY;
-            s_ota_progress.stage = s_ota_progress.cancel_requested ? MAINT_OTA_CANCELLED : MAINT_OTA_FAILED;
-            strlcpy(s_ota_progress.error, s_ota_progress.cancel_requested ?
-                "Simulation: cancelled before boot selection" : "Simulation: image verification rejected", sizeof(s_ota_progress.error));
+            s_ota_progress.failed_stage =
+                s_ota_progress.cancel_requested ? s_ota_progress.stage : MAINT_OTA_VERIFY;
+            s_ota_progress.stage =
+                s_ota_progress.cancel_requested ? MAINT_OTA_CANCELLED : MAINT_OTA_FAILED;
+            strlcpy(s_ota_progress.error,
+                    s_ota_progress.cancel_requested ? "Simulation: cancelled before boot selection"
+                                                    : "Simulation: image verification rejected",
+                    sizeof(s_ota_progress.error));
         }
     }
     portEXIT_CRITICAL(&s_ota_progress_lock);
 #endif
     ota_progress_t p = ota_progress_snapshot();
-    *out = (maintenance_ota_snapshot_t){ .active=p.active, .done=p.done,
-        .ok=p.ok, .cancellable=p.cancellable, .boot_selected=p.boot_selected,
-        .total=p.total, .transferred=p.downloaded, .stage=p.stage,
-        .failed_stage=p.failed_stage, .started_us=p.started_us };
+    *out = (maintenance_ota_snapshot_t){.active = p.active,
+                                        .done = p.done,
+                                        .ok = p.ok,
+                                        .cancellable = p.cancellable,
+                                        .boot_selected = p.boot_selected,
+                                        .total = p.total,
+                                        .transferred = p.downloaded,
+                                        .stage = p.stage,
+                                        .failed_stage = p.failed_stage,
+                                        .started_us = p.started_us};
     strlcpy(out->error, p.error, sizeof(out->error));
 }
 
@@ -3977,7 +4166,8 @@ static void ota_url_task(void *arg)
 
     ESP_LOGI(TAG, "OTA URL: downloading firmware");
     ota_heap_snapshot_t start_heap = ota_heap_snapshot();
-    ESP_LOGI(TAG, "OTA URL start: internal8 free=%u largest=%u PSRAM=%u",
+    ESP_LOGI(TAG,
+             "OTA URL start: internal8 free=%u largest=%u PSRAM=%u",
              (unsigned)start_heap.free_bytes,
              (unsigned)start_heap.largest_block_bytes,
              (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
@@ -4023,7 +4213,8 @@ static void ota_url_task(void *arg)
             goto out;
         }
         err = esp_https_ota_perform(handle);
-        if (err != ESP_ERR_HTTPS_OTA_IN_PROGRESS) break;
+        if (err != ESP_ERR_HTTPS_OTA_IN_PROGRESS)
+            break;
 
         int read = esp_https_ota_get_image_len_read(handle);
         ota_progress_set_transfer(read);
@@ -4085,7 +4276,8 @@ static void ota_url_task(void *arg)
     bsp_display_end_therapy_safe_maintenance();
     ota_progress_set_active(false);
     ota_heap_snapshot_t finish_heap = ota_heap_snapshot();
-    ESP_LOGI(TAG, "OTA URL finish: internal8 free=%u largest=%u",
+    ESP_LOGI(TAG,
+             "OTA URL finish: internal8 free=%u largest=%u",
              (unsigned)finish_heap.free_bytes,
              (unsigned)finish_heap.largest_block_bytes);
     free(url);
@@ -4108,7 +4300,8 @@ out:
     bsp_display_end_therapy_safe_maintenance();
     ota_progress_finish(false, NULL);
     ota_heap_snapshot_t failed_heap = ota_heap_snapshot();
-    ESP_LOGE(TAG, "OTA URL stopped: internal8 free=%u largest=%u",
+    ESP_LOGE(TAG,
+             "OTA URL stopped: internal8 free=%u largest=%u",
              (unsigned)failed_heap.free_bytes,
              (unsigned)failed_heap.largest_block_bytes);
     netprov_lifecycle_release();
@@ -4121,27 +4314,38 @@ esp_err_t maintenance_ota_start_url(const char *url)
     if (!url || strlen(url) >= OTA_URL_MAX_LEN || strncmp(url, "https://", 8))
         return ESP_ERR_INVALID_ARG;
 #if CONFIG_SOMNOTRACE_BOARD_QEMU
-    if (ota_progress_snapshot().active) return ESP_ERR_INVALID_STATE;
+    if (ota_progress_snapshot().active)
+        return ESP_ERR_INVALID_STATE;
     ota_progress_start();
     return ESP_OK;
 #endif
     if (!netprov_is_link_up() || !netprov_lifecycle_try_claim("native-url"))
         return ESP_ERR_INVALID_STATE;
-    if (!ota_storage_preflight()) { netprov_lifecycle_release(); return ESP_ERR_INVALID_STATE; }
-    if (!ota_heap_admit("native URL", OTA_URL_MIN_INTERNAL_FREE,
-                         OTA_URL_MIN_INTERNAL_LARGEST, NULL)) {
-        netprov_lifecycle_release(); return ESP_ERR_NO_MEM;
+    if (!ota_storage_preflight()) {
+        netprov_lifecycle_release();
+        return ESP_ERR_INVALID_STATE;
     }
-    char *copy = heap_caps_malloc(strlen(url)+1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!copy) { netprov_lifecycle_release(); return ESP_ERR_NO_MEM; }
+    if (!ota_heap_admit(
+            "native URL", OTA_URL_MIN_INTERNAL_FREE, OTA_URL_MIN_INTERNAL_LARGEST, NULL)) {
+        netprov_lifecycle_release();
+        return ESP_ERR_NO_MEM;
+    }
+    char *copy = heap_caps_malloc(strlen(url) + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!copy) {
+        netprov_lifecycle_release();
+        return ESP_ERR_NO_MEM;
+    }
     strcpy(copy, url);
     if (!bsp_display_try_begin_therapy_safe_maintenance()) {
-        free(copy); netprov_lifecycle_release(); return ESP_ERR_INVALID_STATE;
+        free(copy);
+        netprov_lifecycle_release();
+        return ESP_ERR_INVALID_STATE;
     }
     ota_progress_start();
     if (xTaskCreate(ota_url_task, "ota_url", OTA_URL_TASK_STACK_BYTES, copy, 5, NULL) != pdPASS) {
         bsp_display_end_therapy_safe_maintenance();
-        free(copy); netprov_lifecycle_release();
+        free(copy);
+        netprov_lifecycle_release();
         ota_progress_finish(false, "internal task allocation failed");
         return ESP_ERR_NO_MEM;
     }
@@ -4160,46 +4364,74 @@ static void ota_sd_task(void *arg)
     FILE *file = NULL;
     uint8_t *buffer = heap_caps_malloc(OTA_CHUNK_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     const esp_partition_t *partition = esp_ota_get_next_update_partition(NULL);
-    if (!buffer || !partition) { ota_progress_set_error("update resources unavailable"); goto out; }
+    if (!buffer || !partition) {
+        ota_progress_set_error("update resources unavailable");
+        goto out;
+    }
     leased = sd_storage_lease_acquire(SD_LEASE_UPLOAD, 0);
-    if (!leased || ota_native_should_abort()) { ota_progress_set_error("card busy or therapy starting"); goto out; }
+    if (!leased || ota_native_should_abort()) {
+        ota_progress_set_error("card busy or therapy starting");
+        goto out;
+    }
     file = fopen(path, "rb");
-    if (!file || fseek(file, 0, SEEK_END)) { ota_progress_set_error("cannot read SD image"); goto out; }
+    if (!file || fseek(file, 0, SEEK_END)) {
+        ota_progress_set_error("cannot read SD image");
+        goto out;
+    }
     long size = ftell(file);
     if (size <= 384 || size > OTA_MAX_SIZE || size > partition->size || fseek(file, 0, SEEK_SET)) {
-        ota_progress_set_error("image size outside inactive slot bounds"); goto out;
+        ota_progress_set_error("image size outside inactive slot bounds");
+        goto out;
     }
     ota_progress_set_total((int)size);
     size_t n = fread(buffer, 1, OTA_CHUNK_SIZE, file);
     if (!somnotrace_firmware_target_matches(buffer, n)) {
-        ota_progress_set_error("missing or incompatible SomnoTrace board identity"); goto out;
+        ota_progress_set_error("missing or incompatible SomnoTrace board identity");
+        goto out;
     }
     /* esp_ota_write validates image magic/chip; esp_ota_end verifies the complete
      * image. No whole image allocation and no flash call from an external stack. */
     result = esp_ota_begin(partition, OTA_WITH_SEQUENTIAL_WRITES, &handle);
-    if (result != ESP_OK) goto failed;
+    if (result != ESP_OK)
+        goto failed;
     begun = true;
     int transferred = 0;
     while (n) {
         if (ota_native_should_abort() || sd_storage_recording_pending()) {
-            ota_progress_set_error("cancelled before boot selection (request or therapy)"); goto out;
+            ota_progress_set_error("cancelled before boot selection (request or therapy)");
+            goto out;
         }
         result = esp_ota_write(handle, buffer, n);
-        if (result != ESP_OK) goto failed;
+        if (result != ESP_OK)
+            goto failed;
         transferred += (int)n;
         ota_progress_set_transfer(transferred);
         n = fread(buffer, 1, OTA_CHUNK_SIZE, file);
     }
-    if (ferror(file) || transferred != size) { ota_progress_set_error("truncated SD image"); goto out; }
-    fclose(file); file = NULL;
-    sd_storage_lease_release(SD_LEASE_UPLOAD); leased = false;
+    if (ferror(file) || transferred != size) {
+        ota_progress_set_error("truncated SD image");
+        goto out;
+    }
+    fclose(file);
+    file = NULL;
+    sd_storage_lease_release(SD_LEASE_UPLOAD);
+    leased = false;
     ota_native_stage(MAINT_OTA_VERIFY);
-    if (ota_native_should_abort()) { ota_progress_set_error("cancelled before verification"); goto out; }
-    result = esp_ota_end(handle); begun = false;
-    if (result != ESP_OK) goto failed;
-    if (!ota_native_commit_begin()) { ota_progress_set_error("cancelled before boot selection"); goto out; }
+    if (ota_native_should_abort()) {
+        ota_progress_set_error("cancelled before verification");
+        goto out;
+    }
+    result = esp_ota_end(handle);
+    begun = false;
+    if (result != ESP_OK)
+        goto failed;
+    if (!ota_native_commit_begin()) {
+        ota_progress_set_error("cancelled before boot selection");
+        goto out;
+    }
     result = esp_ota_set_boot_partition(partition);
-    if (result != ESP_OK) goto failed;
+    if (result != ESP_OK)
+        goto failed;
     ota_native_boot_selected();
     free(buffer);
     bsp_display_cancel_therapy_safe_restart();
@@ -4214,9 +4446,12 @@ static void ota_sd_task(void *arg)
 failed:
     ota_progress_set_error(esp_err_to_name(result));
 out:
-    if (begun) esp_ota_abort(handle);
-    if (file) fclose(file);
-    if (leased) sd_storage_lease_release(SD_LEASE_UPLOAD);
+    if (begun)
+        esp_ota_abort(handle);
+    if (file)
+        fclose(file);
+    if (leased)
+        sd_storage_lease_release(SD_LEASE_UPLOAD);
     free(buffer);
     bsp_display_cancel_therapy_safe_restart();
     bsp_display_end_therapy_safe_maintenance();
@@ -4227,29 +4462,41 @@ out:
 
 esp_err_t maintenance_ota_start_sd(const char *root_filename)
 {
-    if (!maintenance_sd_image_name_valid(root_filename)) return ESP_ERR_INVALID_ARG;
+    if (!maintenance_sd_image_name_valid(root_filename))
+        return ESP_ERR_INVALID_ARG;
 #if CONFIG_SOMNOTRACE_BOARD_QEMU
-    if (ota_progress_snapshot().active) return ESP_ERR_INVALID_STATE;
+    if (ota_progress_snapshot().active)
+        return ESP_ERR_INVALID_STATE;
     ota_progress_start();
     return ESP_OK;
 #endif
     if (!sd_storage_is_ready() || !netprov_lifecycle_try_claim("native-sd"))
         return ESP_ERR_INVALID_STATE;
-    if (!ota_storage_preflight()) { netprov_lifecycle_release(); return ESP_ERR_INVALID_STATE; }
-    if (!ota_heap_admit("SD", OTA_UPLOAD_MIN_INTERNAL_FREE,
-                         OTA_UPLOAD_MIN_INTERNAL_LARGEST, NULL)) {
-        netprov_lifecycle_release(); return ESP_ERR_NO_MEM;
+    if (!ota_storage_preflight()) {
+        netprov_lifecycle_release();
+        return ESP_ERR_INVALID_STATE;
     }
-    char *copy = heap_caps_malloc(strlen(root_filename)+1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!copy) { netprov_lifecycle_release(); return ESP_ERR_NO_MEM; }
+    if (!ota_heap_admit(
+            "SD", OTA_UPLOAD_MIN_INTERNAL_FREE, OTA_UPLOAD_MIN_INTERNAL_LARGEST, NULL)) {
+        netprov_lifecycle_release();
+        return ESP_ERR_NO_MEM;
+    }
+    char *copy = heap_caps_malloc(strlen(root_filename) + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!copy) {
+        netprov_lifecycle_release();
+        return ESP_ERR_NO_MEM;
+    }
     strcpy(copy, root_filename);
     if (!bsp_display_try_begin_therapy_safe_maintenance()) {
-        free(copy); netprov_lifecycle_release(); return ESP_ERR_INVALID_STATE;
+        free(copy);
+        netprov_lifecycle_release();
+        return ESP_ERR_INVALID_STATE;
     }
     ota_progress_start();
     if (xTaskCreate(ota_sd_task, "ota_sd", OTA_UPLOAD_TASK_STACK_BYTES, copy, 5, NULL) != pdPASS) {
         bsp_display_end_therapy_safe_maintenance();
-        free(copy); netprov_lifecycle_release();
+        free(copy);
+        netprov_lifecycle_release();
         ota_progress_finish(false, "internal task allocation failed");
         return ESP_ERR_NO_MEM;
     }
@@ -4298,8 +4545,7 @@ static esp_err_t ota_url_handler(httpd_req_t *req)
 #endif
     if (!allowed_scheme) {
         cJSON_Delete(root);
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-                            "URL must start with https://");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "URL must start with https://");
         return ESP_FAIL;
     }
 
@@ -4315,10 +4561,8 @@ static esp_err_t ota_url_handler(httpd_req_t *req)
     }
 
     ota_heap_snapshot_t admission;
-    if (!ota_heap_admit("URL",
-                        OTA_URL_MIN_INTERNAL_FREE,
-                        OTA_URL_MIN_INTERNAL_LARGEST,
-                        &admission)) {
+    if (!ota_heap_admit(
+            "URL", OTA_URL_MIN_INTERNAL_FREE, OTA_URL_MIN_INTERNAL_LARGEST, &admission)) {
         cJSON_Delete(root);
         netprov_lifecycle_release();
         return ota_send_resource_error(req,
@@ -4330,8 +4574,7 @@ static esp_err_t ota_url_handler(httpd_req_t *req)
 
     /* Copy the URL to PSRAM for the background task (it frees it). */
     size_t url_len = strlen(url) + 1;
-    char *url_copy = heap_caps_malloc(url_len,
-                                      MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    char *url_copy = heap_caps_malloc(url_len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (url_copy) {
         memcpy(url_copy, url, url_len);
     }
@@ -4359,8 +4602,8 @@ static esp_err_t ota_url_handler(httpd_req_t *req)
 
     /* Launch the download+flash task on an internal RAM stack. */
     TaskHandle_t task = NULL;
-    BaseType_t tr = xTaskCreate(ota_url_task, "ota_url",
-                                OTA_URL_TASK_STACK_BYTES, url_copy, 5, &task);
+    BaseType_t tr =
+        xTaskCreate(ota_url_task, "ota_url", OTA_URL_TASK_STACK_BYTES, url_copy, 5, &task);
     if (tr != pdPASS) {
         bsp_display_end_therapy_safe_maintenance();
         free(url_copy);
@@ -4375,7 +4618,8 @@ static esp_err_t ota_url_handler(httpd_req_t *req)
     }
 
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr(req, "{\"ok\":true,\"message\":\"Download started. Device will reboot when complete.\"}");
+    httpd_resp_sendstr(
+        req, "{\"ok\":true,\"message\":\"Download started. Device will reboot when complete.\"}");
     return ESP_OK;
 }
 
@@ -4386,7 +4630,8 @@ static esp_err_t ota_progress_handler(httpd_req_t *req)
     char resp[512];
     ota_heap_snapshot_t heap = ota_heap_snapshot();
     ota_progress_t progress = ota_progress_snapshot();
-    snprintf(resp, sizeof(resp),
+    snprintf(resp,
+             sizeof(resp),
              "{\"active\":%s,\"done\":%s,\"ok\":%s,\"mode\":\"%s\","
              "\"total\":%d,\"downloaded\":%d,\"flashed\":%d,\"error\":\"%s\","
              "\"internal_free\":%u,\"internal_minimum\":%u,"
@@ -4397,7 +4642,9 @@ static esp_err_t ota_progress_handler(httpd_req_t *req)
              progress.done ? "true" : "false",
              progress.ok ? "true" : "false",
              lifecycle_claim_owner(),
-             progress.total, progress.downloaded, progress.flashed,
+             progress.total,
+             progress.downloaded,
+             progress.flashed,
              progress.error,
              (unsigned)heap.free_bytes,
              (unsigned)heap.minimum_free_bytes,
@@ -4410,7 +4657,8 @@ static esp_err_t ota_progress_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-/* HTTP handler for consolidated actions. Body: {"action":"reset-state|delete-edfs|reset-all|recreate-edfs|format-sd"} */
+/* HTTP handler for consolidated actions. Body:
+ * {"action":"reset-state|delete-edfs|reset-all|recreate-edfs|format-sd"} */
 
 static esp_err_t actions_handler(httpd_req_t *req)
 {
@@ -4456,8 +4704,7 @@ static esp_err_t actions_handler(httpd_req_t *req)
         cJSON *day = cJSON_GetObjectItem(root, "day");
         if (!day || !cJSON_IsString(day) || strlen(day->valuestring) != 8) {
             cJSON_Delete(root);
-            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-                                "missing or invalid 'day' (YYYYMMDD)");
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing or invalid 'day' (YYYYMMDD)");
             return ESP_FAIL;
         }
         char *day_arg = strdup(day->valuestring);
@@ -4465,8 +4712,8 @@ static esp_err_t actions_handler(httpd_req_t *req)
             err = ESP_ERR_NO_MEM;
         } else {
             ESP_LOGI(TAG, "action: rebuild day %s", day_arg);
-            TaskHandle_t h = psram_task_create(rebuild_day_task, "rebuild_day",
-                                               16384, day_arg, 5, 1, NULL, NULL);
+            TaskHandle_t h = psram_task_create(
+                rebuild_day_task, "rebuild_day", 16384, day_arg, 5, 1, NULL, NULL);
             if (!h) {
                 free(day_arg);
                 err = ESP_ERR_NO_MEM;
@@ -4493,7 +4740,8 @@ static esp_err_t actions_handler(httpd_req_t *req)
         memset((void *)&s_format_progress, 0, sizeof(s_format_progress));
         s_format_progress.active = true;
         xSemaphoreGive(s_format_mtx);
-        TaskHandle_t h = psram_task_create(format_sd_task, "format_sd", 16384, NULL, 5, 1, NULL, NULL);
+        TaskHandle_t h =
+            psram_task_create(format_sd_task, "format_sd", 16384, NULL, 5, 1, NULL, NULL);
         if (!h) {
             xSemaphoreTake(s_format_mtx, portMAX_DELAY);
             s_format_progress.active = false;
@@ -4507,32 +4755,30 @@ static esp_err_t actions_handler(httpd_req_t *req)
          * avoids consuming a 61st URI slot on the memory-constrained 7B. */
         cJSON *hz_item = cJSON_GetObjectItem(root, "hz");
         if (!cJSON_IsNumber(hz_item) ||
-            (hz_item->valuedouble != 18000000.0 &&
-             hz_item->valuedouble != 30850000.0)) {
+            (hz_item->valuedouble != 18000000.0 && hz_item->valuedouble != 30850000.0)) {
             cJSON_Delete(root);
-            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-                                "hz must be 18000000 or 30850000");
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "hz must be 18000000 or 30850000");
             return ESP_FAIL;
         }
 
         uint32_t hz = (uint32_t)hz_item->valuedouble;
-        err = waveshare_7b_set_panel_pclk(hz);
+        err = rgb_display_transport_set_pixel_clock(hz);
         cJSON_Delete(root);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "display PCLK diagnostic failed: %s",
-                     esp_err_to_name(err));
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
-                                esp_err_to_name(err));
+            ESP_LOGE(TAG, "display PCLK diagnostic failed: %s", esp_err_to_name(err));
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, esp_err_to_name(err));
             return ESP_FAIL;
         }
 
         /* Current porch totals are 1386 x 661 pixels per frame. */
         double frame_hz = (double)hz / (1386.0 * 661.0);
         char response[160];
-        snprintf(response, sizeof(response),
+        snprintf(response,
+                 sizeof(response),
                  "{\"ok\":true,\"pclk_hz\":%" PRIu32
                  ",\"nominal_frame_hz\":%.4f,\"boot_default_hz\":30850000}",
-                 hz, frame_hz);
+                 hz,
+                 frame_hz);
         httpd_resp_set_type(req, "application/json");
         return httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
 #endif
@@ -4557,7 +4803,8 @@ static inline esp_err_t reg_uri(httpd_handle_t handle, const httpd_uri_t *uri_ha
 {
     esp_err_t err = httpd_register_uri_handler(handle, uri_handler);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "failed to register URI '%s' (method %d): %s",
+        ESP_LOGE(TAG,
+                 "failed to register URI '%s' (method %d): %s",
                  uri_handler ? uri_handler->uri : "NULL",
                  uri_handler ? (int)uri_handler->method : -1,
                  esp_err_to_name(err));
@@ -4570,7 +4817,10 @@ static esp_err_t start_webserver(void)
     if (s_httpd) {
         /* An async clone still references the server and session. Refuse to
          * free either while its owner is running, even after the deadline. */
-        if (!download_cancel_and_wait()) return ESP_ERR_TIMEOUT;
+        if (!download_cancel_and_wait())
+            return ESP_ERR_TIMEOUT;
+        if (!session_graph_cancel_and_wait())
+            return ESP_ERR_TIMEOUT;
         ESP_LOGI(TAG, "stopping existing webserver");
         httpd_stop(s_httpd);
         s_httpd = NULL;
@@ -4593,19 +4843,20 @@ static esp_err_t start_webserver(void)
     upload_sched_set_busy_fn(sd_storage_recording_active);
     /* Guards s_format_progress between format_sd_task and the progress handler.
      * Created here so it exists before any request can reach the handler. */
-    if (!s_format_mtx) s_format_mtx = xSemaphoreCreateMutex();
+    if (!s_format_mtx)
+        s_format_mtx = xSemaphoreCreateMutex();
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.lru_purge_enable = true;
     config.max_uri_handlers = 128;
     config.stack_size = 12288;
     config.max_open_sockets = 20;
-    config.recv_wait_timeout = 1;       /* close idle keep-alive sockets fast */
+    config.recv_wait_timeout = 1; /* close idle keep-alive sockets fast */
     config.send_wait_timeout = 5;
-    config.keep_alive_enable = true;    /* detect dead connections via TCP probes */
-    config.keep_alive_idle = 2;         /* start probing after 2s idle */
-    config.keep_alive_interval = 2;     /* probe every 2s */
-    config.keep_alive_count = 2;        /* 2 failed probes = dead */
+    config.keep_alive_enable = true; /* detect dead connections via TCP probes */
+    config.keep_alive_idle = 2;      /* start probing after 2s idle */
+    config.keep_alive_interval = 2;  /* probe every 2s */
+    config.keep_alive_count = 2;     /* 2 failed probes = dead */
     /* Allocate the httpd worker task's stack from PSRAM to free internal RAM.
      * Safe because no handler performs a flash write on this task (see above). */
     config.task_caps = MALLOC_CAP_SPIRAM;
@@ -4613,63 +4864,82 @@ static esp_err_t start_webserver(void)
     /* Silence benign peer-reset (104 ECONNRESET) log noise on client disconnects. */
     esp_log_level_set("httpd_txrx", ESP_LOG_ERROR);
 
-    ESP_LOGI(TAG, "starting httpd: stack=%d (PSRAM), handlers=%d, internal free=%u",
-             config.stack_size, config.max_uri_handlers,
+    ESP_LOGI(TAG,
+             "starting httpd: stack=%d (PSRAM), handlers=%d, internal free=%u",
+             config.stack_size,
+             config.max_uri_handlers,
              (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
 
+    esp_err_t graph_err = session_graph_init();
+    if (graph_err != ESP_OK) {
+        ESP_LOGE(TAG, "session graph worker unavailable: %s", esp_err_to_name(graph_err));
+        return graph_err;
+    }
+
     esp_err_t herr = httpd_start(&s_httpd, &config);
-    if (herr == ESP_OK) __atomic_store_n(&s_download_closing, false, __ATOMIC_RELEASE);
+    if (herr == ESP_OK)
+        __atomic_store_n(&s_download_closing, false, __ATOMIC_RELEASE);
     if (herr != ESP_OK) {
-        ESP_LOGE(TAG, "failed to start httpd: %s (internal free=%u)",
+        ESP_LOGE(TAG,
+                 "failed to start httpd: %s (internal free=%u)",
                  esp_err_to_name(herr),
                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
         return ESP_FAIL;
     }
 
-    session_graph_init();
     oximetry_http_register_handlers(s_httpd);
 
-    httpd_uri_t root = { .uri = "/", .method = HTTP_GET, .handler = root_get_handler };
+    httpd_uri_t root = {.uri = "/", .method = HTTP_GET, .handler = root_get_handler};
     reg_uri(s_httpd, &root);
 
-    httpd_uri_t wifi_uri = { .uri = "/wifi", .method = HTTP_GET, .handler = root_get_handler };
+    httpd_uri_t wifi_uri = {.uri = "/wifi", .method = HTTP_GET, .handler = root_get_handler};
     reg_uri(s_httpd, &wifi_uri);
 
-    httpd_uri_t manifest = { .uri = "/manifest.json", .method = HTTP_GET, .handler = manifest_get_handler };
+    httpd_uri_t manifest = {
+        .uri = "/manifest.json", .method = HTTP_GET, .handler = manifest_get_handler};
     reg_uri(s_httpd, &manifest);
 
-    httpd_uri_t sw = { .uri = "/sw.js", .method = HTTP_GET, .handler = sw_get_handler };
+    httpd_uri_t sw = {.uri = "/sw.js", .method = HTTP_GET, .handler = sw_get_handler};
     reg_uri(s_httpd, &sw);
 
-    httpd_uri_t uplot_js = { .uri = "/uplot.js", .method = HTTP_GET, .handler = uplot_js_get_handler };
+    httpd_uri_t uplot_js = {
+        .uri = "/uplot.js", .method = HTTP_GET, .handler = uplot_js_get_handler};
     reg_uri(s_httpd, &uplot_js);
 
-    httpd_uri_t uplot_css = { .uri = "/uplot.css", .method = HTTP_GET, .handler = uplot_css_get_handler };
+    httpd_uri_t uplot_css = {
+        .uri = "/uplot.css", .method = HTTP_GET, .handler = uplot_css_get_handler};
     reg_uri(s_httpd, &uplot_css);
 
-    httpd_uri_t logo_svg = { .uri = "/logo.svg", .method = HTTP_GET, .handler = logo_svg_get_handler };
+    httpd_uri_t logo_svg = {
+        .uri = "/logo.svg", .method = HTTP_GET, .handler = logo_svg_get_handler};
     reg_uri(s_httpd, &logo_svg);
 
-    httpd_uri_t favicon = { .uri = "/favicon.svg", .method = HTTP_GET, .handler = favicon_get_handler };
+    httpd_uri_t favicon = {
+        .uri = "/favicon.svg", .method = HTTP_GET, .handler = favicon_get_handler};
     reg_uri(s_httpd, &favicon);
 
-    httpd_uri_t status = { .uri = "/api/status", .method = HTTP_GET, .handler = status_get_handler };
+    httpd_uri_t status = {.uri = "/api/status", .method = HTTP_GET, .handler = status_get_handler};
     reg_uri(s_httpd, &status);
 
-    httpd_uri_t tz_db = { .uri = "/api/tz", .method = HTTP_GET, .handler = tz_get_handler };
+    httpd_uri_t tz_db = {.uri = "/api/tz", .method = HTTP_GET, .handler = tz_get_handler};
     reg_uri(s_httpd, &tz_db);
 
-    httpd_uri_t scan = { .uri = "/scan", .method = HTTP_GET, .handler = scan_get_handler };
-    httpd_uri_t save = { .uri = "/save", .method = HTTP_POST, .handler = save_post_handler };
+    httpd_uri_t scan = {.uri = "/scan", .method = HTTP_GET, .handler = scan_get_handler};
+    httpd_uri_t save = {.uri = "/save", .method = HTTP_POST, .handler = save_post_handler};
     reg_uri(s_httpd, &scan);
     reg_uri(s_httpd, &save);
 
     /* AirSense 11 BLE pairing endpoints (status folded into /api/status) */
-    httpd_uri_t ble_scan = { .uri = "/api/ble/scan", .method = HTTP_GET, .handler = ble_scan_handler };
-    httpd_uri_t ble_pair = { .uri = "/api/ble/pair", .method = HTTP_POST, .handler = ble_pair_handler };
-    httpd_uri_t ble_conf = { .uri = "/api/ble/confirm", .method = HTTP_POST, .handler = ble_confirm_handler };
-    httpd_uri_t ble_forget = { .uri = "/api/ble/forget", .method = HTTP_POST, .handler = ble_forget_handler };
-    httpd_uri_t ble_pass = { .uri = "/api/ble/passthrough", .method = HTTP_POST, .handler = ble_passthrough_handler };
+    httpd_uri_t ble_scan = {
+        .uri = "/api/ble/scan", .method = HTTP_GET, .handler = ble_scan_handler};
+    httpd_uri_t ble_pair = {
+        .uri = "/api/ble/pair", .method = HTTP_POST, .handler = ble_pair_handler};
+    httpd_uri_t ble_conf = {
+        .uri = "/api/ble/confirm", .method = HTTP_POST, .handler = ble_confirm_handler};
+    httpd_uri_t ble_forget = {
+        .uri = "/api/ble/forget", .method = HTTP_POST, .handler = ble_forget_handler};
+    httpd_uri_t ble_pass = {
+        .uri = "/api/ble/passthrough", .method = HTTP_POST, .handler = ble_passthrough_handler};
     reg_uri(s_httpd, &ble_scan);
     reg_uri(s_httpd, &ble_pair);
     reg_uri(s_httpd, &ble_conf);
@@ -4677,97 +4947,127 @@ static esp_err_t start_webserver(void)
     reg_uri(s_httpd, &ble_pass);
 
     /* Oximeter (O2 Ring) BLE pairing endpoints (status folded into /api/status) */
-    httpd_uri_t ox_scan = { .uri = "/api/ox/scan", .method = HTTP_GET, .handler = ox_scan_handler };
-    httpd_uri_t ox_pair = { .uri = "/api/ox/pair", .method = HTTP_POST, .handler = ox_pair_handler };
-    httpd_uri_t ox_forget = { .uri = "/api/ox/forget", .method = HTTP_POST, .handler = ox_forget_handler };
-    httpd_uri_t ox_pm = { .uri = "/api/ox/probe-mode", .method = HTTP_POST, .handler = ox_probe_mode_handler };
+    httpd_uri_t ox_scan = {.uri = "/api/ox/scan", .method = HTTP_GET, .handler = ox_scan_handler};
+    httpd_uri_t ox_pair = {.uri = "/api/ox/pair", .method = HTTP_POST, .handler = ox_pair_handler};
+    httpd_uri_t ox_forget = {
+        .uri = "/api/ox/forget", .method = HTTP_POST, .handler = ox_forget_handler};
+    httpd_uri_t ox_pm = {
+        .uri = "/api/ox/probe-mode", .method = HTTP_POST, .handler = ox_probe_mode_handler};
     reg_uri(s_httpd, &ox_scan);
     reg_uri(s_httpd, &ox_pair);
     reg_uri(s_httpd, &ox_forget);
     reg_uri(s_httpd, &ox_pm);
 
     /* EZShare-compatible file server endpoints */
-    httpd_uri_t dir_hdl = { .uri = "/dir", .method = HTTP_GET, .handler = dir_get_handler };
-    httpd_uri_t dl_hdl = { .uri = "/download", .method = HTTP_GET, .handler = download_get_handler };
+    httpd_uri_t dir_hdl = {.uri = "/dir", .method = HTTP_GET, .handler = dir_get_handler};
+    httpd_uri_t dl_hdl = {.uri = "/download", .method = HTTP_GET, .handler = download_get_handler};
     reg_uri(s_httpd, &dir_hdl);
     reg_uri(s_httpd, &dl_hdl);
 
     /* Upload configuration endpoints (status folded into /api/status) */
-    httpd_uri_t up_prog_get = { .uri = "/api/uploads/progress", .method = HTTP_GET, .handler = upload_progress_get_handler };
-    httpd_uri_t up_state_get = { .uri = "/api/uploads/state", .method = HTTP_GET, .handler = upload_state_get_handler };
-    httpd_uri_t up_cfg_get = { .uri = "/api/uploads/config", .method = HTTP_GET, .handler = upload_config_get_handler };
-    httpd_uri_t up_cfg_post = { .uri = "/api/uploads/config", .method = HTTP_POST, .handler = upload_config_post_handler };
+    httpd_uri_t up_prog_get = {
+        .uri = "/api/uploads/progress", .method = HTTP_GET, .handler = upload_progress_get_handler};
+    httpd_uri_t up_state_get = {
+        .uri = "/api/uploads/state", .method = HTTP_GET, .handler = upload_state_get_handler};
+    httpd_uri_t up_cfg_get = {
+        .uri = "/api/uploads/config", .method = HTTP_GET, .handler = upload_config_get_handler};
+    httpd_uri_t up_cfg_post = {
+        .uri = "/api/uploads/config", .method = HTTP_POST, .handler = upload_config_post_handler};
     reg_uri(s_httpd, &up_cfg_get);
     reg_uri(s_httpd, &up_cfg_post);
     reg_uri(s_httpd, &up_prog_get);
     reg_uri(s_httpd, &up_state_get);
 
     /* "Test connection" buttons: probe a backend with the saved settings */
-    httpd_uri_t up_test_smb = { .uri = "/api/uploads/test-smb", .method = HTTP_POST, .handler = upload_test_smb_handler };
-    httpd_uri_t up_test_shq = { .uri = "/api/uploads/test-sleephq", .method = HTTP_POST, .handler = upload_test_sleephq_handler };
-    httpd_uri_t up_test_status = { .uri = "/api/uploads/test-status", .method = HTTP_GET, .handler = upload_test_status_handler };
+    httpd_uri_t up_test_smb = {
+        .uri = "/api/uploads/test-smb", .method = HTTP_POST, .handler = upload_test_smb_handler};
+    httpd_uri_t up_test_shq = {.uri = "/api/uploads/test-sleephq",
+                               .method = HTTP_POST,
+                               .handler = upload_test_sleephq_handler};
+    httpd_uri_t up_test_status = {.uri = "/api/uploads/test-status",
+                                  .method = HTTP_GET,
+                                  .handler = upload_test_status_handler};
     reg_uri(s_httpd, &up_test_smb);
     reg_uri(s_httpd, &up_test_shq);
     reg_uri(s_httpd, &up_test_status);
 
     /* Device settings endpoints (brightness, LCD therapy mode) */
-    httpd_uri_t settings_all = { .uri = "/api/settings/all", .method = HTTP_GET, .handler = settings_all_get_handler };
+    httpd_uri_t settings_all = {
+        .uri = "/api/settings/all", .method = HTTP_GET, .handler = settings_all_get_handler};
     reg_uri(s_httpd, &settings_all);
-    httpd_uri_t dev_get = { .uri = "/api/device/settings", .method = HTTP_GET, .handler = device_settings_get_handler };
-    httpd_uri_t dev_post = { .uri = "/api/device/settings", .method = HTTP_POST, .handler = device_settings_post_handler };
+    httpd_uri_t dev_get = {
+        .uri = "/api/device/settings", .method = HTTP_GET, .handler = device_settings_get_handler};
+    httpd_uri_t dev_post = {.uri = "/api/device/settings",
+                            .method = HTTP_POST,
+                            .handler = device_settings_post_handler};
     reg_uri(s_httpd, &dev_get);
     reg_uri(s_httpd, &dev_post);
 
     /* Audio test beep endpoint */
-    httpd_uri_t beep_test = { .uri = "/api/device/test-beep", .method = HTTP_POST, .handler = audio_test_beep_handler };
+    httpd_uri_t beep_test = {
+        .uri = "/api/device/test-beep", .method = HTTP_POST, .handler = audio_test_beep_handler};
     reg_uri(s_httpd, &beep_test);
 
     /* Therapy alert config endpoints */
-    httpd_uri_t alert_cfg_get = { .uri = "/api/alert/config", .method = HTTP_GET, .handler = alert_config_get_handler };
-    httpd_uri_t alert_cfg_post = { .uri = "/api/alert/config", .method = HTTP_POST, .handler = alert_config_post_handler };
-    httpd_uri_t alert_test = { .uri = "/api/alert/test", .method = HTTP_POST, .handler = alert_test_push_handler };
+    httpd_uri_t alert_cfg_get = {
+        .uri = "/api/alert/config", .method = HTTP_GET, .handler = alert_config_get_handler};
+    httpd_uri_t alert_cfg_post = {
+        .uri = "/api/alert/config", .method = HTTP_POST, .handler = alert_config_post_handler};
+    httpd_uri_t alert_test = {
+        .uri = "/api/alert/test", .method = HTTP_POST, .handler = alert_test_push_handler};
     reg_uri(s_httpd, &alert_cfg_get);
     reg_uri(s_httpd, &alert_cfg_post);
     reg_uri(s_httpd, &alert_test);
 
     /* Reboot endpoint */
-    httpd_uri_t reboot_post = { .uri = "/api/reboot", .method = HTTP_POST, .handler = reboot_post_handler };
+    httpd_uri_t reboot_post = {
+        .uri = "/api/reboot", .method = HTTP_POST, .handler = reboot_post_handler};
     reg_uri(s_httpd, &reboot_post);
 
     /* Heap stats endpoint (per-task stack HWM, internal/PSRAM/DMA breakdown) */
-    httpd_uri_t heap_stats = { .uri = "/api/heap", .method = HTTP_GET, .handler = heap_stats_handler };
+    httpd_uri_t heap_stats = {
+        .uri = "/api/heap", .method = HTTP_GET, .handler = heap_stats_handler};
     reg_uri(s_httpd, &heap_stats);
 
     /* Consolidated actions endpoint */
-    httpd_uri_t actions = { .uri = "/api/actions", .method = HTTP_POST, .handler = actions_handler };
+    httpd_uri_t actions = {.uri = "/api/actions", .method = HTTP_POST, .handler = actions_handler};
     reg_uri(s_httpd, &actions);
 
-    httpd_uri_t format_prog = { .uri = "/api/format-progress", .method = HTTP_GET, .handler = format_progress_handler };
+    httpd_uri_t format_prog = {
+        .uri = "/api/format-progress", .method = HTTP_GET, .handler = format_progress_handler};
     reg_uri(s_httpd, &format_prog);
 
     /* OTA firmware upload endpoint */
-    httpd_uri_t ota_upload = { .uri = "/api/ota", .method = HTTP_POST, .handler = ota_upload_handler };
+    httpd_uri_t ota_upload = {
+        .uri = "/api/ota", .method = HTTP_POST, .handler = ota_upload_handler};
     reg_uri(s_httpd, &ota_upload);
 
     /* OTA firmware download from URL endpoint */
-    httpd_uri_t ota_url = { .uri = "/api/ota-url", .method = HTTP_POST, .handler = ota_url_handler };
+    httpd_uri_t ota_url = {.uri = "/api/ota-url", .method = HTTP_POST, .handler = ota_url_handler};
     reg_uri(s_httpd, &ota_url);
 
     /* OTA progress polling endpoint */
-    httpd_uri_t ota_prog = { .uri = "/api/ota-progress", .method = HTTP_GET, .handler = ota_progress_handler };
+    httpd_uri_t ota_prog = {
+        .uri = "/api/ota-progress", .method = HTTP_GET, .handler = ota_progress_handler};
     reg_uri(s_httpd, &ota_prog);
 
     /* Log stream endpoints (SSE, download, level control) */
     log_stream_register_handlers(s_httpd);
 
     /* Session graph data endpoints (dashboard charts) */
-    httpd_uri_t sessions_list = { .uri = "/api/sessions", .method = HTTP_GET, .handler = sessions_list_handler };
-    httpd_uri_t session_graph = { .uri = "/api/session/graph", .method = HTTP_GET, .handler = session_graph_handler };
-    httpd_uri_t session_file  = { .uri = "/api/session/file", .method = HTTP_GET, .handler = session_file_handler };
-    httpd_uri_t session_file_head = { .uri = "/api/session/file", .method = HTTP_HEAD, .handler = session_file_handler };
-    httpd_uri_t days_list     = { .uri = "/api/days", .method = HTTP_GET, .handler = days_list_handler };
-    httpd_uri_t summary_uri   = { .uri = "/api/summary", .method = HTTP_GET, .handler = summary_handler };
-    httpd_uri_t sess_settings = { .uri = "/api/session/settings", .method = HTTP_GET, .handler = session_settings_handler };
+    httpd_uri_t sessions_list = {
+        .uri = "/api/sessions", .method = HTTP_GET, .handler = sessions_list_handler};
+    httpd_uri_t session_graph = {
+        .uri = "/api/session/graph", .method = HTTP_GET, .handler = session_graph_handler};
+    httpd_uri_t session_file = {
+        .uri = "/api/session/file", .method = HTTP_GET, .handler = session_file_handler};
+    httpd_uri_t session_file_head = {
+        .uri = "/api/session/file", .method = HTTP_HEAD, .handler = session_file_handler};
+    httpd_uri_t days_list = {.uri = "/api/days", .method = HTTP_GET, .handler = days_list_handler};
+    httpd_uri_t summary_uri = {
+        .uri = "/api/summary", .method = HTTP_GET, .handler = summary_handler};
+    httpd_uri_t sess_settings = {
+        .uri = "/api/session/settings", .method = HTTP_GET, .handler = session_settings_handler};
     reg_uri(s_httpd, &sessions_list);
     reg_uri(s_httpd, &session_graph);
     reg_uri(s_httpd, &session_file);
@@ -4834,42 +5134,57 @@ void netprov_dns_task(void *arg)
     ESP_LOGI(TAG, "captive DNS server listening on port 53");
 
     while (true) {
-        int len = recvfrom(sock, buf, sizeof(buf), 0,
-                           (struct sockaddr *)&src_addr, &src_len);
-        if (len < 12) continue;
+        int len = recvfrom(sock, buf, sizeof(buf), 0, (struct sockaddr *)&src_addr, &src_len);
+        if (len < 12)
+            continue;
 
         uint16_t qdcount = (buf[4] << 8) | buf[5];
-        if (qdcount != 1) continue;
+        if (qdcount != 1)
+            continue;
 
         int qoff = 12;
         while (qoff < len && buf[qoff] != 0) {
             qoff += buf[qoff] + 1;
         }
         qoff++;
-        if (qoff + 4 > len) continue;
+        if (qoff + 4 > len)
+            continue;
         uint16_t qtype = (buf[qoff] << 8) | buf[qoff + 1];
         uint16_t qclass = (buf[qoff + 2] << 8) | buf[qoff + 3];
         qoff += 4;
 
-        if (qtype != 1 || qclass != 1) continue;
+        if (qtype != 1 || qclass != 1)
+            continue;
 
         uint8_t resp[512];
         int rlen = 0;
-        resp[rlen++] = buf[0]; resp[rlen++] = buf[1];
-        resp[rlen++] = 0x81; resp[rlen++] = 0x80;
-        resp[rlen++] = 0x00; resp[rlen++] = 0x01;
-        resp[rlen++] = 0x00; resp[rlen++] = 0x01;
-        resp[rlen++] = 0x00; resp[rlen++] = 0x00;
-        resp[rlen++] = 0x00; resp[rlen++] = 0x00;
+        resp[rlen++] = buf[0];
+        resp[rlen++] = buf[1];
+        resp[rlen++] = 0x81;
+        resp[rlen++] = 0x80;
+        resp[rlen++] = 0x00;
+        resp[rlen++] = 0x01;
+        resp[rlen++] = 0x00;
+        resp[rlen++] = 0x01;
+        resp[rlen++] = 0x00;
+        resp[rlen++] = 0x00;
+        resp[rlen++] = 0x00;
+        resp[rlen++] = 0x00;
         memcpy(resp + rlen, buf + 12, qoff - 12);
         rlen += qoff - 12;
 
-        resp[rlen++] = 0xC0; resp[rlen++] = 0x0C;
-        resp[rlen++] = 0x00; resp[rlen++] = 0x01;
-        resp[rlen++] = 0x00; resp[rlen++] = 0x01;
-        resp[rlen++] = 0x00; resp[rlen++] = 0x00;
-        resp[rlen++] = 0x00; resp[rlen++] = 0x01;
-        resp[rlen++] = 0x00; resp[rlen++] = 0x04;
+        resp[rlen++] = 0xC0;
+        resp[rlen++] = 0x0C;
+        resp[rlen++] = 0x00;
+        resp[rlen++] = 0x01;
+        resp[rlen++] = 0x00;
+        resp[rlen++] = 0x01;
+        resp[rlen++] = 0x00;
+        resp[rlen++] = 0x00;
+        resp[rlen++] = 0x00;
+        resp[rlen++] = 0x01;
+        resp[rlen++] = 0x00;
+        resp[rlen++] = 0x04;
         resp[rlen++] = (s_ap_ip >> 0) & 0xFF;
         resp[rlen++] = (s_ap_ip >> 8) & 0xFF;
         resp[rlen++] = (s_ap_ip >> 16) & 0xFF;
@@ -4884,7 +5199,8 @@ void netprov_dns_task(void *arg)
 /* ------------------------------------------------------------------ */
 esp_err_t netprov_start_portal(const struct netprov_config *cfg, char *ap_ip_out)
 {
-    if (!s_radio_gate) return ESP_ERR_INVALID_STATE;
+    if (!s_radio_gate)
+        return ESP_ERR_INVALID_STATE;
     /* Do not wait behind a potentially long connect attempt on the main task.
      * Its caller already retries the portal request; returning busy also keeps
      * a scan's mode and result ownership intact. */
@@ -4898,19 +5214,22 @@ esp_err_t netprov_start_portal(const struct netprov_config *cfg, char *ap_ip_out
     snprintf(s_ap_ssid, sizeof(s_ap_ssid), "%s-setup", cfg->hostname);
 
     wifi_config_t ap_cfg = {
-        .ap = {
-            .ssid = "",
-            .ssid_len = strlen(s_ap_ssid),
-            .max_connection = 4,
-            .authmode = WIFI_AUTH_OPEN,
-            .channel = 1,
-        },
+        .ap =
+            {
+                .ssid = "",
+                .ssid_len = strlen(s_ap_ssid),
+                .max_connection = 4,
+                .authmode = WIFI_AUTH_OPEN,
+                .channel = 1,
+            },
     };
     memcpy(ap_cfg.ap.ssid, s_ap_ssid, ap_cfg.ap.ssid_len);
 
     esp_err_t err = esp_wifi_set_mode(WIFI_MODE_APSTA);
-    if (err == ESP_OK) err = esp_wifi_set_config(WIFI_IF_AP, &ap_cfg);
-    if (err == ESP_OK) err = esp_wifi_start();
+    if (err == ESP_OK)
+        err = esp_wifi_set_config(WIFI_IF_AP, &ap_cfg);
+    if (err == ESP_OK)
+        err = esp_wifi_start();
     if (err != ESP_OK) {
         s_portal_mode = false;
         xSemaphoreGive(s_radio_gate);
@@ -4934,9 +5253,9 @@ esp_err_t netprov_start_portal(const struct netprov_config *cfg, char *ap_ip_out
 void netprov_start_link_supervisor(void)
 {
     static bool supervisor_started = false;
-    if (supervisor_started) return;
-    psram_task_create(link_supervisor_task, "link_sup", 4096,
-                      NULL, 3, tskNO_AFFINITY, NULL, NULL);
+    if (supervisor_started)
+        return;
+    psram_task_create(link_supervisor_task, "link_sup", 4096, NULL, 3, tskNO_AFFINITY, NULL, NULL);
     supervisor_started = true;
 }
 
@@ -4972,17 +5291,21 @@ esp_err_t netprov_start_connected_server(const char *ip)
 void netprov_get_mac(char out[18])
 {
     uint8_t mac[6];
-    if (esp_read_mac(mac, ESP_MAC_WIFI_STA) != ESP_OK) { out[0] = 0; return; }
-    snprintf(out, 18, "%02X:%02X:%02X:%02X:%02X:%02X",
-             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    if (esp_read_mac(mac, ESP_MAC_WIFI_STA) != ESP_OK) {
+        out[0] = 0;
+        return;
+    }
+    snprintf(
+        out, 18, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 
 esp_err_t netprov_apply_config(const struct netprov_config *cfg, bool reconnect)
 {
     esp_err_t err = netprov_validate_config(cfg);
-    if (err != ESP_OK) return err;
-    if (!s_radio_gate || s_portal_mode ||
-        xSemaphoreTake(s_radio_gate, 0) != pdTRUE) return ESP_ERR_INVALID_STATE;
+    if (err != ESP_OK)
+        return err;
+    if (!s_radio_gate || s_portal_mode || xSemaphoreTake(s_radio_gate, 0) != pdTRUE)
+        return ESP_ERR_INVALID_STATE;
     bool claim = false;
     if (reconnect) {
         if (bsp_display_is_therapy_active() || sd_storage_recording_active() ||
@@ -5000,13 +5323,15 @@ esp_err_t netprov_apply_config(const struct netprov_config *cfg, bool reconnect)
         s_status_cache.cfg_valid = false;
         if (reconnect) {
             char ip[16];
-            if (bsp_display_therapy_safe_maintenance_should_abort()) err = ESP_ERR_INVALID_STATE;
+            if (bsp_display_therapy_safe_maintenance_should_abort())
+                err = ESP_ERR_INVALID_STATE;
             else {
                 /* Explicitly stop the old station before scanning/restarting.
                  * Event-loop reconnects see reselect_on_disconnect and defer. */
                 esp_wifi_disconnect();
                 esp_err_t stopped = esp_wifi_stop();
-                if (stopped != ESP_OK && stopped != ESP_ERR_WIFI_NOT_STARTED) err = stopped;
+                if (stopped != ESP_OK && stopped != ESP_ERR_WIFI_NOT_STARTED)
+                    err = stopped;
                 else {
                     s_manual_reconnect = true;
                     err = try_connect_radio_locked(cfg, ip, 12000);
@@ -5015,7 +5340,8 @@ esp_err_t netprov_apply_config(const struct netprov_config *cfg, bool reconnect)
             }
         }
     }
-    if (claim) bsp_display_end_therapy_safe_maintenance();
+    if (claim)
+        bsp_display_end_therapy_safe_maintenance();
     xSemaphoreGive(s_radio_gate);
     return err;
 }
