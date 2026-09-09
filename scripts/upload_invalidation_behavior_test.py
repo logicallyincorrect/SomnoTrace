@@ -136,7 +136,10 @@ code += ''.join(function(SCHED,n) for n in [
     'upload_sched_set_invalidation_hooks','post','upload_sched_notify_invalidate'])
 code += r'''
 static void reset_ram(void) {
-    for(int i=0;i<s_n_days;i++)free(s_days[i]);s_n_days=0;
+    for(int i=0;i<s_n_days;i++) {
+        free(s_days[i]);
+    }
+    s_n_days=0;
     lease_depth=unlink_error=next_calls=ack_calls=ack_error=0;
     cancel=deny_lease=deny_callback=cancel_after_next=false;
     cancel_after_take=cancel_after_give=newer_after_give=false;
@@ -167,8 +170,11 @@ int main(void) {
     }
     // A pending recording or denied gate never waits or loses the token.
     for(int phase=0;phase<5;phase++) {
-        seed();if(phase==0)cancel=true;if(phase==1)deny_lease=true;
-        if(phase==2)cancel_after_next=true;if(phase==3)cancel_after_take=true;
+        seed();
+        if(phase==0)cancel=true;
+        if(phase==1)deny_lease=true;
+        if(phase==2)cancel_after_next=true;
+        if(phase==3)cancel_after_take=true;
         if(phase==4)deny_callback=true;
         assert(!service_pending_invalidation());assert(pending() && index_file() && ack_calls==0);
         assert(lease_depth==0);if(phase==0)assert(next_calls==0);
@@ -255,7 +261,11 @@ joint += function(SCHED,'service_pending_invalidation')
 joint += r'''
 #undef unlink
 static void boot_ram(void) {
-    assert(lease_depth==0);for(int i=0;i<s_n_days;i++)free(s_days[i]);s_n_days=0;
+    assert(lease_depth==0);
+    for(int i=0;i<s_n_days;i++) {
+        free(s_days[i]);
+    }
+    s_n_days=0;
     fail_index_unlink=fail_marker_unlink=0;allow_lease=true;deny_ack_on_release=false;
 }
 static void seed_joint(void) {

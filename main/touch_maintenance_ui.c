@@ -991,6 +991,9 @@ static void tick(lv_timer_t *timer)
                                       "Restart pending",
                                       "Failed",
                                       "Cancelled"};
+        const size_t stage_count = sizeof(stage) / sizeof(stage[0]);
+        const char *current_stage =
+            (size_t)s->ota.stage < stage_count ? stage[s->ota.stage] : "Unknown";
         const char *health =
             s->ota.boot_selected
                 ? "New image selected; running firmware changes after restart."
@@ -1004,7 +1007,7 @@ static void tick(lv_timer_t *timer)
             snprintf(text,
                      sizeof(text),
                      "%s\n%d / %d bytes%s\n%s\n%s",
-                     stage[s->ota.stage],
+                     current_stage,
                      s->ota.transferred,
                      s->ota.total,
                      s->ota.active && eta >= 0 ? " - estimate based on observed transfer rate" : "",
@@ -1023,11 +1026,11 @@ static void tick(lv_timer_t *timer)
             snprintf(text,
                      sizeof(text),
                      "%s\n%d bytes transferred; total size unknown\n%s\n%s",
-                     stage[s->ota.stage],
+                     current_stage,
                      s->ota.transferred,
                      health,
                      s->ota.error);
-        if (s->ota.done && !s->ota.ok && s->ota.failed_stage < 8) {
+        if (s->ota.done && !s->ota.ok && (size_t)s->ota.failed_stage < stage_count) {
             size_t n = strlen(text);
             snprintf(text + n, sizeof(text) - n, "\nStopped at: %s", stage[s->ota.failed_stage]);
         }

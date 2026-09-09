@@ -10,6 +10,15 @@
 #ifndef TIMEZONE_CATALOG_HOST_TEST
 extern const char _binary_zones_json_start[];
 extern const char _binary_zones_json_end[];
+
+static size_t embedded_catalog_size(void)
+{
+    /* ESP-IDF's EMBED_FILES linker contract places these boundary symbols around
+     * one blob. Static analysis cannot infer that linker guarantee. */
+    /* cppcheck-suppress comparePointers */
+    /* cppcheck-suppress subtractPointers */
+    return (size_t)(_binary_zones_json_end - _binary_zones_json_start);
+}
 #endif
 
 typedef struct {
@@ -231,11 +240,7 @@ size_t timezone_catalog_search(const char *query,
     return 0;
 #else
     return timezone_catalog_search_source(
-        _binary_zones_json_start,
-        (size_t)(_binary_zones_json_end - _binary_zones_json_start),
-        query,
-        entries,
-        capacity);
+        _binary_zones_json_start, embedded_catalog_size(), query, entries, capacity);
 #endif
 }
 
@@ -247,9 +252,6 @@ esp_err_t timezone_catalog_lookup(const char *iana_id, timezone_catalog_entry_t 
     return ESP_ERR_NOT_FOUND;
 #else
     return timezone_catalog_lookup_source(
-        _binary_zones_json_start,
-        (size_t)(_binary_zones_json_end - _binary_zones_json_start),
-        iana_id,
-        entry);
+        _binary_zones_json_start, embedded_catalog_size(), iana_id, entry);
 #endif
 }

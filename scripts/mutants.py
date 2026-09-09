@@ -87,16 +87,16 @@ MUTANTS = [
      "if (false) {",
      "header sample_count trusted over the bytes on disk"),
     ("spool-sentinel-scaled", "edf_data_dict.h",
-     "if (raw == -1 || den <= 0) return -1;\n    int32_t prod",
-     "if (den <= 0) return -1;\n    int32_t prod",
+     "if (raw == -1 || den <= 0)\n        return -1;\n    int32_t prod",
+     "if (den <= 0)\n        return -1;\n    int32_t prod",
      "summary -1 becomes 0 after logical-scale division"),
     ("record-count-off-by-one", "edf_header.c",
      "snprintf(rc, sizeof(rc), \"%d\", record_count);",
      "snprintf(rc, sizeof(rc), \"%d\", record_count + 1);",
      "EDF header promises a record that is never written"),
     ("as11-noon-boundary", "as11_time.c",
-     "if (tod < 43200) days -= 1;",
-     "if (tod <= 43200) days -= 1;",
+     "if (tod < 43200)\n        days -= 1;",
+     "if (tod <= 43200)\n        days -= 1;",
      "AS11-side noon put on the previous day"),
     # The four below were found by scripts/mutants_probe.py as survivors, then
     # killed by tests written for them.  They stay here as the regression.
@@ -105,12 +105,12 @@ MUTANTS = [
      "long end = ftell(f) + 1;",
      "file length measured one byte long — a torn frame counted as a whole sample"),
     ("overflow-wraps", "snt_format.h",
-     "if (val > max_val) return max_val;",
-     "if (val > max_val) return min_val;",
+     "if (val > max_val)\n        return max_val;",
+     "if (val > max_val)\n        return min_val;",
      "a sensor spike exported as maximal NEGATIVE flow instead of saturating"),
     ("pld-map-bound", "snt_format.h",
-     "if (map[i] < 0 || map[i] >= snt_channels) return false;",
-     "if (map[i] < 0 || map[i] > snt_channels) return false;",
+     "if (map[i] < 0 || map[i] >= snt_channels)\n            return false;",
+     "if (map[i] < 0 || map[i] > snt_channels)\n            return false;",
      "channel map allowed to index one past the last channel in every frame"),
     ("maskoff-ignored", "edf_waveform.c",
      "if (max_samples > 0 && max_samples < total_samples) {",
@@ -140,12 +140,12 @@ MUTANTS = [
 # which means this comment is what needs fixing, not the test.
 EQUIVALENT = [
     ("eq-zero-channels", "edf_waveform.c",
-     "if (!f || channels_in_file <= 0) return UINT32_MAX;",
-     "if (!f || channels_in_file < 0) return UINT32_MAX;",
+     "if (!f || channels_in_file <= 0)\n        return UINT32_MAX;",
+     "if (!f || channels_in_file < 0)\n        return UINT32_MAX;",
      "a 0-channel file is refused by the channel-map / channel-count check before it gets here"),
     ("eq-header-only", "edf_waveform.c",
-     "if (end <= (long)sizeof(snt_header_t)) return 0;",
-     "if (end < (long)sizeof(snt_header_t)) return 0;",
+     "if (end <= (long)sizeof(snt_header_t))\n        return 0;",
+     "if (end < (long)sizeof(snt_header_t))\n        return 0;",
      "for end == sizeof(header) the fall-through computes 0 / frame == 0, the same answer"),
     ("eq-header-fill", "edf_header.c",
      "memset(hdr, ' ', sizeof(hdr));",
@@ -296,4 +296,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-

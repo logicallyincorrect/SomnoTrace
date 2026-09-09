@@ -46,7 +46,8 @@ static cJSON *cJSON_Parse(const char *line) {
     return r;
 }
 static cJSON *cJSON_GetObjectItem(const cJSON *r,const char *name) {
-    if(!r)return NULL;int i=!strcmp(name,"day")?0:!strcmp(name,"attempts")?1:!strcmp(name,"stalled")?2:!strcmp(name,"phase")?4:!strcmp(name,"generation")?5:3;
+    if(!r)return NULL;
+    int i=!strcmp(name,"day")?0:!strcmp(name,"attempts")?1:!strcmp(name,"stalled")?2:!strcmp(name,"phase")?4:!strcmp(name,"generation")?5:3;
     return r->children+i;
 }
 static bool cJSON_IsString(const cJSON *v){return v && v->type==1;}
