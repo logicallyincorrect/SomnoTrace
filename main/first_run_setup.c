@@ -12,7 +12,7 @@
 
 #include "first_run_setup.h"
 #include "first_run_setup_internal.h"
-#include "nvs_writer.h"
+#include "flash_executor.h"
 
 #include <string.h>
 
@@ -42,7 +42,7 @@ _Static_assert(sizeof(first_run_record_v1_t) == 4, "first-run v1 record layout c
 
 static first_run_setup_state_t s_state;
 /* Writer arguments live in static internal DRAM. A callback still copies this
- * value onto the nvs_writer task's internal stack before opening NVS. */
+ * value onto the flash_executor task's internal stack before opening NVS. */
 static first_run_setup_state_t s_nvs_work;
 static bool s_loaded;
 static bool s_persisted;
@@ -215,19 +215,19 @@ static esp_err_t persist_candidate(const first_run_setup_state_t *candidate)
     /* s_operation_mutex serializes this static work area. It is deliberately
      * not caller stack memory, because a touchscreen/UI caller may use PSRAM. */
     s_nvs_work = *candidate;
-    return nvs_writer_run(do_save_nvs, &s_nvs_work);
+    return flash_executor_run(do_save_nvs, &s_nvs_work);
 }
 
 esp_err_t first_run_setup_load(void)
 {
     ensure_runtime();
-    /* Prevent nvs_writer_run() from taking its early-boot inline fallback when
+    /* Prevent flash_executor_run() from taking its early-boot inline fallback when
      * this API is first reached from a PSRAM-stack UI or HTTP task. */
-    nvs_writer_init();
+    flash_executor_init();
     xSemaphoreTake(s_operation_mutex, portMAX_DELAY);
 
     first_run_setup_model_defaults(&s_nvs_work);
-    esp_err_t err = nvs_writer_run(do_load_nvs, &s_nvs_work);
+    esp_err_t err = flash_executor_run(do_load_nvs, &s_nvs_work);
     if (err == ESP_OK) {
         publish_state(&s_nvs_work, true, true, ESP_OK);
         ESP_LOGI(TAG,
@@ -289,7 +289,7 @@ static esp_err_t copy_mutable_state(first_run_setup_state_t *out, bool *persiste
 esp_err_t first_run_setup_update(first_run_setup_step_t step, first_run_setup_update_t update)
 {
     ensure_runtime();
-    nvs_writer_init();
+    flash_executor_init();
     xSemaphoreTake(s_operation_mutex, portMAX_DELAY);
 
     first_run_setup_state_t candidate;
@@ -314,7 +314,7 @@ esp_err_t first_run_setup_reconcile(const first_run_setup_observed_t *observed)
     if (!observed)
         return ESP_ERR_INVALID_ARG;
     ensure_runtime();
-    nvs_writer_init();
+    flash_executor_init();
     xSemaphoreTake(s_operation_mutex, portMAX_DELAY);
 
     first_run_setup_state_t candidate;
@@ -339,10 +339,10 @@ esp_err_t first_run_setup_reconcile(const first_run_setup_observed_t *observed)
 esp_err_t first_run_setup_reset(void)
 {
     ensure_runtime();
-    nvs_writer_init();
+    flash_executor_init();
     xSemaphoreTake(s_operation_mutex, portMAX_DELAY);
 
-    esp_err_t err = nvs_writer_run(do_reset_nvs, NULL);
+    esp_err_t err = flash_executor_run(do_reset_nvs, NULL);
     if (err == ESP_OK) {
         first_run_setup_state_t defaults;
         first_run_setup_model_defaults(&defaults);

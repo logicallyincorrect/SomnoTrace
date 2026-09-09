@@ -1,7 +1,7 @@
 #include "touch_manage_config.h"
 #include "config_redaction.h"
 #include "time_sync.h"
-#include "nvs_writer.h"
+#include "flash_executor.h"
 #include "nvs.h"
 #include "psram_task.h"
 #include "bsp_display.h"
@@ -379,8 +379,8 @@ static void worker(void *arg)
 {
     manage_config_snapshot_t *work = arg;
 #if CONFIG_SOMNOTRACE_BOARD_QEMU
-    uploader_set_nvs_executor(nvs_writer_run);
-    therapy_alert_set_nvs_executor(nvs_writer_run);
+    uploader_set_nvs_executor(flash_executor_run);
+    therapy_alert_set_nvs_executor(flash_executor_run);
     struct netprov_config demo;
     if (!netprov_load_config(&demo)) {
         strlcpy(demo.wifi[0].ssid, "QEMU-2.4GHz", 33);

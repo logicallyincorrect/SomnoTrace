@@ -32,7 +32,7 @@
 #include "sd_storage.h"
 #include "as11_ble.h"
 #include "psram_task.h"
-#include "nvs_writer.h"
+#include "flash_executor.h"
 #include "oximetry_canonical.h"
 #include "time_sync.h"
 #include "upload_sched.h"
@@ -1213,7 +1213,7 @@ static void load_paired_from_nvs(void)
 {
     nvs_handle_t h;
     bool forgotten = false;
-    nvs_writer_lock();
+    flash_executor_lock();
     if (nvs_open(OX_NVS_NS, NVS_READONLY, &h) == ESP_OK) {
         size_t len;
         uint8_t forgotten_value = 0;
@@ -1240,7 +1240,7 @@ static void load_paired_from_nvs(void)
             s_probe_mode = (ox_probe_mode_t)pm;
         nvs_close(h);
     }
-    nvs_writer_unlock();
+    flash_executor_unlock();
 
     /* Also try loading from paired.json (SD) as fallback */
     if (!s_paired && !forgotten) {
@@ -1390,7 +1390,7 @@ static void pair_task(void *arg)
     strlcpy(nvs_arg.name_prefix, prefix, sizeof(nvs_arg.name_prefix));
     strlcpy(nvs_arg.ble_name, display_name, sizeof(nvs_arg.ble_name));
     strlcpy(nvs_arg.last_addr, addr_str, sizeof(nvs_arg.last_addr));
-    esp_err_t persisted = nvs_writer_run(do_save_nvs, &nvs_arg);
+    esp_err_t persisted = flash_executor_run(do_save_nvs, &nvs_arg);
     if (persisted != ESP_OK) {
         set_error("pairing storage failed: %s", esp_err_to_name(persisted));
         do_disconnect();
@@ -1855,7 +1855,7 @@ static esp_err_t legacy_pair(const char *addr_str)
 
 static esp_err_t legacy_forget(void)
 {
-    esp_err_t persisted = nvs_writer_run(do_erase_nvs, NULL);
+    esp_err_t persisted = flash_executor_run(do_erase_nvs, NULL);
     if (persisted != ESP_OK) {
         set_error("forget storage failed: %s", esp_err_to_name(persisted));
         return persisted;
@@ -1925,7 +1925,7 @@ static esp_err_t legacy_set_probe_mode(ox_probe_mode_t mode)
     if (mode == s_probe_mode)
         return ESP_OK;
     s_probe_mode = mode;
-    nvs_writer_run(do_save_probe_mode, (void *)(intptr_t)mode);
+    flash_executor_run(do_save_probe_mode, (void *)(intptr_t)mode);
     ESP_LOGI(TAG, "probe mode set to %s", mode == OX_PROBE_PERSISTENT ? "persistent" : "legacy");
     return ESP_OK;
 }

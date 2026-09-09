@@ -65,7 +65,7 @@ for source, driver in (
     )
 
     pair = function_body("pair_task", source)
-    persist = pair.index("nvs_writer_run(do_save_nvs, &nvs_arg)")
+    persist = pair.index("flash_executor_run(do_save_nvs, &nvs_arg)")
     persist_guard = pair.index("if (persisted != ESP_OK)", persist)
     sd_mirror = pair.index("ox_store_save_paired(", persist_guard)
     ram_publish = pair.index("s_paired = true", sd_mirror)
@@ -122,11 +122,11 @@ for source, driver in (
     # Missing keys remain backward-compatible: only an explicitly persisted 1
     # suppresses the paired.json fallback.
     assert re.search(r'== ESP_OK\s*&&\s*forgotten_value == 1', load)
-    assert "nvs_writer_unlock(); return;" not in load[:sd_fallback]
+    assert "flash_executor_unlock(); return;" not in load[:sd_fallback]
 
     forget_name = "oxyii_forget" if driver == "OX_DRIVER_OXYII" else "legacy_forget"
     forget = function_body(forget_name, source)
-    persist = forget.index("nvs_writer_run(do_erase_nvs, NULL)")
+    persist = forget.index("flash_executor_run(do_erase_nvs, NULL)")
     persist_guard = forget.index("if (persisted != ESP_OK)", persist)
     sd_mirror = forget.index("ox_store_delete_paired()", persist_guard)
     ram_clear = forget.index("s_paired = false", sd_mirror)

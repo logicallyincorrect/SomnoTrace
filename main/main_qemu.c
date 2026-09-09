@@ -7,7 +7,7 @@
 #include "first_run_setup.h"
 #include "log_stream.h"
 #include "touch_logs_qemu.h"
-#include "nvs_writer.h"
+#include "flash_executor.h"
 #include "psram_task.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -19,7 +19,7 @@ static const char *TAG = "somnotrace_qemu";
 
 static void seed_finished_setup_preview(void)
 {
-    nvs_writer_init();
+    flash_executor_init();
     esp_err_t err = first_run_setup_load();
     if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
         /* QEMU's flash image is disposable.  Recover an incompatible retained

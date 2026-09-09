@@ -64,7 +64,7 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "psram_task.h"
-#include "nvs_writer.h"
+#include "flash_executor.h"
 #include "log_stream.h"
 
 #include "mbedtls/sha256.h"
@@ -1855,9 +1855,9 @@ static void pair_cache_load(void)
 {
     memset(&s_pair_cache, 0, sizeof(s_pair_cache));
     nvs_handle_t h;
-    nvs_writer_lock();
+    flash_executor_lock();
     if (nvs_open(NVS_NS, NVS_READONLY, &h) != ESP_OK) {
-        nvs_writer_unlock();
+        flash_executor_unlock();
         return;
     }
     bool ok =
@@ -1866,7 +1866,7 @@ static void pair_cache_load(void)
     nvs_get_str_opt(h, NVS_K_NAME, s_pair_cache.name, sizeof(s_pair_cache.name));
     nvs_get_str_opt(h, NVS_K_PAIRKEY, s_pair_cache.pair_key, sizeof(s_pair_cache.pair_key));
     nvs_close(h);
-    nvs_writer_unlock();
+    flash_executor_unlock();
     s_pair_cache.valid = ok;
 }
 
@@ -2226,7 +2226,7 @@ static void confirm_task(void *arg)
     strlcpy(nvarg.name, s_target_name, sizeof(nvarg.name));
     strlcpy(nvarg.client_id, cid->valuestring, sizeof(nvarg.client_id));
     strlcpy(nvarg.pair_key, s_srp.master_key_hex, sizeof(nvarg.pair_key));
-    esp_err_t ns = nvs_writer_run(do_save_pairing_nvs, &nvarg);
+    esp_err_t ns = flash_executor_run(do_save_pairing_nvs, &nvarg);
     cJSON_Delete(resp);
     if (ns != ESP_OK) {
         set_error("NVS save failed");
@@ -3069,7 +3069,7 @@ esp_err_t as11_ble_forget(void)
     as11_clock_capture_invalidate();
     /* Delegate the NVS erase so callers on a PSRAM stack (httpd forget handler)
      * are safe; the BLE teardown below stays on the caller (no flash). */
-    esp_err_t e = nvs_writer_run(do_forget_nvs, NULL);
+    esp_err_t e = flash_executor_run(do_forget_nvs, NULL);
     if (e == ESP_OK) {
         memset(&s_pair_cache, 0, sizeof(s_pair_cache));
     }

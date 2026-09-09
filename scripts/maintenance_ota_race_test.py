@@ -64,11 +64,12 @@ with tempfile.TemporaryDirectory(prefix='somno-ota-race-') as path:
 # Full factory erasure commits its one-way restart before NVS and never returns
 # from that branch, including an erase failure.
 factory=function(net,'factory_reset_task')
-assert factory.index('bsp_display_try_commit_therapy_safe_restart()') < factory.index('nvs_writer_lock()') < factory.index('nvs_flash_erase()') < factory.index('esp_restart()')
-assert 'nvs_writer_unlock()' not in factory
+assert factory.index('bsp_display_try_commit_therapy_safe_restart()') < factory.index('flash_executor_lock()') < factory.index('nvs_flash_erase()') < factory.index('esp_restart()')
+assert 'flash_executor_unlock()' not in factory
 assert factory.index('esp_restart()') < factory.index('out:')
 sd=function(net,'ota_sd_task')
-assert sd.index('somnotrace_firmware_target_matches') < sd.index('esp_ota_begin(')
-assert sd.index('esp_ota_end(') < sd.index('ota_native_commit_begin()') < sd.index('esp_ota_set_boot_partition(')
-assert 'sd_storage_recording_pending()' in sd
+assert sd.index('somnotrace_firmware_target_matches') < sd.index('ota_flash_session_begin(')
+assert sd.index('ota_flash_session_finish(') < sd.index('ota_native_commit_begin()') < sd.index('ota_flash_session_select(')
+assert 'ota_sd_flash_should_abort' in sd
+assert 'sd_storage_recording_pending()' in function(net,'ota_sd_flash_should_abort')
 print('factory reset and SD image boundary contracts passed')

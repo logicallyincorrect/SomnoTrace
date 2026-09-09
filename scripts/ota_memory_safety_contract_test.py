@@ -7,6 +7,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = (ROOT / "main/net_provision.c").read_text(encoding="utf-8")
+FLASH_SESSION = (ROOT / "main/ota_flash_session.c").read_text(encoding="utf-8")
 PARTITIONS = (ROOT / "partitions.csv").read_text(encoding="utf-8")
 DISPLAY_HEADER = (ROOT / "main/bsp_display.h").read_text(encoding="utf-8")
 DISPLAY_SMALL = (ROOT / "main/bsp_display.c").read_text(encoding="utf-8")
@@ -65,10 +66,22 @@ assert re.search(r"app0,\s+app,\s+ota_0,\s+0x10000,\s+0x400000", PARTITIONS)
 assert re.search(r"app1,\s+app,\s+ota_1,\s+0x410000,\s+0x400000", PARTITIONS)
 assert re.search(r"^#define\s+OTA_MAX_SIZE\s+\(0x400000\)", SOURCE, re.MULTILINE)
 
-# Admission uses exactly the byte-addressable internal heap used by ordinary
-# FreeRTOS task stacks, and considers fragmentation as well as aggregate free.
+# Flash work uses the retained internal-stack executor. Admission therefore
+# keeps only a small runtime floor; the former 25.6/29.7 KiB per-route stack
+# reservations must not return.
 assert "#define OTA_INTERNAL_CAPS (MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)" in SOURCE
-assert "OTA_INTERNAL_RUNTIME_RESERVE_BYTES (16U * 1024U)" in SOURCE
+assert re.search(r"#define\s+OTA_MIN_INTERNAL_FREE\s+4096U", SOURCE)
+assert re.search(r"#define\s+OTA_MIN_INTERNAL_LARGEST\s+1024U", SOURCE)
+for removed in (
+    "OTA_INTERNAL_RUNTIME_RESERVE_BYTES",
+    "OTA_UPLOAD_TASK_STACK_BYTES",
+    "OTA_FLASH_TASK_STACK_BYTES",
+    "25600U",
+    "29696U",
+    "25U * 1024U",
+    "29U * 1024U",
+):
+    assert removed not in SOURCE, f"legacy OTA admission reserve remains: {removed}"
 admit = function_body("ota_heap_admit")
 assert "heap_caps_get_free_size(OTA_INTERNAL_CAPS)" in function_body("ota_heap_snapshot")
 assert "snapshot.free_bytes >= required_free" in admit
@@ -76,20 +89,23 @@ assert "snapshot.largest_block_bytes >= required_largest" in admit
 
 upload = function_body("ota_upload_handler")
 url = function_body("ota_url_handler")
-for body, mode, free_gate, block_gate in (
+sd_start = function_body("maintenance_ota_start_sd")
+for body, mode, free_gate, block_gate, create in (
     (upload, 'netprov_lifecycle_try_claim("upload")', "OTA_UPLOAD_MIN_INTERNAL_FREE",
-     "OTA_UPLOAD_MIN_INTERNAL_LARGEST"),
+     "OTA_UPLOAD_MIN_INTERNAL_LARGEST", "ota_flash_session_begin("),
     (url, 'netprov_lifecycle_try_claim("url")', "OTA_URL_MIN_INTERNAL_FREE",
-     "OTA_URL_MIN_INTERNAL_LARGEST"),
+     "OTA_URL_MIN_INTERNAL_LARGEST", "psram_task_create("),
+    (sd_start, 'netprov_lifecycle_try_claim("native-sd")', "OTA_UPLOAD_MIN_INTERNAL_FREE",
+     "OTA_UPLOAD_MIN_INTERNAL_LARGEST", "psram_task_create("),
 ):
     assert mode in body
-    assert "ota_send_busy(req)" in body
     assert "ota_storage_preflight()" in body
     assert "ota_heap_admit(" in body
     assert free_gate in body and block_gate in body
-    assert body.index("ota_storage_preflight()") < body.index("xTaskCreate(")
-    assert body.index("ota_heap_admit(") < body.index("xTaskCreate(")
-    assert "ota_send_resource_error(req" in body
+    assert body.index("ota_storage_preflight()") < body.index(create)
+    assert body.index("ota_heap_admit(") < body.index(create)
+assert "ota_send_busy(req)" in upload and "ota_send_resource_error(req" in upload
+assert "ota_send_busy(req)" in url and "ota_send_resource_error(req" in url
 
 assert 'httpd_resp_set_status(req, "409 Conflict")' in function_body("ota_send_busy")
 resource_error = function_body("ota_send_resource_error")
@@ -225,70 +241,60 @@ unknown_release = passthrough.index(
 )
 assert rpc_pos < unknown_publish < unknown_release
 
-# The upload handler no longer passes a stack context to another task. Every
-# shared object exists before task creation, and cleanup follows the definitive
-# completion bit rather than a timeout that could free a live task's stream.
-create = function_body("ota_upload_context_create")
-assert "heap_caps_calloc(1, sizeof(*ctx), OTA_INTERNAL_CAPS)" in create
-assert "xStreamBufferCreateStatic" in create
-assert "xEventGroupCreateStatic" in create
-assert create.count("MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT") >= 2
-assert "ota_ctx_t ctx =" not in upload
-assert "ota_ctx_t *ctx = ota_upload_context_create(total)" in upload
-assert upload.index("ota_upload_context_create(total)") < upload.index("xTaskCreate(")
-assert upload.index("heap_caps_malloc(OTA_CHUNK_SIZE") < upload.index("xTaskCreate(")
-assert "OTA_INPUT_ABORT_BIT : OTA_INPUT_DONE_BIT" in upload
-assert "xEventGroupGetBits(ctx->events) & OTA_FLASH_DONE_BIT" in upload
-assert "pdMS_TO_TICKS(250)" in upload
-assert "xEventGroupWaitBits(ctx->events, OTA_FLASH_DONE_BIT" in upload
-assert upload.index("xEventGroupWaitBits(ctx->events, OTA_FLASH_DONE_BIT") \
-       < upload.rindex("ota_upload_context_destroy(ctx)")
-assert "wait_ms" not in upload
-assert "flash task timed out" not in upload
+# Uploads stay on the HTTP owner and synchronously submit short operations to
+# ota_flash_session. No dynamic flash task or cross-task context remains.
+for removed in ("ota_flash_task", "ota_upload_context_create", "ota_ctx_t"):
+    assert removed not in SOURCE, f"obsolete upload worker remains: {removed}"
+for removed in (
+    "xStreamBufferCreate",
+    "xEventGroupCreate",
+    "xEventGroupWaitBits",
+    "vTaskDelete(flash_task)",
+):
+    assert removed not in upload, f"upload still owns cross-task state: {removed}"
+assert "psram_task_create(" not in upload
+assert "xTaskCreate(" not in upload
+assert "heap_caps_malloc(OTA_CHUNK_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)" in upload
+assert upload.index("somnotrace_firmware_target_matches") \
+       < upload.index("ota_flash_session_begin(") \
+       < upload.index("ota_flash_session_write(")
 
-flash = function_body("ota_flash_task")
-assert "esp_ota_begin(part, OTA_WITH_SEQUENTIAL_WRITES, &ota_hdl)" in flash
-assert "OTA_SIZE_UNKNOWN" not in flash
-assert "OTA_INPUT_ABORT_BIT" in flash
-assert "ctx->aborted_by_input = true" in flash
-assert "OTA_INPUT_DONE_BIT" in flash
-assert "xStreamBufferReceive(ctx->sbuf, ctx->flash_buf" in flash
-assert "xEventGroupSetBits(ctx->events, OTA_FLASH_DONE_BIT)" in flash
-assert "vTaskSuspend(NULL)" in flash
-assert "vTaskDelete(NULL)" not in flash
+before_finish = upload.index("ota_native_should_abort()", upload.index("MAINT_OTA_VERIFY"))
+finish = upload.index("ota_flash_session_finish(")
+after_finish = upload.index("ota_native_should_abort()", finish)
+reserve = upload.index("ota_native_commit_begin()", after_finish)
+select = upload.index("ota_flash_session_select(", reserve)
+assert before_finish < finish < after_finish < reserve < select
+assert "ota_flash_session_abort(&flash)" in upload
 
-# Waking an event-group waiter is not a lifetime join on SMP: the waiter can
-# run while xEventGroupSetBits() is still unwinding on the other core, and
-# deleting a remotely running worker only requests a cross-core yield.  The
-# worker therefore parks after publishing completion; its parent first observes
-# eSuspended (proving the event call returned), then deletes it before freeing
-# any context-owned state or deleting the static group.
-wait_pos = upload.index("xEventGroupWaitBits(ctx->events, OTA_FLASH_DONE_BIT")
-park_observed_pos = upload.index("eTaskGetState(flash_task) != eSuspended", wait_pos)
-delete_worker_pos = upload.index("vTaskDelete(flash_task)", park_observed_pos)
-read_result_pos = upload.index("esp_err_t flash_result = ctx->result", wait_pos)
-destroy_pos = upload.rindex("ota_upload_context_destroy(ctx)")
-assert wait_pos < park_observed_pos < delete_worker_pos < read_result_pos < destroy_pos
-assert flash.index("xEventGroupSetBits(ctx->events, OTA_FLASH_DONE_BIT)") \
-       < flash.index("vTaskSuspend(NULL)")
-assert upload.index("flash_result != ESP_OK && !aborted_by_input") \
-       < upload.index("if (input_error)")
-flash_error_branch = upload[
-    upload.index("if (flash_result != ESP_OK && !aborted_by_input)"):
-    upload.index("if (input_error)")
-]
-assert "netprov_lifecycle_release()" in flash_error_branch
-assert "HTTPD_500_INTERNAL_SERVER_ERROR" in flash_error_branch
-assert "esp_err_to_name(flash_result)" in flash_error_branch
-assert "return ESP_FAIL" in flash_error_branch
+# Raw inactive-image operations are centralized in ota_flash_session.c. Boot
+# confirmation and rollback remain in main.c and are outside this census.
+raw_flash_call = re.compile(
+    r"\b(?:esp_ota_(?:get_next_update_partition|begin|write|end|abort|set_boot_partition)"
+    r"|esp_partition_(?:read|write|erase_range))\s*\("
+)
+raw_flash_sites = {}
+for path in production_c:
+    calls = raw_flash_call.findall(path.read_text(encoding="utf-8"))
+    if calls:
+        raw_flash_sites[str(path.relative_to(ROOT))] = len(calls)
+assert raw_flash_sites == {"main/ota_flash_session.c": 7}
+
+session_write = function_body("write_on_flash_task", FLASH_SESSION)
+session_finish = function_body("finish_on_flash_task", FLASH_SESSION)
+assert session_write.index("should_abort(abort_context)") \
+       < session_write.index("esp_ota_write(")
+assert session_finish.index("should_abort(abort_context)") \
+       < session_finish.index("esp_ota_end(")
 input_error_branch = upload[
-    upload.index("if (input_error)"):
-    upload.index("if (flash_result != ESP_OK)",
-                 upload.index("if (input_error)") + 1)
+    upload.index("if (input_error || flash_result != ESP_OK)"):
+    upload.index('ESP_LOGI(TAG, "OTA: upload complete')
 ]
 assert "input_status" in input_error_branch
 assert '"{\\\"ok\\\":false,\\\"error\\\":\\\"%s\\\"}"' in input_error_branch
 assert "return httpd_resp_send" in input_error_branch
+assert "HTTPD_500_INTERNAL_SERVER_ERROR" in input_error_branch
+assert "esp_err_to_name(flash_result)" in input_error_branch
 
 # OTA starts at an idle boundary, and a completed update owns a deterministic
 # restart lifecycle. It waits through therapy/card activity, acquires the
@@ -436,8 +442,14 @@ assert "#define OTA_REBOOT_FALLBACK_TIMEOUT_MS 5000U" in SOURCE
 upload_success_tail = upload[upload.index('ESP_LOGI(TAG, "OTA: upload complete'):]
 assert upload_success_tail.index("if (!ota_schedule_reboot())") \
        < upload_success_tail.index('httpd_resp_sendstr(req, "{\\"ok\\":true}")')
-assert upload_success_tail.index("netprov_lifecycle_release()") \
-       < upload_success_tail.index("firmware installed; restart manually") \
+manual_restart = upload_success_tail[
+    upload_success_tail.index("if (!ota_schedule_reboot())"):
+    upload_success_tail.index("ota_progress_finish(true, NULL)")
+]
+assert manual_restart.index("firmware installed; restart manually") \
+       < manual_restart.index("netprov_lifecycle_release()") \
+       < manual_restart.index("503 Service Unavailable")
+assert upload_success_tail.index("ota_progress_finish(true, NULL)") \
        < upload_success_tail.index('httpd_resp_sendstr(req, "{\\"ok\\":true}")')
 
 url_success_tail = url_task[url_task.index('ESP_LOGI(TAG, "OTA URL: flash complete'):]
@@ -448,13 +460,65 @@ assert url_success_tail.index('ota_progress_finish(false, "firmware installed; r
        < url_success_tail.index("ota_progress_finish(true, NULL)")
 assert "netprov_lifecycle_release()" not in schedule
 
-# URL OTA keeps its transfer buffer and URL in PSRAM, but retains the required
-# internal task stack. Any failed background run releases the global claim.
-assert ".buffer_caps = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT" in url_task
+# URL and SD OTA workers use reclaimable PSRAM stacks. Any failed background
+# run releases the global claim and self-deletes through the matching helper.
 assert "netprov_lifecycle_release()" in url_task
-assert "vTaskDelete(NULL)" in url_task
+assert "psram_task_delete(NULL)" in url_task
+assert "vTaskDelete(NULL)" not in url_task
 assert "OTA_URL_TASK_STACK_BYTES" in url
 assert "MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT" in url
+assert "psram_task_create(" in url
+sd_task = function_body("ota_sd_task")
+assert "psram_task_delete(NULL)" in sd_task
+assert "vTaskDelete(NULL)" not in sd_task
+assert "psram_task_create(" in sd_start
+
+# The explicit URL read loop observes cancellation before a potentially
+# blocking read and submits each buffered write with a second executor-side
+# cancellation callback. Redirects are bounded and performed manually so a
+# stalled peer remains bounded by the five-second client timeout.
+redirect_check = function_body("ota_http_status_is_redirect")
+for status in (301, 302, 303, 307, 308):
+    assert str(status) in redirect_check
+assert ".timeout_ms = 5000" in url_task
+assert ".disable_auto_redirect = true" in url_task
+assert ".max_redirection_count = 8" in url_task
+assert "esp_http_client_open(client, 0)" in url_task
+assert "esp_http_client_fetch_headers(client)" in url_task
+assert url_task.index("esp_http_client_set_redirection(client)") \
+       < url_task.index("esp_http_client_close(client)",
+                        url_task.index("esp_http_client_set_redirection(client)"))
+url_read_loop = url_task.index("while (true)")
+url_abort = url_task.index("ota_native_should_abort()", url_read_loop)
+url_read = url_task.index("esp_http_client_read(", url_abort)
+url_write = url_task.index("ota_flash_session_write(", url_read)
+assert url_abort < url_read < url_write
+assert "ota_flash_should_abort" in url_task[url_write:url_task.index(
+    "ota_progress_set_transfer", url_write
+)]
+url_before_finish = url_task.index("ota_native_should_abort()", url_task.index("MAINT_OTA_VERIFY"))
+url_finish = url_task.index("ota_flash_session_finish(")
+url_after_finish = url_task.index("ota_native_should_abort()", url_finish)
+url_reserve = url_task.index("ota_native_commit_begin()", url_after_finish)
+url_select = url_task.index("ota_flash_session_select(", url_reserve)
+assert url_before_finish < url_finish < url_after_finish < url_reserve < url_select
+
+# SD flashing has the same cancellation/commit fences and adds recording-
+# pending cancellation while it owns the upload lease.
+sd_loop = sd_task.index("while (n)")
+sd_abort = sd_task.index("ota_sd_flash_should_abort(NULL)", sd_loop)
+sd_write = sd_task.index("ota_flash_session_write(", sd_abort)
+assert sd_abort < sd_write
+assert "ota_sd_flash_should_abort" in sd_task[sd_write:sd_task.index(
+    "ota_progress_set_transfer", sd_write
+)]
+sd_before_finish = sd_task.index("ota_native_should_abort()", sd_task.index("MAINT_OTA_VERIFY"))
+sd_finish = sd_task.index("ota_flash_session_finish(")
+sd_after_finish = sd_task.index("ota_native_should_abort()", sd_finish)
+sd_reserve = sd_task.index("ota_native_commit_begin()", sd_after_finish)
+sd_select = sd_task.index("ota_flash_session_select(", sd_reserve)
+assert sd_before_finish < sd_finish < sd_after_finish < sd_reserve < sd_select
+assert "sd_storage_recording_pending()" in function_body("ota_sd_flash_should_abort")
 
 # Plain HTTP is unavailable unless the build explicitly enables ESP-IDF's
 # insecure OTA transport option.

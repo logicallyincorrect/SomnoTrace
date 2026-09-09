@@ -70,7 +70,7 @@ idf_component_register(SRCS ${SOMNOTRACE_MAIN_SRC} "firmware_target.c" "board_de
                            "sd_storage.c" "maintenance_model.c" "maintenance_fs.c" "maintenance_release.c" "touch_maintenance.c" "controller_diagnostics.c" "session_writer.c" "time_sync.c"
                            "post_therapy.c" "edf_gen.c" "edf_header.c" "edf_waveform.c" "edf_annotations.c" "edf_summary.c" "log_stream.c" "device_settings.c"
                            "first_run_setup.c" "first_run_setup_model.c"
-                           "psram_task.c" "session_graph.c" "nvs_writer.c"
+                           "psram_task.c" "session_graph.c" "flash_executor.c" "ota_flash_session.c"
                            "as11_time.c"
                            "crash_diag.c"
                            "touch_history.c" "history_cache.c" "history_flow_cache.c"
@@ -78,7 +78,7 @@ idf_component_register(SRCS ${SOMNOTRACE_MAIN_SRC} "firmware_target.c" "board_de
                        INCLUDE_DIRS "."
                        REQUIRES esp_lcd driver esp_wifi esp_netif esp_event nvs_flash esp_http_server json esp_app_format
                                 bt mbedtls esp_rom fatfs sdmmc esp-idf-ftpServer uploader esp_http_client
-                                esp_driver_i2c esp_driver_i2s esp_adc app_update espcoredump esp_https_ota therapy_alert esp_coex
+                                esp_driver_i2c esp_driver_i2s esp_adc app_update espcoredump therapy_alert esp_coex
                                 ${SOMNOTRACE_DISPLAY_REQUIRES})
 
 # Keep board identity even in compact previews that never link OTA services.

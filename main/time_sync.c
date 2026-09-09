@@ -33,7 +33,7 @@
 #include "esp_log.h"
 #include "esp_sntp.h"
 #include "nvs_flash.h"
-#include "nvs_writer.h"
+#include "flash_executor.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -135,7 +135,7 @@ static void apply_timezone(const char *tz_str)
     ESP_LOGI(TAG, "timezone set to %s", tz_str);
 }
 
-/* Args for the NVS write, passed by pointer to the nvs_writer task. */
+/* Args for the NVS write, passed by pointer to the flash_executor task. */
 typedef struct {
     const char *tz_str;
     const char *tz_name;
@@ -169,7 +169,7 @@ esp_err_t time_sync_set_timezone(const char *tz_str, const char *tz_name)
     }
     /* Delegate the flash write so callers on a PSRAM stack (httpd) are safe. */
     tz_save_args_t args = {.tz_str = tz_str, .tz_name = tz_name};
-    esp_err_t err = nvs_writer_run(do_set_timezone, &args);
+    esp_err_t err = flash_executor_run(do_set_timezone, &args);
     if (err == ESP_OK) {
         apply_timezone(tz_str);
     }
@@ -220,7 +220,7 @@ static void read_nvs_string(const char *key, char *out, size_t out_len)
         .out_len = out_len,
         .ok = false,
     };
-    nvs_writer_run(do_read_nvs_string, &args);
+    flash_executor_run(do_read_nvs_string, &args);
 }
 
 void time_sync_get_timezone(char *tz_str, size_t tz_str_len)
@@ -261,7 +261,7 @@ esp_err_t time_sync_set_ntp_server(const char *server)
     if (server && (strlen(server) >= NTP_SRV_MAX || strpbrk(server, " /\\:@?#\r\n")))
         return ESP_ERR_INVALID_ARG;
     /* Delegate the flash write so callers on a PSRAM stack (httpd) are safe. */
-    esp_err_t err = nvs_writer_run(do_set_ntp_server, (void *)server);
+    esp_err_t err = flash_executor_run(do_set_ntp_server, (void *)server);
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "NTP server set to: %s", (server && server[0]) ? server : "(auto)");
     }
@@ -374,7 +374,7 @@ void time_sync_save_drift(int64_t drift_ms, int64_t measured_at_ms)
     drift_cache_store(drift_ms, measured_at_ms, "nvs");
 
     drift_save_args_t args = {.drift_ms = drift_ms, .measured_at_ms = measured_at_ms};
-    esp_err_t err = nvs_writer_run(do_save_drift, &args);
+    esp_err_t err = flash_executor_run(do_save_drift, &args);
     if (err == ESP_OK) {
         ESP_LOGI(TAG,
                  "drift saved: %lld ms (measured at %lld)",
@@ -391,7 +391,7 @@ typedef struct {
     bool ok;
 } drift_read_args_t;
 
-/* Executed by nvs_writer on its internal-RAM stack.  Copy the request values
+/* Executed by flash_executor on its internal-RAM stack.  Copy the request values
  * into locals before entering NVS/flash, and copy results back only after the
  * NVS handle is closed and flash access is restored.  This is important even
  * though the caller may be using a PSRAM-backed stack. */
@@ -422,7 +422,7 @@ static esp_err_t do_load_drift_from_nvs(void *arg)
 static bool load_drift_from_nvs(void)
 {
     drift_read_args_t args = {0};
-    nvs_writer_run(do_load_drift_from_nvs, &args);
+    flash_executor_run(do_load_drift_from_nvs, &args);
 
     if (args.ok) {
         drift_cache_store(args.drift_ms, args.measured_at_ms, "nvs");

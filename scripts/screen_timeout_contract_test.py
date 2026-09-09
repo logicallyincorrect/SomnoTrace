@@ -97,7 +97,7 @@ require(SOURCE,
         "settings snapshots carry their revision")
 require(SOURCE,
         r"persist_current_locked.*?copy_current_settings\(&s_save_work,\s*&revision\).*?"
-        r"nvs_writer_run\(do_device_settings_save,\s*&s_save_work\).*?"
+        r"flash_executor_run\(do_device_settings_save,\s*&s_save_work\).*?"
         r"revision\s*==\s*s_settings_revision.*?if\s*\(stable\)\s*return ESP_OK",
         "a concurrent change causes the durable snapshot to be retried")
 require(MAINTENANCE_UI,

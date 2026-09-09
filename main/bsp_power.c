@@ -44,7 +44,7 @@
 #include "psram_task.h"
 #include "nvs_flash.h"
 #include "nvs.h"
-#include "nvs_writer.h"
+#include "flash_executor.h"
 #include "therapy_alert.h"
 #include "device_settings.h"
 
@@ -444,7 +444,7 @@ static const struct {
 #define BAT_ANCHOR_MAX_MV 4160
 static int s_full_charge_mv = 4160;
 
-/* NVS write callback — runs on the internal-stack nvs_writer task. */
+/* NVS write callback — runs on the internal-stack flash_executor task. */
 static esp_err_t do_save_bat_anchor(void *arg)
 {
     int mv = *(const int *)arg;
@@ -463,9 +463,9 @@ static esp_err_t do_save_bat_anchor(void *arg)
 static void bat_load_anchor(void)
 {
     nvs_handle_t h;
-    nvs_writer_lock();
+    flash_executor_lock();
     if (nvs_open(BAT_NVS_NS, NVS_READONLY, &h) != ESP_OK) {
-        nvs_writer_unlock();
+        flash_executor_unlock();
         return;
     }
     int32_t mv = 4200;
@@ -475,7 +475,7 @@ static void bat_load_anchor(void)
         ESP_LOGI(TAG, "battery: loaded full-charge anchor = %dmV from NVS", mv);
     }
     nvs_close(h);
-    nvs_writer_unlock();
+    flash_executor_unlock();
 }
 
 static int bat_mv_to_percent(int mv)
@@ -851,7 +851,7 @@ static void battery_monitor_task(void *arg)
                                 s_full_charge_mv = filtered_mv;
                                 ESP_LOGI(
                                     TAG, "battery: full-charge anchor = %dmV", s_full_charge_mv);
-                                nvs_writer_run(do_save_bat_anchor, &s_full_charge_mv);
+                                flash_executor_run(do_save_bat_anchor, &s_full_charge_mv);
                                 last_nvs_save = now;
                             }
                         }
@@ -877,7 +877,7 @@ esp_err_t bsp_power_battery_monitor_start(void)
         return ESP_OK; /* already running */
 
     bat_load_anchor();
-    nvs_writer_init();
+    flash_executor_init();
 
     s_bat_mutex = xSemaphoreCreateMutex();
     if (!s_bat_mutex)

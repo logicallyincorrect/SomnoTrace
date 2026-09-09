@@ -77,23 +77,23 @@ require(
 )
 require(
     SERVICE,
-    r"first_run_setup_load\(void\).*?nvs_writer_init\(\).*?"
-    r"nvs_writer_run\(do_load_nvs",
+    r"first_run_setup_load\(void\).*?flash_executor_init\(\).*?"
+    r"flash_executor_run\(do_load_nvs",
     "load initializes the proxy before any possible PSRAM-stack call",
 )
 require(
     SERVICE,
-    r"nvs_writer_run\(do_load_nvs,\s*&s_nvs_work\)",
+    r"flash_executor_run\(do_load_nvs,\s*&s_nvs_work\)",
     "loads run through the internal-stack NVS worker",
 )
 require(
     SERVICE,
-    r"nvs_writer_run\(do_save_nvs,\s*&s_nvs_work\)",
+    r"flash_executor_run\(do_save_nvs,\s*&s_nvs_work\)",
     "writes run through the internal-stack NVS worker",
 )
 require(
     SERVICE,
-    r"nvs_writer_run\(do_reset_nvs,\s*NULL\)",
+    r"flash_executor_run\(do_reset_nvs,\s*NULL\)",
     "reset runs through the internal-stack NVS worker",
 )
 
@@ -101,8 +101,8 @@ require(
 # setup-facing facts, reconcile only after storage and the pairing cache are
 # known, and publish that coherent state before touch services become live.
 require(MAIN, r'#include "first_run_setup\.h"', "boot includes setup service")
-assert MAIN.index("nvs_writer_init();") < MAIN.index("first_run_setup_load();"), (
-    "boot must initialise the NVS writer before loading first-run state"
+assert MAIN.index("flash_executor_init();") < MAIN.index("first_run_setup_load();"), (
+    "boot must initialise the flash executor before loading first-run state"
 )
 assert MAIN.index("first_run_setup_load();") < MAIN.index(
     "netprov_load_config(&cfg)"

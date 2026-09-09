@@ -71,7 +71,7 @@ void uploader_register_backend(const upload_backend_t *backend)
 extern const upload_backend_t smb_backend;
 extern const upload_backend_t sleephq_backend;
 
-/* Injected NVS-write executor (the app's internal-stack nvs_writer). */
+/* Injected NVS-write executor (the app's internal-stack flash_executor). */
 static uploader_nvs_exec_fn_t s_nvs_exec = NULL;
 
 /* ── Config load / save (NVS) ───────────────────────────────────────── */
@@ -156,7 +156,7 @@ esp_err_t uploader_load_config(uploader_config_t *cfg)
     cfg->ftp_anonymous = true;
     cfg->max_days = UPLOAD_DEFAULT_MAX_DAYS;
 
-    /* Use the injected NVS executor (nvs_writer_run) if available so the
+    /* Use the injected NVS executor (flash_executor_run) if available so the
      * read is serialized with all other NVS access.  Fall back to direct
      * access only before the executor is set (early boot, internal stack). */
     esp_err_t err =
@@ -284,7 +284,7 @@ esp_err_t uploader_save_config(const uploader_config_t *cfg)
         return ESP_ERR_INVALID_ARG;
 
     /* Delegate the flash write to the injected executor (internal-stack
-     * nvs_writer) so a caller on a PSRAM stack (httpd) is safe. Runs inline
+     * flash_executor) so a caller on a PSRAM stack (httpd) is safe. Runs inline
      * if no executor was injected (caller then has an internal stack). */
     esp_err_t ret = s_nvs_exec ? s_nvs_exec(do_uploader_save_config, (void *)cfg)
                                : do_uploader_save_config((void *)cfg);

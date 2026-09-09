@@ -24,7 +24,7 @@
 #include "device_settings.h"
 #include "bsp_display.h"
 #include "bsp_audio.h"
-#include "nvs_writer.h"
+#include "flash_executor.h"
 
 #include <string.h>
 #include "nvs_flash.h"
@@ -164,9 +164,9 @@ esp_err_t device_settings_load(device_settings_t *cfg)
     /* Clamp stale NVS values to current valid range */
 
     nvs_handle_t h;
-    nvs_writer_lock();
+    flash_executor_lock();
     if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &h) != ESP_OK) {
-        nvs_writer_unlock();
+        flash_executor_unlock();
         ESP_LOGI(TAG, "no device settings in NVS — using defaults");
         settings_lock();
         s_settings = *cfg;
@@ -239,7 +239,7 @@ esp_err_t device_settings_load(device_settings_t *cfg)
     }
 
     nvs_close(h);
-    nvs_writer_unlock();
+    flash_executor_unlock();
     settings_lock();
     s_settings = *cfg;
     s_settings_revision++;
@@ -302,7 +302,7 @@ static esp_err_t persist_current_locked(device_settings_t *persisted)
     for (;;) {
         uint32_t revision;
         copy_current_settings(&s_save_work, &revision);
-        esp_err_t ret = nvs_writer_run(do_device_settings_save, &s_save_work);
+        esp_err_t ret = flash_executor_run(do_device_settings_save, &s_save_work);
         if (ret != ESP_OK)
             return ret;
 

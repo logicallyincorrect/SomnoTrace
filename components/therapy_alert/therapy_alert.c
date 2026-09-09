@@ -306,7 +306,7 @@ esp_err_t therapy_alert_load_config(therapy_alert_config_t *cfg)
     if (!cfg)
         return ESP_ERR_INVALID_ARG;
 
-    /* Use the injected NVS executor (nvs_writer_run) if available so the
+    /* Use the injected NVS executor (flash_executor_run) if available so the
      * read is serialized with all other NVS access.  Fall back to direct
      * access only before the executor is set (early boot, internal stack). */
     esp_err_t err;

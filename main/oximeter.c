@@ -35,7 +35,7 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "nvs.h"
-#include "nvs_writer.h"
+#include "flash_executor.h"
 #include "psram_task.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -54,7 +54,7 @@ static void load_driver_type(void)
     /* Try NVS first */
     nvs_handle_t h;
     bool forgotten = false;
-    nvs_writer_lock();
+    flash_executor_lock();
     if (nvs_open(OX_NVS_NS, NVS_READONLY, &h) == ESP_OK) {
         uint8_t drv;
         uint8_t forgotten_value = 0;
@@ -63,7 +63,7 @@ static void load_driver_type(void)
             s_driver_type = (ox_driver_t)drv;
         nvs_close(h);
     }
-    nvs_writer_unlock();
+    flash_executor_unlock();
 
     /* Fall back to paired.json on SD */
     if (!forgotten && s_driver_type == OX_DRIVER_OXYII) {

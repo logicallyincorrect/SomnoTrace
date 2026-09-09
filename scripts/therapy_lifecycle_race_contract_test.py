@@ -85,23 +85,41 @@ worker = function_body(AS11, "notif_proc_task")
 assert worker.index("handle_notify(item.data, item.len)") \
        < worker.index("bsp_display_note_as11_notification_processed()")
 
-# OTA uses a separate cancellable maintenance gate. It never makes the live
-# therapy publisher wait, and both upload modes check it between flash steps.
+# OTA uses a separate cancellable maintenance gate. Upload flashing is
+# synchronous through ota_flash_session; URL work runs on a reclaimable PSRAM
+# stack. Both paths check cancellation before submitting flash writes and
+# around final image validation.
 upload = function_body(NET, "ota_upload_handler")
-flash = function_body(NET, "ota_flash_task")
 url_handler = function_body(NET, "ota_url_handler")
 url_task = function_body(NET, "ota_url_task")
 assert upload.index("bsp_display_try_begin_therapy_safe_maintenance()") \
-       < upload.index("xTaskCreate(ota_flash_task")
-assert flash.index("bsp_display_therapy_safe_maintenance_should_abort()") \
-       < flash.index("esp_ota_write(")
-assert "ctx->aborted_by_therapy = true" in flash
+       < upload.index("ota_flash_session_begin(")
+assert "ota_flash_task" not in NET
+assert "psram_task_create(" not in upload
+assert upload.index("ota_native_should_abort()") \
+       < upload.index("ota_flash_session_write(")
+assert upload.index("ota_native_should_abort()", upload.index("MAINT_OTA_VERIFY")) \
+       < upload.index("ota_flash_session_finish(") \
+       < upload.index("ota_native_should_abort()", upload.index("ota_flash_session_finish(")) \
+       < upload.index("ota_native_commit_begin()") \
+       < upload.index("ota_flash_session_select(")
 assert "therapy started; update cancelled" in upload
-assert upload.count("bsp_display_end_therapy_safe_maintenance()") >= 5
+assert upload.count("bsp_display_end_therapy_safe_maintenance()") >= 2
 assert url_handler.index("bsp_display_try_begin_therapy_safe_maintenance()") \
-       < url_handler.index("xTaskCreate(ota_url_task")
-assert url_task.index("ota_native_should_abort()") \
-       < url_task.index("esp_https_ota_perform(")
+       < url_handler.index("psram_task_create(")
+read_loop = url_task.index("while (true)")
+assert url_task.index("ota_native_should_abort()", read_loop) \
+       < url_task.index("esp_http_client_read(", read_loop) \
+       < url_task.index("ota_flash_session_write(", read_loop)
+assert "ota_flash_should_abort" in url_task[
+    url_task.index("ota_flash_session_write(", read_loop):
+    url_task.index("ota_progress_set_transfer", read_loop)
+]
+assert url_task.index("ota_native_should_abort()", url_task.index("MAINT_OTA_VERIFY")) \
+       < url_task.index("ota_flash_session_finish(") \
+       < url_task.index("ota_native_should_abort()", url_task.index("ota_flash_session_finish(")) \
+       < url_task.index("ota_native_commit_begin()") \
+       < url_task.index("ota_flash_session_select(")
 assert url_task.count("bsp_display_end_therapy_safe_maintenance()") >= 2
 assert url_task.index("bsp_display_end_therapy_safe_maintenance()") \
        < url_task.index("ota_schedule_reboot()")

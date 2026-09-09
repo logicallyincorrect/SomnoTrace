@@ -95,6 +95,8 @@ self_deleting = {
     ("net_provision.c", "rebuild_day_task"),
     ("net_provision.c", "format_sd_task"),
     ("net_provision.c", "netprov_dns_task"),
+    ("net_provision.c", "ota_url_task"),
+    ("net_provision.c", "ota_sd_task"),
     ("oximeter.c", "auto_pair_task"),
     ("oximeter_legacy.c", "pair_task"),
     ("oximeter_legacy.c", "pull_task"),
@@ -117,20 +119,18 @@ for filename, task_name in sorted(self_deleting):
             f"{filename}:{task_name} has no reclaiming self-delete path"
         )
 
-# OTA URL uses ordinary xTaskCreate and therefore self-deletes normally.  The
-# streamed flash worker is deliberately parent-joined: after publishing its
-# result it parks, and the owning HTTP task deletes it before freeing the
-# shared event group and buffers.
+# OTA network and SD workers use reclaimable PSRAM stacks. The upload route
+# streams synchronously through the retained flash executor and therefore
+# creates no per-upload flash task or cross-task context.
 ota_url = function_body(sources["net_provision.c"], "ota_url_task")
-assert "vTaskDelete(NULL)" in ota_url
-assert "psram_task_delete" not in ota_url
-
-ota_flash = function_body(sources["net_provision.c"], "ota_flash_task")
+ota_sd = function_body(sources["net_provision.c"], "ota_sd_task")
 ota_upload = function_body(sources["net_provision.c"], "ota_upload_handler")
-assert "vTaskSuspend(NULL)" in ota_flash
-assert "vTaskDelete(NULL)" not in ota_flash
-assert "vTaskDelete(flash_task)" in ota_upload
-assert "psram_task_delete" not in ota_flash
+assert "psram_task_delete(NULL)" in ota_url
+assert "psram_task_delete(NULL)" in ota_sd
+assert "ota_flash_task" not in sources["net_provision.c"]
+assert "ota_upload_context_create" not in sources["net_provision.c"]
+assert "psram_task_create(" not in ota_upload
+assert "ota_flash_session_write(" in ota_upload
 
 assert "psram_task_lifecycle_contract_test.py" in HOST_TEST
 

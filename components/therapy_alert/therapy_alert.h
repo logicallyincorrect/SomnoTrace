@@ -75,7 +75,7 @@ typedef enum {
 /* Beep function signature (matches bsp_audio_beep). */
 typedef esp_err_t (*alert_beep_fn_t)(int freq_hz, int duration_ms, uint8_t volume);
 
-/* NVS executor function signature (matches nvs_writer_run). */
+/* NVS executor function signature (matches flash_executor_run). */
 typedef esp_err_t (*alert_nvs_exec_fn_t)(esp_err_t (*fn)(void *), void *arg);
 
 /* Therapy-active checker (matches bsp_display_is_therapy_active). */

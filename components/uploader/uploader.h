@@ -216,7 +216,7 @@ esp_err_t uploader_save_config(const uploader_config_t *cfg);
  *
  * uploader_save_config() is reached from the httpd worker, which runs on a
  * PSRAM stack — a task with a PSRAM stack cannot itself perform a flash write.
- * The app injects an executor (its internal-stack nvs_writer) here; when set,
+ * The app injects an executor (its internal-stack flash_executor) here; when set,
  * uploader_save_config() runs its NVS write on that task instead of inline.
  * If never set, the write runs inline (safe when the caller has an internal
  * stack). The uploader component does not depend on the app, hence injection. */

@@ -103,7 +103,7 @@ bool first_run_setup_is_finished(const first_run_setup_state_t *state);
 /* Load the state from NVS. ESP_ERR_NVS_NOT_FOUND installs a fresh in-memory
  * state and is an expected result on a new device. Call this before update or
  * reconcile so an existing/future record can never be overwritten blindly.
- * All service I/O first initializes and then uses nvs_writer; it is safe for a
+ * All service I/O first initializes and then uses flash_executor; it is safe for a
  * caller whose task stack lives in PSRAM. */
 esp_err_t first_run_setup_load(void);
 

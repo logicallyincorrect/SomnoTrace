@@ -37,7 +37,7 @@
 #include "oximeter.h"
 #include "sd_storage.h"
 #include "session_writer.h"
-#include "nvs_writer.h"
+#include "flash_executor.h"
 #include "psram_task.h"
 #include "esp_system.h"
 #include "esp_app_desc.h"
@@ -322,13 +322,13 @@ void app_main(void)
     ESP_ERROR_CHECK(netprov_init());
 
     /* 4-pre. The first-run record must be loaded before any setup-facing
-     * service can accept input.  Start the internal-stack NVS proxy first and
+     * service can accept input. Start the internal-stack flash executor first and
      * inject it into components whose configuration probes run below. */
-    nvs_writer_init();
-    uploader_set_nvs_executor((uploader_nvs_exec_fn_t)nvs_writer_run);
+    flash_executor_init();
+    uploader_set_nvs_executor((uploader_nvs_exec_fn_t)flash_executor_run);
     uploader_set_invalidation_hooks(session_writer_next_upload_invalidation,
                                     session_writer_ack_upload_invalidation);
-    therapy_alert_set_nvs_executor((alert_nvs_exec_fn_t)nvs_writer_run);
+    therapy_alert_set_nvs_executor((alert_nvs_exec_fn_t)flash_executor_run);
 
     esp_err_t setup_load_ret = first_run_setup_load();
     if (setup_load_ret != ESP_OK && setup_load_ret != ESP_ERR_NVS_NOT_FOUND) {
@@ -610,7 +610,7 @@ void app_main(void)
         if (time_failed && !native_setup_active) {
             nvs_handle_t nvs_h;
             int boot_fail_count = 0;
-            nvs_writer_lock();
+            flash_executor_lock();
             if (nvs_open("cfg", NVS_READWRITE, &nvs_h) == ESP_OK) {
                 nvs_get_i32(nvs_h, "boot_fail", (int32_t *)&boot_fail_count);
                 boot_fail_count++;
@@ -618,18 +618,18 @@ void app_main(void)
                 nvs_commit(nvs_h);
                 nvs_close(nvs_h);
             }
-            nvs_writer_unlock();
+            flash_executor_unlock();
 
             if (boot_fail_count >= 3) {
                 ESP_LOGW(TAG,
                          "3+ consecutive boot failures — entering SoftAP for user intervention");
-                nvs_writer_lock();
+                flash_executor_lock();
                 if (nvs_open("cfg", NVS_READWRITE, &nvs_h) == ESP_OK) {
                     nvs_set_i32(nvs_h, "boot_fail", 0);
                     nvs_commit(nvs_h);
                     nvs_close(nvs_h);
                 }
-                nvs_writer_unlock();
+                flash_executor_unlock();
                 if (enter_softap(&cfg)) {
                     in_softap = true;
                     softap_start_ticks = xTaskGetTickCount();
@@ -672,25 +672,25 @@ void app_main(void)
     } else {
         /* Degraded mode — reset boot failure counter. */
         nvs_handle_t nvs_h;
-        nvs_writer_lock();
+        flash_executor_lock();
         if (nvs_open("cfg", NVS_READWRITE, &nvs_h) == ESP_OK) {
             nvs_set_i32(nvs_h, "boot_fail", 0);
             nvs_commit(nvs_h);
             nvs_close(nvs_h);
         }
-        nvs_writer_unlock();
+        flash_executor_unlock();
     }
 
     /* ── Reset boot failure counter on a fully successful boot ─── */
     if (wifi_connected && ntp_ok && !degraded_mode) {
         nvs_handle_t nvs_h;
-        nvs_writer_lock();
+        flash_executor_lock();
         if (nvs_open("cfg", NVS_READWRITE, &nvs_h) == ESP_OK) {
             nvs_set_i32(nvs_h, "boot_fail", 0);
             nvs_commit(nvs_h);
             nvs_close(nvs_h);
         }
-        nvs_writer_unlock();
+        flash_executor_unlock();
     }
 
     /* ── Normal boot continuation (Wi-Fi connected or degraded mode) ─── */

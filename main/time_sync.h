@@ -109,7 +109,7 @@ bool time_sync_peek_drift_snapshot(time_drift_snapshot_t *out);
  * degraded-mode fallback.  Called at session stop when clock_drift_valid.
  * drift_ms: NTP_epoch_ms - AS11_epoch_ms (positive = AS11 is behind).
  * measured_at_ms: NTP epoch ms when the drift was measured.
- * Safe to call from PSRAM-stack tasks (delegates to nvs_writer). */
+ * Safe to call from PSRAM-stack tasks (delegates to flash_executor). */
 void time_sync_save_drift(int64_t drift_ms, int64_t measured_at_ms);
 
 /* Attempt to recover time without NTP by combining the AS11 BLE clock
